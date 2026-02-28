@@ -1,103 +1,123 @@
 # Agent Customer Service - 智能电商客服系统
 
-## 核心设计
+## 环境要求
 
-```
-用户消息
-  → 保存消息(DB)
-    → 智能分析(LLM/关键词兜底) → 场景 + 意图 + 情绪
-      → 知识检索(商品/活动/FAQ，支持手动选择)
-        → 多轮上下文(最近10条历史)
-          → 提示词组装 + LLM生成(失败则规则引擎兜底)
-            → 工具选择 + 推理过程构建
-              → 返回前端(回复 + 卡片 + 推理链)
-```
-
-**双引擎降级**：LLM 不可用时自动切换关键词规则引擎，系统永远可用。
-
-## 功能模块
-
-| 模块 | 功能 | 状态 |
+| 工具 | 版本 | 必须 |
 |------|------|:----:|
-| **对话中心** | 多会话管理、AI 智能回复、推理过程可视化、多轮上下文 | ✅ 真实 |
-| **知识中心** | 商品/活动/FAQ 知识管理与检索 | ✅ 真实 |
-| **知识中心** | 行业知识/解决方案管理 | 📋 模拟 |
-| **场景配置** | 意图/提示词/规则管理 | 📋 模拟 |
+| Java | JDK 17+ | ✅ |
+| Maven | 3.8+ | ✅ |
+| MySQL | 8.0+ | ✅ |
+| Node.js | 18+ | ✅ |
+| pnpm | 8+ | ✅ |
+| Redis | 6.0+ | 可选（项目内置降级） |
 
-> ✅ 真实 = 接入对话链路，📋 模拟 = CRUD 可用但未接入对话链路，预留扩展
-
-## 技术栈
-
-**后端**：Spring Boot 3.4.5 + JPA + MySQL 8 + Redis + Druid | **前端**：Vue 3.5 + Element Plus + Vite + Pinia + TypeScript | **LLM**：OneRouter (OpenAI 兼容)
-
-## 快速开始
-
-### 1. 数据库
+## 第一步：创建数据库
 
 ```sql
 CREATE DATABASE agent_customer_service DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-> JPA `ddl-auto: update`，启动自动建表，无需手动。
+> 无需手动建表，JPA 配置了 `ddl-auto: update`，后端启动时自动创建全部 10 张业务表。
 
-### 2. 后端
+## 第二步：配置后端
 
 ```bash
 cd backend
+
+# 复制示例配置文件
 cp src/main/resources/application-local.yml.example src/main/resources/application-local.yml
-# 编辑 application-local.yml，填入 MySQL 密码和 LLM API Key
+```
+
+编辑 `application-local.yml`，填入你的配置：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/agent_customer_service?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 你的MySQL密码               # ← 必填
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:                            # ← 如有密码则填入，无密码留空即可
+
+# LLM 大模型配置（可选，不配也能正常对话，走规则引擎兜底）
+llm:
+  enabled: true                            # ← 改为 true 启用大模型
+  api-url: https://api.onerouter.top/v1/chat/completions
+  api-key: 你的API_Key                     # ← 从 https://onerouter.top 注册获取
+  model: gpt-4o-mini
+```
+
+> `application-local.yml` 已被 `.gitignore` 排除，不会上传到 GitHub。
+
+## 第三步：启动后端
+
+```bash
+cd backend
+mvn clean compile -DskipTests
 mvn spring-boot:run
 ```
 
-验证：访问 `http://localhost:10002/api/knowledge/overview` 返回 JSON 即成功。
+或在 IDE 中直接运行 `Application.java` 主类。
 
-### 3. 前端
+**验证后端**：
+
+```bash
+curl http://localhost:10002/api/knowledge/overview
+```
+
+返回 JSON 数据即表示后端启动成功：
+
+```json
+{"code":200,"data":{"productCount":5,"activityCount":3,"faqCount":5,"industryCount":3,"solutionCount":3}}
+```
+
+## 第四步：启动前端
 
 ```bash
 cd frontend
+
+# 安装依赖
 pnpm install
+
+# 启动开发服务器
 pnpm dev
 ```
 
-验证：浏览器访问后，左侧菜单「智能客服」→ 对话中心 / 知识中心 / 场景配置。
+开发环境已配置代理，`/api` 请求自动转发到 `http://localhost:10002`。
 
-## 项目结构
+**验证前端**：
 
+浏览器访问后登录系统，左侧菜单「智能客服」下有三个子菜单：
+
+- **对话中心** → 发送消息测试 AI 回复
+- **知识中心** → 查看/新增知识数据
+- **场景配置** → 查看意图/提示词/规则配置
+
+## 常见问题
+
+### Q：后端启动报 `Communications link failure`
+
+MySQL 连接失败。检查：MySQL 是否启动、端口是否 3306、密码是否正确。
+
+### Q：对话只返回固定文案，LLM 没生效
+
+`llm.enabled` 为 false 或 API Key 无效。在 `application-local.yml` 中设置 `llm.enabled: true` 并填入有效 Key。
+
+> 即使 LLM 不可用，系统也能正常对话——会自动降级为关键词规则引擎。
+
+### Q：`pnpm: command not found`
+
+```bash
+npm install -g pnpm
 ```
-backend/src/main/java/com/anjing/
-├── module/chat/          # 对话中心（ChatService 8步链路 + LlmService）
-├── module/knowledge/     # 知识中心（5类知识 CRUD）
-├── module/scene/         # 场景配置（意图/提示词/规则）
-├── config/               # CORS、Redis、JPA、Druid 等配置
-└── model/                # 统一响应、异常、常量
 
-frontend/src/views/customer-service/
-├── chat/                 # 对话中心（四栏布局）
-├── knowledge/            # 知识中心（5个Tab）
-└── scene/                # 场景配置（3个Tab）
-```
+### Q：Redis 没装，影响启动吗？
 
-## API 接口
-
-| 模块 | 接口 | 说明 |
-|------|------|------|
-| 对话 | `POST /api/chat/session/create` | 创建会话 |
-| 对话 | `POST /api/chat/message/send` | 发送消息（核心链路） |
-| 知识 | `POST /api/knowledge/{type}/list` | 查询知识列表 |
-| 知识 | `POST /api/knowledge/{type}/save` | 新增/编辑知识 |
-| 场景 | `POST /api/scene/{type}/list` | 查询配置列表 |
-| 场景 | `POST /api/scene/prompt/test` | 测试提示词（真实调 LLM） |
-
-## 环境变量
-
-| 变量 | 说明 |
-|------|------|
-| `DB_PASSWORD` | MySQL 密码 |
-| `LLM_ENABLED` | 是否启用 LLM（默认 false） |
-| `LLM_API_KEY` | LLM API Key |
-| `LLM_MODEL` | 模型名（默认 gpt-4o-mini） |
-
-> 完整配置见 `application-local.yml.example`
+不影响。项目内置了 Redis 不可用时的本地锁降级，核心功能正常运行。
 
 ## License
 
