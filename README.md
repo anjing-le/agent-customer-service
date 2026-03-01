@@ -67,7 +67,7 @@ llm:
 
 ```bash
 cd backend
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 看到以下日志说明启动成功：
