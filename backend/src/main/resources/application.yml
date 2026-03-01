@@ -14,13 +14,13 @@ spring:
   
   # 环境配置
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active:
   
   # 数据源配置
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/agent_customer_service?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.alibaba.druid.pool.DruidDataSource
     
@@ -65,7 +65,7 @@ spring:
         url-pattern: "/druid/*"
         # 控制台管理用户名和密码
         login-username: ${DRUID_USERNAME:admin}
-        login-password: ${DRUID_PASSWORD:admin}
+        login-password: ${DRUID_PASSWORD:admin123}
       filter:
         stat:
           enabled: true
@@ -81,13 +81,15 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
-        format_sql: false
+        format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
-        show_sql: false
-        use_sql_comments: false
+        # 显示SQL参数绑定
+        show_sql: true
+        use_sql_comments: true
+        # 统计信息
         generate_statistics: false
   
   # Redis配置
@@ -119,14 +121,13 @@ spring:
 logging:
   level:
     root: INFO
-    com.anjing: INFO
+    com.anjing: DEBUG
     org.springframework.web: INFO
-    # Hibernate SQL日志（演示环境关闭，避免刷屏）
-    org.hibernate.SQL: WARN
-    org.hibernate.type.descriptor.sql.BasicBinder: WARN
-    org.hibernate.orm.jdbc.bind: WARN
+    # Hibernate SQL日志（开发环境）
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     # Spring Data JPA日志
-    org.springframework.data.jpa: INFO
+    org.springframework.data.jpa: DEBUG
     # 抑制JPA Named Query查找日志（抑制 "Did not find named query" 信息）
     org.springframework.data.jpa.repository.query.NamedQuery: ERROR
     org.springframework.data.jpa.repository.query.QueryEnhancerFactory: WARN
