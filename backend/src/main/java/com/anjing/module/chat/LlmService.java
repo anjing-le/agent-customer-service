@@ -18,7 +18,7 @@ import java.util.*;
 @Service
 public class LlmService {
 
-    @Value("${llm.api-url:https://api.onerouter.top/v1/chat/completions}")
+    @Value("${llm.api-url:https://llm.onerouter.pro/v1/chat/completions}")
     private String apiUrl;
 
     @Value("${llm.api-key:}")

@@ -3,6 +3,7 @@
  * 路径与后端 ChatController (ApiConstants.Chat) 完全对齐
  */
 import request from '@/utils/http'
+import { ApiPaths } from '@/api/apiPaths'
 
 // ==================== 会话管理 ====================
 
@@ -12,7 +13,7 @@ import request from '@/utils/http'
  */
 export function fetchCreateSession(data: { userId: string; userName?: string; channel?: string }) {
   return request.post<any>({
-    url: '/api/chat/session/create',
+    url: ApiPaths.chat.createSession,
     data
   })
 }
@@ -23,7 +24,7 @@ export function fetchCreateSession(data: { userId: string; userName?: string; ch
  */
 export function fetchGetSessionList(data?: { userId?: string; status?: string }) {
   return request.post<any[]>({
-    url: '/api/chat/session/list',
+    url: ApiPaths.chat.listSessions,
     data: data || {}
   })
 }
@@ -34,7 +35,7 @@ export function fetchGetSessionList(data?: { userId?: string; status?: string })
  */
 export function fetchGetSessionDetail(sessionId: string) {
   return request.post<any>({
-    url: '/api/chat/session/get',
+    url: ApiPaths.chat.getSession,
     data: { sessionId }
   })
 }
@@ -45,7 +46,7 @@ export function fetchGetSessionDetail(sessionId: string) {
  */
 export function fetchDeleteSession(sessionId: string) {
   return request.post<void>({
-    url: '/api/chat/session/delete',
+    url: ApiPaths.chat.deleteSession,
     data: { sessionId }
   })
 }
@@ -58,7 +59,7 @@ export function fetchDeleteSession(sessionId: string) {
  */
 export function fetchSendMessage(data: { sessionId: string; content: string; contentType?: string; extra?: Record<string, any> }) {
   return request.post<any>({
-    url: '/api/chat/message/send',
+    url: ApiPaths.chat.sendMessage,
     data
   })
 }
@@ -69,7 +70,7 @@ export function fetchSendMessage(data: { sessionId: string; content: string; con
  */
 export function fetchGetMessageList(data: { sessionId: string; page?: number; size?: number }) {
   return request.post<any[]>({
-    url: '/api/chat/message/list',
+    url: ApiPaths.chat.listMessages,
     data
   })
 }
@@ -87,7 +88,7 @@ export function fetchUpdateContext(data: {
   userProfile?: Record<string, any>
 }) {
   return request.post<void>({
-    url: '/api/chat/context/update',
+    url: ApiPaths.chat.updateContext,
     data
   })
 }
@@ -98,7 +99,7 @@ export function fetchUpdateContext(data: {
  */
 export function fetchGetContext(sessionId: string) {
   return request.post<any>({
-    url: '/api/chat/context/get',
+    url: ApiPaths.chat.getContext,
     data: { sessionId }
   })
 }

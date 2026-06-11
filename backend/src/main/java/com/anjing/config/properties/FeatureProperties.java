@@ -214,7 +214,7 @@ public class FeatureProperties {
         public static class KafkaConfig {
             private boolean enabled = false;
             private String bootstrapServers = "localhost:9092";
-            private String groupId = "agent-dev-scaffolding";
+            private String groupId = "agent-customer-service";
         }
 
         @Data

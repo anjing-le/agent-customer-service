@@ -1,5 +1,5 @@
-# 🚀 Agent Dev Scaffolding 配置文件
-# 企业级Spring Boot脚手架 - 条件化配置版本
+# agent-customer-service 配置文件
+# 可靠智能客服后端 - 条件化配置版本
 
 # 基础配置
 server:
@@ -166,7 +166,7 @@ anjing:
 # LLM 配置（OneRouter 统一网关）
 llm:
   enabled: ${LLM_ENABLED:false}
-  api-url: ${LLM_API_URL:https://api.onerouter.top/v1/chat/completions}
+  api-url: ${LLM_API_URL:https://llm.onerouter.pro/v1/chat/completions}
   api-key: ${LLM_API_KEY:}
   model: ${LLM_MODEL:gpt-4o-mini}
 
@@ -218,7 +218,7 @@ app:
       kafka:
         enabled: false                # 是否启用Kafka
         bootstrap-servers: localhost:9092
-        group-id: agent-dev-scaffolding
+        group-id: agent-customer-service
       
       # MinIO对象存储
       minio:
@@ -243,4 +243,3 @@ app:
       enable-performance: true        # 是否启用性能监控
       enable-health-check: true       # 是否启用健康检查
       enable-metrics: true            # 是否启用指标收集
-

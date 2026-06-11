@@ -1,99 +1,28 @@
-# Agent Customer Service - 智能电商客服系统
+# agent-customer-service
 
-> LLM 大模型 + 知识库检索 + 规则兜底，双引擎架构保证系统永远可用。
+可靠智能客服项目，聚焦多轮对话、RAG 检索增强、规则兜底、防幻觉、会话管理和历史记录。
 
-## 环境要求
+## 当前边界
 
-| 环境 | 版本 | 必须 |
-|------|------|:----:|
-| JDK | 17+ | ✅ |
-| Maven | 3.8+ | ✅ |
-| Node.js | 18+ | ✅ |
-| pnpm | 8+ | ✅ |
-| MySQL | 8.0+ | ✅ |
-| Redis | 6.0+ | 可选（项目内置降级） |
+- 对话中心：`/api/chat/**`，会话、消息、多轮上下文、LLM/规则回复、推理过程。
+- 知识中心：`/api/knowledge/**`，商品、活动、FAQ 参与当前对话检索。
+- 场景配置：`/api/scene/**`，Intent/Prompt/Rule 管理与 Prompt 测试，暂未接入对话主链路。
 
-## 1. 克隆项目
+机器可读契约见 [contracts/service-boundaries.json](./contracts/service-boundaries.json)。
 
-```bash
-git clone git@github.com:anjing-le/agent-customer-service.git
-cd agent-customer-service
-```
+## 技术栈
 
-## 2. 创建数据库
+- Frontend: Vue 3.5 + TypeScript + Vite 7 + Element Plus
+- Backend: Spring Boot 3.4.5 + Java 17 + JPA
+- Storage: MySQL 8；Redis/Redisson 可选
+- LLM: OneRouter / OpenAI-compatible Chat Completions
 
-```sql
-CREATE DATABASE agent_customer_service DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-表结构由 JPA 自动创建（`ddl-auto: update`），无需手动建表。
-
-## 3. 配置后端
-
-```bash
-cp backend/src/main/resources/application-local.yml.example \
-   backend/src/main/resources/application-local.yml
-```
-
-编辑 `application-local.yml`，填入以下配置：
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/agent_customer_service?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: your_mysql_password        # 改成你的 MySQL 密码
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password:                          # 如有密码则填入，无密码留空
-
-# LLM 大模型配置（可选，不配也能正常对话，走规则引擎兜底）
-llm:
-  enabled: true                          # 改为 true 启用大模型
-  api-url: https://api.onerouter.top/v1/chat/completions
-  api-key: your_api_key                  # OneRouter API Key
-  model: gpt-4o-mini
-```
-
-**API Key 获取方式：**
-- OneRouter API Key：https://onerouter.pro
-
-> `application-local.yml` 已被 `.gitignore` 排除，不会上传到 GitHub。
-
-## 4. 启动后端
+## 快速开始
 
 ```bash
 cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run
 ```
-
-看到以下日志说明启动成功：
-
-```
-========== 智能客服系统启动完成 ==========
-端口: 10002
-数据库: agent_customer_service
-LLM: enabled
-```
-
-后端运行在 http://localhost:10002
-
-**命令行验证：**
-
-```bash
-curl http://localhost:10002/api/knowledge/overview
-```
-
-返回 JSON 数据即成功：
-
-```json
-{"code":200,"data":{"productCount":5,"activityCount":3,"faqCount":5,"industryCount":3,"solutionCount":3}}
-```
-
-## 5. 启动前端
 
 ```bash
 cd frontend
@@ -101,41 +30,26 @@ pnpm install
 pnpm dev
 ```
 
-前端运行在 http://localhost:3100，API 请求自动代理到后端。
+后端默认端口 `10002`，前端默认端口 `20002`。本地敏感配置放在 `backend/src/main/resources/application-local.yml`，该文件已被 ignore，不应提交。
 
-## 6. 验证
-
-### 方式一：命令行验证
+## 质量门禁
 
 ```bash
-# 创建会话
-curl -X POST http://localhost:10002/api/chat/session/create \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "test", "userName": "测试用户", "channel": "web"}'
-
-# 用返回的 sessionId 发送消息
-curl -X POST http://localhost:10002/api/chat/message/send \
-  -H "Content-Type: application/json" \
-  -d '{"sessionId": "返回的sessionId", "content": "最近有什么优惠活动吗？"}'
+./scripts/check-template.sh
+./scripts/check-contracts.sh
+./scripts/quality-gate.sh
 ```
 
-### 方式二：前端验证
+## 文档
 
-1. 打开浏览器，登录进入系统
-2. 左侧菜单「智能客服」→ **对话中心**
-3. 点击「新建会话」，输入"最近有什么优惠活动吗？"
-4. 观察 AI 回复 + 右下角推理过程展示
+- [项目约束](./project_document/PROJECT_CONSTRAINTS.md)
+- [API 契约](./project_document/API_CONTRACT_GUIDE.md)
+- [服务边界](./project_document/SERVICE_BOUNDARY_GUIDE.md)
+- [领域模型](./project_document/DOMAIN_MODEL.md)
+- [路线图](./project_document/ROADMAP.md)
+- [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)
+- [教学文档](./docs/teaching/00-环境准备与运行.md)
 
-## 常见问题
+## License
 
-| 问题 | 解决方案 |
-|------|---------|
-| 数据库连接失败 `Communications link failure` | 确认 MySQL 已启动，端口 3306，密码正确 |
-| 对话只返回固定文案，LLM 没生效 | `llm.enabled` 设为 true 并填入有效 API Key |
-| `pnpm: command not found` | 执行 `npm install -g pnpm` |
-| Redis 连接失败 | 不影响核心功能，项目内置本地锁降级 |
-| 前端 API 404 | 确保后端在 10002 端口运行 |
-
-## 许可证
-
-本项目仅供教学和学习使用。
+MIT

@@ -22,7 +22,7 @@
 /** 基础 API 响应结构 */
 export interface BaseResponse<T = unknown> {
   /** 状态码 */
-  code: number
+  code: number | string
   /** 消息（兼容 msg 和 message 两种字段名） */
   msg: string
   message?: string
@@ -36,4 +36,12 @@ export interface PaginatedResponse<T = unknown> {
   total: number
   page: number
   size: number
+}
+
+/** 通用列表查询参数 */
+export interface CommonSearchParams {
+  current?: number
+  page?: number
+  size?: number
+  keyword?: string
 }

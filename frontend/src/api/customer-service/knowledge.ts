@@ -3,6 +3,7 @@
  * 路径与后端 KnowledgeController (ApiConstants.Knowledge) 完全对齐
  */
 import request from '@/utils/http'
+import { ApiPaths } from '@/api/apiPaths'
 
 // ==================== 知识总览 ====================
 
@@ -12,7 +13,7 @@ import request from '@/utils/http'
  */
 export function fetchGetOverview() {
   return request.post<any>({
-    url: '/api/knowledge/overview',
+    url: ApiPaths.knowledge.overview,
     data: {}
   })
 }
@@ -21,35 +22,35 @@ export function fetchGetOverview() {
 
 export function fetchListProducts(data?: { keyword?: string; category?: string; status?: string; page?: number; size?: number }) {
   return request.post<any>({
-    url: '/api/knowledge/product/list',
+    url: ApiPaths.knowledge.productList,
     data: data || {}
   })
 }
 
 export function fetchCreateProduct(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/product/create',
+    url: ApiPaths.knowledge.productCreate,
     data
   })
 }
 
 export function fetchUpdateProduct(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/product/update',
+    url: ApiPaths.knowledge.productUpdate,
     data
   })
 }
 
 export function fetchDeleteProduct(id: number) {
   return request.post<void>({
-    url: '/api/knowledge/product/delete',
+    url: ApiPaths.knowledge.productDelete,
     data: { id }
   })
 }
 
 export function fetchGetProductDetail(id: number) {
   return request.post<any>({
-    url: '/api/knowledge/product/detail',
+    url: ApiPaths.knowledge.productDetail,
     data: { id }
   })
 }
@@ -58,35 +59,35 @@ export function fetchGetProductDetail(id: number) {
 
 export function fetchListActivities(data?: { keyword?: string; activityType?: string; status?: string; page?: number; size?: number }) {
   return request.post<any>({
-    url: '/api/knowledge/activity/list',
+    url: ApiPaths.knowledge.activityList,
     data: data || {}
   })
 }
 
 export function fetchCreateActivity(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/activity/create',
+    url: ApiPaths.knowledge.activityCreate,
     data
   })
 }
 
 export function fetchUpdateActivity(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/activity/update',
+    url: ApiPaths.knowledge.activityUpdate,
     data
   })
 }
 
 export function fetchDeleteActivity(id: number) {
   return request.post<void>({
-    url: '/api/knowledge/activity/delete',
+    url: ApiPaths.knowledge.activityDelete,
     data: { id }
   })
 }
 
 export function fetchGetActivityDetail(id: number) {
   return request.post<any>({
-    url: '/api/knowledge/activity/detail',
+    url: ApiPaths.knowledge.activityDetail,
     data: { id }
   })
 }
@@ -95,35 +96,35 @@ export function fetchGetActivityDetail(id: number) {
 
 export function fetchListFaqs(data?: { keyword?: string; category?: string; status?: string; page?: number; size?: number }) {
   return request.post<any>({
-    url: '/api/knowledge/faq/list',
+    url: ApiPaths.knowledge.faqList,
     data: data || {}
   })
 }
 
 export function fetchCreateFaq(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/faq/create',
+    url: ApiPaths.knowledge.faqCreate,
     data
   })
 }
 
 export function fetchUpdateFaq(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/faq/update',
+    url: ApiPaths.knowledge.faqUpdate,
     data
   })
 }
 
 export function fetchDeleteFaq(id: number) {
   return request.post<void>({
-    url: '/api/knowledge/faq/delete',
+    url: ApiPaths.knowledge.faqDelete,
     data: { id }
   })
 }
 
 export function fetchGetFaqDetail(id: number) {
   return request.post<any>({
-    url: '/api/knowledge/faq/detail',
+    url: ApiPaths.knowledge.faqDetail,
     data: { id }
   })
 }
@@ -132,28 +133,28 @@ export function fetchGetFaqDetail(id: number) {
 
 export function fetchListIndustries(data?: { keyword?: string; industryType?: string; status?: string; page?: number; size?: number }) {
   return request.post<any>({
-    url: '/api/knowledge/industry/list',
+    url: ApiPaths.knowledge.industryList,
     data: data || {}
   })
 }
 
 export function fetchCreateIndustry(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/industry/create',
+    url: ApiPaths.knowledge.industryCreate,
     data
   })
 }
 
 export function fetchUpdateIndustry(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/industry/update',
+    url: ApiPaths.knowledge.industryUpdate,
     data
   })
 }
 
 export function fetchDeleteIndustry(id: number) {
   return request.post<void>({
-    url: '/api/knowledge/industry/delete',
+    url: ApiPaths.knowledge.industryDelete,
     data: { id }
   })
 }
@@ -162,35 +163,35 @@ export function fetchDeleteIndustry(id: number) {
 
 export function fetchListSolutions(data?: { keyword?: string; sceneType?: string; status?: string; page?: number; size?: number }) {
   return request.post<any>({
-    url: '/api/knowledge/solution/list',
+    url: ApiPaths.knowledge.solutionList,
     data: data || {}
   })
 }
 
 export function fetchCreateSolution(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/solution/create',
+    url: ApiPaths.knowledge.solutionCreate,
     data
   })
 }
 
 export function fetchUpdateSolution(data: any) {
   return request.post<any>({
-    url: '/api/knowledge/solution/update',
+    url: ApiPaths.knowledge.solutionUpdate,
     data
   })
 }
 
 export function fetchDeleteSolution(id: number) {
   return request.post<void>({
-    url: '/api/knowledge/solution/delete',
+    url: ApiPaths.knowledge.solutionDelete,
     data: { id }
   })
 }
 
 export function fetchGetSolutionDetail(id: number) {
   return request.post<any>({
-    url: '/api/knowledge/solution/detail',
+    url: ApiPaths.knowledge.solutionDetail,
     data: { id }
   })
 }
@@ -199,14 +200,14 @@ export function fetchGetSolutionDetail(id: number) {
 
 export function fetchVectorize(data: { knowledgeType: string; knowledgeId: number }) {
   return request.post<any>({
-    url: '/api/knowledge/vectorize',
+    url: ApiPaths.knowledge.vectorize,
     data
   })
 }
 
 export function fetchGetVectorizeStatus(taskId: string) {
   return request.post<any>({
-    url: '/api/knowledge/vectorize/status',
+    url: ApiPaths.knowledge.vectorizeStatus,
     data: { taskId }
   })
 }
@@ -215,21 +216,21 @@ export function fetchGetVectorizeStatus(taskId: string) {
 
 export function fetchImportProducts(data: { knowledgeType: string; fileUrl: string }) {
   return request.post<any>({
-    url: '/api/knowledge/product/import',
+    url: ApiPaths.knowledge.productImport,
     data
   })
 }
 
 export function fetchExportProducts(data: { knowledgeType: string; ids?: number[] }) {
   return request.post<any>({
-    url: '/api/knowledge/product/export',
+    url: ApiPaths.knowledge.productExport,
     data
   })
 }
 
 export function fetchImportFaqs(data: { knowledgeType: string; fileUrl: string }) {
   return request.post<any>({
-    url: '/api/knowledge/faq/import',
+    url: ApiPaths.knowledge.faqImport,
     data
   })
 }

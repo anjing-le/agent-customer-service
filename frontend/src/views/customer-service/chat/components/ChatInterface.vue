@@ -154,7 +154,8 @@ const scrollToBottom = () => {
 }
 
 // 按下回车发送
-const handleKeydown = (e: KeyboardEvent) => {
+const handleKeydown = (e: Event | KeyboardEvent) => {
+  if (!(e instanceof KeyboardEvent)) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     sendMessage()
@@ -438,4 +439,3 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 </style>
-

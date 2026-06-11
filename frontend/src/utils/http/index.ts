@@ -84,10 +84,13 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse<BaseResponse>) => {
     const { code, msg, message } = response.data
+    const normalizedCode = String(code)
     const responseMsg = msg || message || ''
-    if (code === ApiStatus.success || code === 0) return response
-    if (code === ApiStatus.unauthorized) handleUnauthorizedError(responseMsg)
-    throw createHttpError(responseMsg || $t('httpMsg.requestFailed'), code)
+    if (code === ApiStatus.success || normalizedCode === '0') return response
+    if (code === ApiStatus.unauthorized || normalizedCode === String(ApiStatus.unauthorized)) {
+      handleUnauthorizedError(responseMsg)
+    }
+    throw createHttpError(responseMsg || $t('httpMsg.requestFailed'), normalizeErrorCode(code))
   },
   (error) => {
     if (error.response?.status === ApiStatus.unauthorized) handleUnauthorizedError()
@@ -98,6 +101,12 @@ axiosInstance.interceptors.response.use(
 /** 统一创建HttpError */
 function createHttpError(message: string, code: number) {
   return new HttpError(message, code)
+}
+
+/** 统一错误码类型，兼容后端字符串响应码 */
+function normalizeErrorCode(code: number | string) {
+  const numericCode = Number(code)
+  return Number.isNaN(numericCode) ? ApiStatus.error : numericCode
 }
 
 /** 处理401错误（带防抖） */

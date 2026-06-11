@@ -26,6 +26,8 @@
 import { MenuThemeEnum, SystemThemeEnum } from '@/enums/appEnum'
 import { LocationQueryRaw } from 'vue-router'
 
+export type UserInfo = Api.Auth.UserInfo
+
 // 系统主题样式（light | dark）
 export interface SystemThemeType {
   /** 主题类名 */

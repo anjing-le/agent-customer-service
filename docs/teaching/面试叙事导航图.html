@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面试叙事导航图 — 智能电商客服系统</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #232733;
+  --surface3: #2a2e3b;
+  --border: #333849;
+  --text: #e4e6ed;
+  --text2: #9ba1b0;
+  --text3: #6b7280;
+  --accent: #6c8cff;
+  --accent2: #818cf8;
+  --accent-glow: rgba(108,140,255,0.12);
+  --green: #34d399;
+  --green-bg: rgba(52,211,153,0.08);
+  --orange: #fb923c;
+  --orange-bg: rgba(251,146,60,0.08);
+  --red: #f87171;
+  --red-bg: rgba(248,113,113,0.08);
+  --purple: #a78bfa;
+  --purple-bg: rgba(167,139,250,0.08);
+  --yellow: #fbbf24;
+  --yellow-bg: rgba(251,191,36,0.08);
+  --cyan: #22d3ee;
+  --cyan-bg: rgba(34,211,238,0.08);
+  --pink: #f472b6;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Top Navigation ===== */
+.top-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(15,17,23,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-brand {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-brand .icon { font-size: 24px; }
+
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.nav-tab {
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+  transition: var(--transition);
+  border: none;
+  background: none;
+  white-space: nowrap;
+}
+
+.nav-tab:hover { color: var(--text); background: var(--surface2); }
+.nav-tab.active { color: #fff; background: var(--accent); }
+
+.nav-hint {
+  font-size: 13px;
+  color: var(--text3);
+}
+
+/* ===== Layout ===== */
+.app { display: flex; margin-top: 64px; }
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px 0;
+  z-index: 50;
+  transition: transform 0.3s ease;
+}
+
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sidebar-section {
+  padding: 8px 16px;
+  margin-bottom: 4px;
+}
+
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 7px 16px;
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 13px;
+  border-radius: 6px;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.sidebar-link:hover { background: var(--surface2); color: var(--text); }
+.sidebar-link.active { background: var(--accent-glow); color: var(--accent); }
+
+/* Main */
+.main {
+  margin-left: 260px;
+  flex: 1;
+  padding: 40px 48px 120px;
+  max-width: 960px;
+}
+
+/* ===== Tab Panels ===== */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ===== Sections ===== */
+.section {
+  margin-bottom: 56px;
+  animation: fadeUp 0.4s ease;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.section-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.section-header .subtitle {
+  font-size: 14px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+  transition: var(--transition);
+}
+
+.card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(108,140,255,0.08);
+}
+
+.card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.label-recommend { background: var(--green-bg); color: var(--green); }
+.label-alt { background: var(--purple-bg); color: var(--purple); }
+.label-alt2 { background: var(--orange-bg); color: var(--orange); }
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quote {
+  background: var(--surface2);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 16px 20px;
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.8;
+  margin: 12px 0;
+}
+
+.quote-note {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text2);
+  font-style: italic;
+}
+
+/* ===== Tree Path ===== */
+.tree-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.tree-node {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tree-arrow { color: var(--text3); font-size: 18px; }
+
+/* ===== Table ===== */
+.table-wrap {
+  overflow-x: auto;
+  margin: 16px 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+thead { background: var(--surface2); }
+
+th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+td {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tr:hover td { background: var(--surface2); }
+
+/* ===== Deep Dive (Collapsible) ===== */
+.deep-dive {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.deep-dive:hover { border-color: rgba(108,140,255,0.3); }
+
+.dd-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition);
+}
+
+.dd-header:hover { background: var(--surface2); }
+
+.dd-num {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dd-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dd-toggle {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  font-size: 14px;
+  color: var(--text3);
+}
+
+.deep-dive.open .dd-toggle { transform: rotate(180deg); color: var(--accent); }
+
+.dd-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+
+.deep-dive.open .dd-body { max-height: 5000px; }
+
+.dd-content { padding: 0 24px 24px; }
+
+.dd-block {
+  margin-bottom: 20px;
+}
+
+.dd-block-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dd-block p, .dd-block .quote {
+  font-size: 14px;
+}
+
+.dd-block p {
+  color: var(--text2);
+  line-height: 1.8;
+}
+
+.qa-item {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-bottom: 8px;
+}
+
+.qa-q {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--orange);
+  margin-bottom: 6px;
+}
+
+.qa-a {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+
+/* ===== Thunder Guide ===== */
+.thunder-table {
+  width: 100%;
+}
+
+.thunder-bad {
+  color: var(--red);
+  font-weight: 500;
+}
+
+.thunder-good {
+  color: var(--green);
+}
+
+.template-card {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.template-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.template-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.8;
+}
+
+/* ===== Story Pack ===== */
+.story-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.story-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.difficulty-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--red-bg);
+  color: var(--red);
+  margin-bottom: 12px;
+}
+
+.star-note {
+  background: var(--yellow-bg);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--yellow);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.star-note .star { font-size: 16px; flex-shrink: 0; }
+
+/* ===== Key Point Highlight ===== */
+.key-point {
+  background: linear-gradient(135deg, rgba(108,140,255,0.08), rgba(167,139,250,0.08));
+  border: 1px solid rgba(108,140,255,0.2);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 20px 0;
+}
+
+.key-point-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+/* ===== Future Direction Cards ===== */
+.direction-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.direction-card {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  border-left: 3px solid;
+}
+
+.direction-card.nlp { border-left-color: var(--accent); }
+.direction-card.se { border-left-color: var(--green); }
+.direction-card.db { border-left-color: var(--purple); }
+
+.direction-label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.intro-banner {
+  background: linear-gradient(135deg, var(--surface), var(--surface2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.intro-banner::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(108,140,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.intro-banner h1 {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.intro-banner .intro-sub {
+  color: var(--text2);
+  font-size: 15px;
+  margin-bottom: 20px;
+}
+
+.intro-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.intro-tag {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--accent-glow);
+  color: var(--accent);
+  border: 1px solid rgba(108,140,255,0.15);
+}
+
+/* ===== Expand All Button ===== */
+.expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-bottom: 16px;
+}
+
+.expand-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===== Back to Top ===== */
+.back-top {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: var(--transition);
+  z-index: 90;
+  border: none;
+}
+
+.back-top.show { opacity: 1; transform: translateY(0); }
+.back-top:hover { background: var(--accent2); transform: translateY(-2px); }
+
+/* ===== Responsive ===== */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 24px 16px 80px; }
+  .nav-hint { display: none; }
+  .top-nav { padding: 0 16px; }
+  .tree-path { gap: 4px; }
+  .tree-node { padding: 6px 10px; font-size: 12px; }
+}
+
+/* ===== Mobile Tab Bar ===== */
+@media (max-width: 600px) {
+  .nav-tabs { gap: 2px; padding: 3px; }
+  .nav-tab { padding: 6px 12px; font-size: 13px; }
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav class="top-nav">
+  <div class="nav-brand">
+    <span class="icon">🗺️</span>
+    <span>面试叙事导航图</span>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('grad')">🎓 复试面试版</button>
+    <button class="nav-tab" onclick="switchTab('job')">💼 求职面试版</button>
+  </div>
+  <span class="nav-hint">智能电商客服系统</span>
+</nav>
+
+<div class="app">
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <!-- Filled by JS based on active tab -->
+</aside>
+
+<!-- Main Content -->
+<main class="main">
+
+<!-- ============================================================ -->
+<!--                   TAB 1: 复试面试版                           -->
+<!-- ============================================================ -->
+<div class="tab-panel active" id="panel-grad">
+
+<div class="intro-banner">
+  <h1>🎓 复试面试版</h1>
+  <p class="intro-sub">目标：打动导师的心 — 展现好奇心、研究深度、学术探究精神与动手能力</p>
+  <div class="intro-tags">
+    <span class="intro-tag">3种开场锚点</span>
+    <span class="intro-tag">3条主线路径</span>
+    <span class="intro-tag">8个深潜知识点</span>
+    <span class="intro-tag">防雷指南</span>
+    <span class="intro-tag">故事线自洽包</span>
+  </div>
+</div>
+
+<!-- Section 1: 开场锚点 -->
+<div class="section" id="g-anchor">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--green-bg);color:var(--green);">🎤</div>
+    <div>
+      <h2>开场锚点</h2>
+      <div class="subtitle">30秒，一句话抓住注意力</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="card-label label-recommend">⭐ 推荐</span>
+    <div class="card-title">风格A：痛点驱动型</div>
+    <div class="quote">
+      我自己网购比较多，经常遇到客服机器人只会回固定话术——你问"有什么优惠"，它回你一大段不相关的模板。我就想，能不能做一个真正"懂"客户问题的客服？于是做了这个智能电商客服系统，用大模型理解意图、用知识库约束回答、用规则引擎做降级兜底。
+      <div class="quote-note">老师喜欢有好奇心的学生。"发现问题→产生疑问→动手解决"的链条自然不做作。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="card-label label-alt">备选</span>
+    <div class="card-title">风格B：技术好奇型</div>
+    <div class="quote">
+      大模型直接用在客服场景有几个问题——幻觉会编造信息、API 不稳定会超时。我就想能不能做一个"大模型+知识库+规则兜底"的三层架构？做了这个电商客服系统，从意图识别到知识检索到双引擎降级，把整条链路都跑通了。
+      <div class="quote-note">直接点出行业痛点，展示对技术趋势的了解。适合面对偏工程导向的导师。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="card-label label-alt2">备选</span>
+    <div class="card-title">风格C：对比思考型</div>
+    <div class="quote">
+      一个比喻——普通客服机器人像背课文，固定话术匹配关键词。我做的像请了个聪明顾问——先理解你想干什么，再查知识库找答案，最后组织语言回答。而且大模型挂了还能自动切到规则引擎，保证服务不中断。
+      <div class="quote-note">生活化比喻让任何背景的老师都能秒懂。"背课文 vs 聪明顾问"的对比很直观。</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: 主线路径 -->
+<div class="section" id="g-paths">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--accent-glow);color:var(--accent);">🌳</div>
+    <div>
+      <h2>主线路径</h2>
+      <div class="subtitle">三条路线，根据问题灵活切入</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线A：从"解决了什么真实问题"出发</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："介绍一下你的项目" / "这个项目做什么的"</p>
+    <div class="tree-path">
+      <span class="tree-node">① 我的方案</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">② 双引擎设计</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">③ 8步流水线</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">④ 推理可视化</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 扩展方向</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官心理</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 我的方案</strong></td><td>把大模型和知识库结合，让 AI 基于真实数据回答问题</td><td>思路清晰，知道 LLM 不能裸用</td></tr>
+          <tr><td><strong>② 双引擎设计</strong></td><td>大模型 API 随时可能挂，做了双引擎——LLM 挂了自动切关键词规则引擎</td><td>有工程意识，知道系统要可靠</td></tr>
+          <tr><td><strong>③ 8步流水线</strong></td><td>一条消息进来要走 8 步：保存→分析意图→检索知识→生成回复→...，像工厂流水线</td><td>看得出做得比较深入，不是随便套了个 API</td></tr>
+          <tr><td><strong>④ 推理可视化</strong></td><td>每次对话的推理过程都透明展示，用户能看到 AI 是怎么思考的</td><td>有可解释性意识，这在 AI 研究中很重要</td></tr>
+          <tr><td><strong>⑤ 扩展方向</strong></td><td>知识表预留了 vectorized 字段，为后续接入向量数据库做语义检索做准备</td><td>有技术规划能力，不只是做了当下的功能</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线B：从"双引擎降级设计"出发</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："你觉得最有挑战的部分是什么" / "遇到的难点"</p>
+    <div class="tree-path">
+      <span class="tree-node">① 问题严重性</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">② 降级方案</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">③ 技术实现</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">④ 可观测性</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 引申思考</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官心理</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 问题严重性</strong></td><td>大模型 API 有三个不稳定因素：网络超时、限流、Key过期。任何一个都会让用户等半天</td><td>有问题分析的习惯，不是遇到问题就绕开</td></tr>
+          <tr><td><strong>② 降级方案</strong></td><td>两个降级点：分析阶段LLM挂了走关键词识别，回复阶段LLM挂了走模板拼接</td><td>方案有层次，不是一个简单的 if-else</td></tr>
+          <tr><td><strong>③ 技术实现</strong></td><td>所有 LLM 调用都 catch 异常返回 null，调用方通过 null 判断走哪个引擎</td><td>代码层面考虑得很细</td></tr>
+          <tr><td><strong>④ 可观测性</strong></td><td>日志里标注了分析引擎=LLM还是关键词，回复引擎=LLM还是规则，方便排查</td><td>有运维意识，知道线上系统需要可观测</td></tr>
+          <tr><td><strong>⑤ 引申思考</strong></td><td>这让我意识到，做 AI 应用和做传统应用最大的区别就是"不确定性管理"</td><td>能从具体问题抽象出一般性认知，有研究潜力</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线C：从"AI + 传统工程的融合"出发</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："你对大模型/AI有什么看法" / "为什么选这个方向"</p>
+    <div class="tree-path">
+      <span class="tree-node">① AI裸用问题</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">② 知识约束</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">③ 工程化考量</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">④ 温度选择</span>
+      <span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 学到什么</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官心理</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① AI裸用问题</strong></td><td>大模型最大的问题是幻觉——它会一本正经地编造信息。客服场景下这是致命的</td><td>对 AI 局限性有认识，不是盲目追捧</td></tr>
+          <tr><td><strong>② 知识约束</strong></td><td>用知识检索来约束——先从数据库找到真实数据，注入提示词让 AI 基于事实回答</td><td>了解 RAG 的基本思想</td></tr>
+          <tr><td><strong>③ 工程化考量</strong></td><td>光有 AI 不够，还需要事务管理、异常处理、分层架构、连接池这些传统工程能力</td><td>技术视野比较全面</td></tr>
+          <tr><td><strong>④ 温度选择</strong></td><td>分析意图用 temperature 0.1 要确定性，生成回复用 0.7 要创造性——同一个模型不同任务参数不同</td><td>对模型参数有理解，不是黑盒调用</td></tr>
+          <tr><td><strong>⑤ 学到什么</strong></td><td>AI 应用的本质是"用确定性工程包裹不确定性模型"——这也是我想继续深入研究的方向</td><td>有提炼、有方向感，适合做研究</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: 深潜知识点 -->
+<div class="section" id="g-deep">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--purple-bg);color:var(--purple);">🔬</div>
+    <div>
+      <h2>深潜知识点</h2>
+      <div class="subtitle">每个概念三层递进：比喻秒懂 → 技术准确 → 个人思考</div>
+    </div>
+  </div>
+
+  <button class="expand-btn" onclick="toggleAllDeepDives('panel-grad')">
+    <span>📂</span> 全部展开 / 收起
+  </button>
+
+  <div class="deep-dive" id="g-dd-1">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--accent-glow);color:var(--accent);">1</div>
+      <div class="dd-title">意图识别（LLM vs 规则引擎）</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>想象你开了一家餐厅，门口站了两个迎宾。第一个是一个特别聪明但偶尔迟到的人（LLM），他一看客人的表情和穿着就知道"这位想吃商务套餐"。第二个是一个很靠谱但比较死板的人（规则引擎），他只会看客人手里拿的菜单牌——牌上写"商务"就带去商务区。正常情况聪明迎宾上班就用他，他迟到了就让靠谱迎宾顶上，客人不能在门口站着。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>意图识别就是搞清楚用户"想干什么"。LLM 路径是把用户消息连同 Prompt 发给大模型，要求返回结构化 JSON（场景、意图编码、置信度、情绪），temperature 设 0.1 保证确定性。规则路径用 containsAny() 做关键词匹配——消息里包含"优惠、打折、促销"就判定为"商品优惠查询"意图，覆盖 5 种核心意图和 30+ 情绪关键词。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"我一开始觉得有了大模型还要什么关键词匹配，后来 API 超时了一次就想明白了——生产系统不能有单点故障。关键词匹配虽然笨，但它快、稳定、不花钱。这就是工程里常说的'优雅降级'——能用好的就用好的，好的不行就用能用的。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: LLM 做意图识别和传统分类模型（比如 BERT）比有什么优劣？</div>
+          <div class="qa-a">LLM 优势是零标注数据、理解能力强，劣势是延迟高、成本高、输出不完全可控。BERT 分类器准确率更高更稳定，但需要大量标注数据训练。真正上生产可能 BERT 做主力、LLM 做兜底。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 你的关键词列表怎么确定的？覆盖率够吗？</div>
+          <div class="qa-a">根据电商最常见的 5 类场景手动梳理。覆盖率不完美，没匹配上的统一归为"通用咨询"。提升方案：从真实对话日志统计高频词动态补充，或从数据库表加载——cs_scene_intent 表已经建好了。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-2">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--green-bg);color:var(--green);">2</div>
+      <div class="dd-title">双引擎降级 / 容错设计</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>就像高速公路和国道的关系。正常情况走高速（LLM），又快体验又好。但高速可能封路（API 超时）、限行（限流）、收费站坏了（Key 过期）。这时候导航自动切到国道（规则引擎），虽然慢点、景色差点，但目的地一样能到。关键是——切换过程对乘客（用户）是无感的。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>系统有两个降级切换点。分析阶段：LlmService.analyzeUserInput() 失败返回 null，ChatService 切到三个 fallback 方法（场景、意图、情绪各一个）做关键词匹配。回复阶段：LlmService.generateReply() 失败返回 null，切到规则引擎做模板拼接。所有 LLM 调用套 try-catch，任何异常吞掉返回 null，降级由调用方控制。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"双引擎的核心不是'两套代码'，而是'一个承诺'——不管后面怎么出错，用户永远能得到一个回复。最好的容错设计是用户感知不到容错在发生。日志里标注了用的哪个引擎，但用户界面上看不出区别。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 降级后回复质量差了怎么办？</div>
+          <div class="qa-a">有总比没有好。规则引擎回复的是标准话术，信息准确度反而更高。还可以加"引擎标识"——降级模式自动追加"如需进一步帮助请联系人工客服"，把期望管理好。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 除了返回 null，还有什么降级策略？</div>
+          <div class="qa-a">超时降级——设 3 秒阈值，超了就切换。熔断器模式——连续 5 次失败直接跳过 LLM 一段时间。Spring Cloud 的 Resilience4j 可以做。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-3">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--orange-bg);color:var(--orange);">3</div>
+      <div class="dd-title">知识检索（关键词匹配 vs 语义检索）</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>去图书馆找书。关键词匹配就像翻卡片目录——找"运动鞋"就一张张翻有没有这三个字。语义检索就像问一个读过全馆书的图书管理员——你说"跑步穿的舒服的鞋"，虽然你没说"运动鞋"，但他懂你的意思。我目前用的是翻卡片，但每张卡片上预留了"管理员读书笔记"的位置（vectorized 字段），以后可以升级。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>采用关键词子串匹配算法 calculateMatchScore()：先做单字符命中统计，再做 2-6 字符连续子串匹配（连续子串权重更高），归一化到 [0,1]，阈值 0.3 以上才算命中，取 Top 3。检索优先级：前端手动选择(score=0.99) > 自动匹配商品 > 自动匹配活动 > FAQ 匹配。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"关键词匹配是有意识的选择。核心目标是展示'大模型+知识库'的架构思路，不是做一个完美的搜索引擎。先用简单方案跑通全链路，预留升级接口——这是'先让它 work，再让它 work better'的原则。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 关键词匹配有什么缺陷？举个例子？</div>
+          <div class="qa-a">不理解语义。用户问"有没有适合送女朋友的礼物"，匹配不到任何商品名，但"香水""丝巾"可能都是好推荐。语义检索能理解"送女朋友"和"礼品类商品"的语义关联。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 如果要升级成语义检索怎么做？</div>
+          <div class="qa-a">三步：① 用 Embedding 模型把知识库描述转成向量存到向量数据库；② 用户消息也转向量做余弦相似度匹配；③ 结果同样注入提示词。vectorized 字段就是为这个预留的。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-4">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--cyan-bg);color:var(--cyan);">4</div>
+      <div class="dd-title">多轮对话与上下文管理</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>打电话给客服，第一个问题"你们有什么运动鞋？"，第二个问题"那它多少钱？"。如果每次不同客服接（单轮），第二个客服不知道"它"是什么。多轮对话就是让同一个客服一直在线，他记得你之前问了什么。但记忆力有限——最多记最近 10 条消息，太早的忘了，不然脑子装不下（Token 超限）。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>通过数据库 + LLM messages 数组实现。每条消息存入 cs_chat_message 表，带 sessionId 做会话隔离。生成回复前从数据库取同 session 最近 10 条历史消息，注入到 messages 数组：[system 提示词, ...历史消息, 当前 user 消息]，这是 OpenAI Chat Completions API 的标准多轮格式。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"多轮对话看起来简单但要权衡很多。传多少条？多了 Token 贵、延迟大；少了上下文不够。我选 10 条——客服场景一般几轮就解决了。用数据库存历史而不是内存——用户关页面再打开，历史记录还在。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 10 条够不够？怎么确定的？</div>
+          <div class="qa-a">经验值。电商客服通常 3-5 轮解决问题，10 条覆盖 2-3 个连续话题。更科学的方法是统计真实对话轮次分布。也可以做动态窗口——超阈值时做摘要压缩。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 指代消解怎么处理？</div>
+          <div class="qa-a">目前靠 LLM 自身理解——历史消息有上下文，大部分情况能推断。更好方案是加实体追踪模块，记住当前对话核心实体，后续轮次自动关联。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-5">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--yellow-bg);color:var(--yellow);">5</div>
+      <div class="dd-title">Prompt Engineering（系统提示词设计）</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>你招了一个超级聪明的实习生（大模型），但他刚来什么都不了解。你写了一份"岗位说明书"（System Prompt），上面写着角色、规矩、什么能说什么不能说。然后每次有客户来，再给他一张"速查小纸条"（增强提示词）——客户在问优惠、心情不太好、相关商品信息……有了说明书+小纸条，实习生就能给出靠谱回答了。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>系统提示词分两层。基础层是 SYSTEM_PROMPT 常量，定义角色和 6 条行为规则。增强层是 buildEnhancedPrompt() 动态拼接：当前场景类型、用户意图、用户情绪（负面追加安抚指令）、检索到的知识。两次 LLM 调用的 Prompt 完全不同：分析用 Prompt 要求输出 JSON，生成回复用 Prompt 要求输出自然语言。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"Prompt 工程看起来是'写作文'，其实更像'写合同'——每个条款写清楚，不然对方（模型）会按自己理解来。比如写了'返回纯 JSON'，有些模型还是包 markdown 代码块，代码里要额外处理。好的 Prompt 不只是'写出来'，还要反复测试调整。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 提示词迭代了几版？</div>
+          <div class="qa-a">最初只有角色设定，LLM 常跑题编造。加了"基于知识回答"减少幻觉。又加了情绪判断和安抚指令。最终 6 条规则+动态上下文，迭代了 4-5 版。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: Few-shot 和 Zero-shot 区别？你用的哪种？</div>
+          <div class="qa-a">Zero-shot 直接告诉模型做什么不给示例；Few-shot 给几个输入-输出示例。目前用 Zero-shot，分析任务简单模型能理解。复杂场景可改 Few-shot 提高格式稳定性。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-6">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--red-bg);color:var(--red);">6</div>
+      <div class="dd-title">LLM 幻觉问题与知识约束</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>大模型就像一个记忆力超强但有时分不清"记住的"和"脑补的"的人。你问"这双鞋打几折"，他可能自信地说"打七折"——但根本没有这个折扣，是他编的。解决办法是给他一张 cheat sheet（小抄）——把真实折扣写上递给他，告诉他"只能按纸上的信息回答"。这就是知识检索+注入提示词在做的事。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>幻觉（Hallucination）是大模型生成看似合理但事实不正确内容的现象。项目通过 RAG 简化版缓解：先从数据库检索真实数据，通过 buildKnowledgeText() 格式化为结构化文本，注入系统提示词的"参考知识"部分，并明确要求"基于提供的知识信息回答，禁止编造不存在的商品和活动"。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"幻觉本质是因为 LLM 是概率模型——不是在'查询事实'，是在'预测最可能的下一个词'。知识注入相当于给概率分布加了一个先验约束——提示词里有了真实数据，模型大概率基于这些数据回答。但不是 100% 有效，极端情况模型还可能无视约束。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 除了知识注入，还有什么方法减少幻觉？</div>
+          <div class="qa-a">降低 temperature 让输出更确定；加后处理校验——生成后检查商品名、价格是否真实存在；用 RLHF 微调模型让它更守规矩（超出项目范围）。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 怎么验证知识约束是有效的？</div>
+          <div class="qa-a">对比测试——有无知识注入的回复对比；推理可视化——前端展示命中了哪些数据，人工核实回复是否与数据一致。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-7">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:rgba(244,114,182,0.08);color:var(--pink);">7</div>
+      <div class="dd-title">Temperature 参数在不同场景的选择</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>Temperature 就像创作的"自由度旋钮"。调到最低（0-0.2），大模型像严谨的会计——1+1 永远是 2，不会创新也不会出错。调到中间（0.5-0.8），像文案写手——同一主题写出不同版本，有创意又不离谱。调到最高（1.5+），像喝了酒的诗人——可能蹦出天才灵感，也可能胡言乱语。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>Temperature 控制 softmax 函数的输出概率分布。值越低概率集中在最高概率 token，输出越确定；值越高概率越分散，输出越随机。项目两次调用用不同温度：analyzeUserInput() 用 0.1（稳定 JSON 输出），generateReply() 用 0.7（自然多样的回复）。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"temperature 选择本质是'准确性'和'多样性'的权衡。意图分析像选择题，答案应该确定，用低温度。生成回复像写作文，同一意思可以多种表达，用适中温度。没有'最佳值'，取决于场景，要实际测试。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: temperature 0 和 0.1 有区别吗？</div>
+          <div class="qa-a">0 理论上每次输出完全一样，但 OpenAI 说实际不保证完全确定性。0.1 基本也高度确定，留一点点灵活性。实际效果差别很小。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 负面情绪时 temperature 要不要调？</div>
+          <div class="qa-a">有意思的想法。负面场景需要更谨慎回复，可以调低到 0.4-0.5 减少"说错话"风险。目前没做动态调整，但确实是有价值的优化方向。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="g-dd-8">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--accent-glow);color:var(--accent);">8</div>
+      <div class="dd-title">对话系统的评估方法</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>评估客服好不好，像评一家餐厅。不能只看"有没有上菜"（系统有没有回复），还要看"菜品对不对"（回答准确吗）、"上菜快不快"（响应延迟）、"服务态度好不好"（语气友好吗）、"推荐对的菜没"（意图识别正确吗）。最重要的是——客人吃完会不会再来（用户满意度）。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>评估维度：意图识别准确率、知识检索召回率和精确率、回复相关性和流畅性、响应延迟、用户满意度。项目通过日志记录每次对话的分析引擎类型、意图结果、知识检索命中数和匹配分数、回复引擎类型。前端推理过程可视化支持人工审查。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"评估是 AI 对话系统最难的部分之一。传统软件有'标准答案'，但 AI 回复没有唯一正确答案。所以自动化指标+人工评估都必不可少。推理过程可视化就是为人工审查设计的——评估者看到 AI 每步决策，判断'这步做对了没'。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 如果让你设计评测方案怎么做？</div>
+          <div class="qa-a">三层：① 自动化——100 条标注测试用例跑意图准确率；② 半自动化——系统回答后人工打 1-5 分；③ 用户调研——上线后收集评分反馈。还可以 A/B 测试——LLM vs 规则引擎对比满意度。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 你有跑过什么评测吗？</div>
+          <div class="qa-a">测试了双引擎降级——关闭 LLM 验证系统正常走规则引擎。也测试了不同类型问题的意图识别。系统化大规模评测还没做，是后续方向。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Section 4: 防雷指南 -->
+<div class="section" id="g-thunder">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--red-bg);color:var(--red);">⚡</div>
+    <div>
+      <h2>防雷指南</h2>
+      <div class="subtitle">避开雷区，自然表达</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⛔ 绝对不能说的话</div>
+    <div class="table-wrap">
+      <table class="thunder-table">
+        <thead><tr><th>雷区表达</th><th>替代说法</th></tr></thead>
+        <tbody>
+          <tr><td class="thunder-bad">"这个是培训班做的"</td><td class="thunder-good">"这是我在学习 AI 应用开发时自己做的项目"</td></tr>
+          <tr><td class="thunder-bad">"这个是跟着视频敲的"</td><td class="thunder-good">"我参考了一些开源项目和技术文档的思路，然后根据自己的理解设计和实现的"</td></tr>
+          <tr><td class="thunder-bad">"代码是 AI 生成的"</td><td class="thunder-good">"我在开发过程中会用 AI 工具辅助编码和查阅文档，但架构设计和核心逻辑都是自己思考的"</td></tr>
+          <tr><td class="thunder-bad">"这个我不太懂"</td><td class="thunder-good">"这部分我了解基本原理，但还没深入研究，我的初步想法是……"</td></tr>
+          <tr><td class="thunder-bad">"这个功能比较简单"</td><td class="thunder-good">"这个功能实现起来不复杂，但设计上考虑了 xxx"</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔍 背诵感 → 自然感</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>背诵感表达</th><th>自然替代</th></tr></thead>
+        <tbody>
+          <tr><td>"本项目采用了双引擎架构设计模式"</td><td>"我做了两套方案——LLM 能用就用 LLM，LLM 挂了就切到关键词匹配"</td></tr>
+          <tr><td>"系统实现了基于 RAG 的知识增强生成"</td><td>"先从数据库把相关的商品信息找出来，塞到提示词里让 AI 参考着回答"</td></tr>
+          <tr><td>"通过 @Transactional 注解保证事务一致性"</td><td>"用 Spring 的事务管理保证——用户消息和 AI 回复要么都存进数据库，要么都不存"</td></tr>
+          <tr><td>"前端采用 MVVM 架构的 Vue 3 框架"</td><td>"前端用的 Vue 3，组件化开发，数据变了界面自动更新"</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="star-note">
+      <span class="star">⭐</span>
+      <span>核心原则：用"跟朋友解释"的语气，而不是"背课文"的语气。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚠️ 高频陷阱题应对</div>
+    <div class="qa-item">
+      <div class="qa-q">"你这个和市面上的客服机器人有什么区别？"</div>
+      <div class="qa-a">"市面上的客服机器人大多分两种：一种是纯规则的，智能程度有限；一种是直接套 LLM API 的 Demo，没有知识约束容易幻觉，也没有降级方案。我的项目想探索的是'两者结合'——LLM 提供语义理解能力，知识库提供事实约束，规则引擎提供可靠性兜底。而且我特别注重了可观测性——推理过程完全可视化。"</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q">"知识检索用关键词匹配是不是太简单了？"</div>
+      <div class="qa-a">"这是一个有意识的设计决策。项目的核心目标是展示'大模型+知识库'的架构思路——完整链路。先用简单的关键词匹配跑通全链路，同时在每张知识表上预留了 vectorized 字段，为后续升级做好了准备。这其实是工程中'先让它 work，再让它 work better'的原则。"</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q">"双引擎降级会不会让回复质量变差？"</div>
+      <div class="qa-a">"降级后确实会从自然语言变成模板话术，但信息准确度反而更高——规则引擎回复的是预设的标准话术。而且有总比没有好，用户等 10 秒看到报错和等 2 秒拿到一个标准回复，体验差很多。还可以在降级模式自动追加'如需进一步帮助请联系人工客服'，把期望管理好。"</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🤷 被问到不会的怎么办</div>
+    <div class="template-card">
+      <div class="template-label">模板1：知道概念但没实现</div>
+      <div class="template-text">"双引擎降级我了解原理——LLM 挂了就切到规则引擎。我项目里实现了这个，架构上两个降级点都做了。如果要加熔断器模式，思路是 Resilience4j 的 CircuitBreaker，具体配置我还没深入研究。"</div>
+    </div>
+    <div class="template-card">
+      <div class="template-label">模板2：完全陌生的概念</div>
+      <div class="template-text">"这个概念我还没有深入了解过，但从字面理解...（试着推理）。这个方向我后续可以去深入学习一下。"</div>
+    </div>
+    <div class="template-card">
+      <div class="template-label">模板3：知道名词但记不清细节</div>
+      <div class="template-text">"这块我之前看过一些资料，核心思路是...（说你记得的部分）。具体的技术细节我可能需要再查一下才能说准确。"</div>
+    </div>
+    <div class="star-note">
+      <span class="star">⭐</span>
+      <span>不会不可怕，瞎编才可怕。老师最讨厌的是明明不懂却装懂。</span>
+    </div>
+  </div>
+</div>
+
+<!-- Section 5: 故事线自洽包 -->
+<div class="section" id="g-story">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--yellow-bg);color:var(--yellow);">📖</div>
+    <div>
+      <h2>故事线自洽包</h2>
+      <div class="subtitle">让你的故事逻辑自洽、真实可信</div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">🎯 为什么选客服方向？</div>
+    <div class="quote">"其实起因挺朴素的。我自己网购比较多，经常遇到客服机器人只会回固定话术的情况——你问一句'有什么优惠'，它回你一大段不相关的模板。后来 ChatGPT 出来之后，我就想试试，能不能做一个真正'懂'客户问题的客服。电商客服场景还有个好处——需求明确、知识边界清晰（就是那些商品和活动数据），特别适合练手大模型应用。"</div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">🔧 遇到的真实挑战</div>
+    <div class="difficulty-tag">挑战 1：8 步流水线的设计</div>
+    <div class="quote">"一开始我想的是'接到消息→调 LLM→返回回复'，三步完事。但做着做着发现不行——LLM 回复质量取决于你给它什么信息。所以我加了意图分析、知识检索、上下文构建这些步骤。最终变成了 8 步，每一步的输出是下一步的输入。"</div>
+    <div class="difficulty-tag">挑战 2：LLM 返回 JSON 的不确定性</div>
+    <div class="quote">"让 LLM 返回结构化 JSON 比想象中难。有时候它会在 JSON 外面包一层 markdown 代码块，有时候字段名大小写不一致。我在代码里写了好几层解析逻辑——先去掉 markdown 包裹，再做 JSON parse，parse 失败就返回 null 走兜底。"</div>
+    <div class="difficulty-tag">挑战 3：关键词匹配算法的调优</div>
+    <div class="quote">"最初用的是简单的 contains() 判断，太粗糙——用户输入'运动鞋推荐'会匹配到所有包含'运'字的商品。后来改成连续子串匹配+加权，连续匹配'运动鞋'三个字的得分远高于只匹配到一个'运'字的。还加了 0.3 阈值过滤低相关结果。"</div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">💡 "双引擎"这个设计是怎么想到的？</div>
+    <div class="quote">"有次在本地调试的时候，LLM API 突然超时了，大概等了 10 秒页面才报错。我当时就想——如果这是上线了的系统呢？用户等 10 秒看到报错，体验直接崩了。然后我想到了'优雅降级'——LLM 的备选方案是什么？就是传统的关键词规则引擎。虽然没有 LLM 那么智能，但起码能给用户一个有用的回复。所以我就设计了双引擎——LLM 是主引擎、规则是备引擎，切换过程对用户无感。"</div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">🤝 被问"这代码是你写的吗"？</div>
+    <div class="quote">"是我独立开发的。当然开发过程中我会参考技术文档和开源项目的实现思路，也会用 AI 工具帮我查文档和排 Bug。但架构设计——比如为什么做双引擎、为什么用 8 步流水线、知识检索的优先级怎么定——这些是我自己思考的。代码里每个设计决策我都能讲清楚为什么这么做。"</div>
+    <div class="star-note">
+      <span class="star">⭐</span>
+      <span>坦诚但自信。承认参考了资料是正常的，重要的是你能说清楚为什么这样做、遇到了什么问题、怎么解决的。</span>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">🔮 未来想法（关联读研方向）</div>
+    <div class="direction-cards">
+      <div class="direction-card nlp">
+        <div class="direction-label" style="color:var(--accent);">NLP / 对话系统方向</div>
+        <p style="font-size:14px;color:var(--text2);">"做这个项目让我对对话系统特别感兴趣。一方面是技术层面——怎么让 AI 更准确地理解用户意图、怎么减少幻觉、怎么在多轮对话中维持上下文；另一方面是工程层面——大模型应用和传统软件工程的结合还有很多课题。如果有机会读研，我希望在自然语言处理或对话系统方向继续深入。"</p>
+      </div>
+      <div class="direction-card se">
+        <div class="direction-label" style="color:var(--green);">软件工程方向</div>
+        <p style="font-size:14px;color:var(--text2);">"这个项目让我对 AI 工程化有了切身体会。AI 应用和传统软件最大的区别是'不确定性管理'——怎么保证模型输出的可靠性。如果读研，我想从软件工程视角研究 AI 系统的可靠性和可测试性。"</p>
+      </div>
+      <div class="direction-card db">
+        <div class="direction-label" style="color:var(--purple);">知识增强 / RAG 方向</div>
+        <p style="font-size:14px;color:var(--text2);">"知识约束的 LLM 输出、检索优化、评估方法，这些方向我特别感兴趣。如果有机会读研，我想在知识增强的对话生成、对话系统的可控性和评估方法方面做更深入的探索。"</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end panel-grad -->
+
+<!-- ============================================================ -->
+<!--                   TAB 2: 求职面试版                           -->
+<!-- ============================================================ -->
+<div class="tab-panel" id="panel-job">
+
+<div class="intro-banner">
+  <h1>💼 求职面试版</h1>
+  <p class="intro-sub">目标：展现工程实力 — 工程能力、问题解决、系统设计、基础扎实</p>
+  <div class="intro-tags">
+    <span class="intro-tag">3种开场锚点</span>
+    <span class="intro-tag">4条主线路径</span>
+    <span class="intro-tag">7个工程深潜</span>
+    <span class="intro-tag">防雷指南+</span>
+    <span class="intro-tag">故事线自洽包</span>
+  </div>
+</div>
+
+<!-- Section 1: 开场锚点 -->
+<div class="section" id="j-anchor">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--green-bg);color:var(--green);">🎤</div>
+    <div>
+      <h2>开场锚点</h2>
+      <div class="subtitle">30秒，用"解决什么问题"切入</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="card-label label-recommend">⭐ 推荐</span>
+    <div class="card-title">风格A：系统定位型</div>
+    <div class="quote">"我做了一个智能电商客服系统，前后端分离架构——后端 Spring Boot 3.4，前端 Vue 3，对接 LLM 大模型。整体规模是 <strong>10 张数据库表、54 个 RESTful API 接口、8 步对话处理流水线</strong>。核心亮点是双引擎降级设计——LLM 可用时走大模型生成回复，LLM 不可用时自动切到关键词规则引擎，<strong>保证系统 0 停服</strong>。"</div>
+    <div class="quote-note">开门见山说技术栈和规模，用数字建立"这不是一个玩具项目"的认知。"0 停服"是工程类面试官最关心的。</div>
+  </div>
+
+  <div class="card">
+    <span class="card-label label-alt">备选</span>
+    <div class="card-title">风格B：业务价值型</div>
+    <div class="quote">"我做了一个电商场景的智能客服系统，解决的核心问题是：传统客服要么纯人工成本高，要么硬编码规则体验差。我的方案是用大模型理解用户意图、从知识库检索真实数据来生成回复。整个对话链路有 <strong>8 个处理步骤</strong>，支持多轮上下文，还有一个<strong>推理过程可视化</strong>功能——让运营人员能看到 AI 每一步的决策。"</div>
+    <div class="quote-note">先说业务场景让面试官理解"系统做什么"，再用技术细节说明"怎么实现的"。</div>
+  </div>
+
+  <div class="card">
+    <span class="card-label label-alt2">备选</span>
+    <div class="card-title">风格C：技术亮点型</div>
+    <div class="quote">"这个项目有几个我觉得值得聊的设计：一是 <strong>8 步对话流水线</strong>——从消息接收到 AI 回复的完整链路，用 @Transactional 保证事务性；二是<strong>双引擎无感降级</strong>——LLM 层和规则层两个降级点，用 null 判断做切换；三是<strong>前端推理过程可视化</strong>——6 步推理链实时展示，让 AI 的决策透明可观测。"</div>
+    <div class="quote-note">三个亮点一口气抛出来，每个都有"钩子"——面试官可以挑任何一个追问，你都准备好了。</div>
+  </div>
+</div>
+
+<!-- Section 2: 主线路径 -->
+<div class="section" id="j-paths">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--accent-glow);color:var(--accent);">🌳</div>
+    <div>
+      <h2>主线路径</h2>
+      <div class="subtitle">四条路线，工程视角全覆盖</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线A：从"解决了什么问题"出发（万能路线）</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："介绍一下你的项目"</p>
+    <div class="tree-path">
+      <span class="tree-node">① 技术方案</span><span class="tree-arrow">→</span>
+      <span class="tree-node">② 系统规模</span><span class="tree-arrow">→</span>
+      <span class="tree-node">③ 核心链路</span><span class="tree-arrow">→</span>
+      <span class="tree-node">④ 稳定性设计</span><span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 可观测性</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官想听什么</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 技术方案</strong></td><td>大模型+知识库+规则兜底，三者配合</td><td>方案思路清晰</td></tr>
+          <tr><td><strong>② 系统规模</strong></td><td>10张表、54个接口、前后端分离、三大功能模块</td><td>有一定复杂度，不是 Demo</td></tr>
+          <tr><td><strong>③ 核心链路</strong></td><td>8步对话流水线：保存→分析→检索→多轮上下文→生成→卡片→推理链→响应</td><td>流程设计有逻辑，像真实系统</td></tr>
+          <tr><td><strong>④ 稳定性设计</strong></td><td>双引擎降级，LLM 挂了走规则引擎，用户无感</td><td>有生产环境意识</td></tr>
+          <tr><td><strong>⑤ 可观测性</strong></td><td>推理过程可视化 + 全链路日志标注分析引擎类型</td><td>知道上线后怎么排查问题</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线B：从"系统架构与分层设计"出发</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："说说你的系统架构" / "怎么设计的"</p>
+    <div class="tree-path">
+      <span class="tree-node">① 前端架构</span><span class="tree-arrow">→</span>
+      <span class="tree-node">② 后端分层</span><span class="tree-arrow">→</span>
+      <span class="tree-node">③ 业务模块</span><span class="tree-arrow">→</span>
+      <span class="tree-node">④ 基础设施</span><span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 外部集成</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官想听什么</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 前端架构</strong></td><td>Vue 3 + TypeScript + Element Plus + Pinia 状态管理，Axios 封装自动拦截</td><td>前端技术栈主流，组件化清晰</td></tr>
+          <tr><td><strong>② 后端分层</strong></td><td>Controller→Service→Repository 三层，加上 AOP 切面（日志、门面、分布式锁）</td><td>分层规范，有企业级设计意识</td></tr>
+          <tr><td><strong>③ 业务模块</strong></td><td>三个独立模块：Chat 对话核心、Knowledge 知识管理、Scene 场景配置</td><td>模块划分合理，职责清晰</td></tr>
+          <tr><td><strong>④ 基础设施</strong></td><td>统一响应R&lt;T&gt;、全局异常处理、CORS配置、Druid连接池、Redis+降级方案</td><td>基础设施完善，不只是写业务代码</td></tr>
+          <tr><td><strong>⑤ 外部集成</strong></td><td>通过 RestTemplate 调用 OpenAI 兼容 API，全链路异常捕获 + null 返回降级</td><td>知道怎么处理外部依赖的不稳定性</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线C：从"数据库设计思路"出发</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："说说你的数据库设计" / "表之间什么关系"</p>
+    <div class="tree-path">
+      <span class="tree-node">① 对话表设计</span><span class="tree-arrow">→</span>
+      <span class="tree-node">② 知识表设计</span><span class="tree-arrow">→</span>
+      <span class="tree-node">③ 预留字段</span><span class="tree-arrow">→</span>
+      <span class="tree-node">④ JPA建表</span><span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 技术选型</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官想听什么</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 对话表设计</strong></td><td>session 和 message 一对多，message 同时作为多轮对话的历史数据源</td><td>一表两用设计得巧</td></tr>
+          <tr><td><strong>② 知识表设计</strong></td><td>独立表而非通用模型——因为字段差异大，商品有价格规格，FAQ 有问答对</td><td>设计有理由，不是拍脑袋</td></tr>
+          <tr><td><strong>③ 预留字段</strong></td><td>每张知识表都有 vectorized 字段，预留向量化扩展</td><td>有长期规划意识</td></tr>
+          <tr><td><strong>④ JPA建表</strong></td><td>ddl-auto:update 实现零SQL建表，实体类即表结构</td><td>技术选型有考量</td></tr>
+          <tr><td><strong>⑤ 技术选型</strong></td><td>项目重点是业务逻辑演示，JPA 更适合快速开发和实体映射</td><td>了解技术选型的 trade-off</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">路线D：从"核心代码实现"出发</div>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:16px;">适合回答："说说印象最深的一段代码" / "核心逻辑怎么写的"</p>
+    <div class="tree-path">
+      <span class="tree-node">① 事务管理</span><span class="tree-arrow">→</span>
+      <span class="tree-node">② 双引擎切换</span><span class="tree-arrow">→</span>
+      <span class="tree-node">③ 多轮上下文</span><span class="tree-arrow">→</span>
+      <span class="tree-node">④ 知识注入</span><span class="tree-arrow">→</span>
+      <span class="tree-node">⑤ 推理链构建</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>节点</th><th>说什么</th><th>面试官想听什么</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 事务管理</strong></td><td>@Transactional 保证用户消息和 AI 回复原子性——要么都写入，要么都回滚</td><td>懂事务边界</td></tr>
+          <tr><td><strong>② 双引擎切换</strong></td><td>LlmService 调用失败返回 null，ChatService 用三元运算符切换到规则引擎</td><td>降级实现简洁清晰</td></tr>
+          <tr><td><strong>③ 多轮上下文</strong></td><td>从数据库取同 session 最近 10 条，按 system→history→user 顺序组装 messages</td><td>理解 OpenAI API 的消息格式</td></tr>
+          <tr><td><strong>④ 知识注入</strong></td><td>检索结果通过 buildKnowledgeText() 格式化后拼入系统提示词</td><td>知道怎么用 RAG 思路约束 LLM</td></tr>
+          <tr><td><strong>⑤ 推理链构建</strong></td><td>每步结果组装成 ReasoningStepVO 返回前端，包含引擎类型标注</td><td>前后端数据契约设计合理</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: 深潜知识点 -->
+<div class="section" id="j-deep">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--purple-bg);color:var(--purple);">🔬</div>
+    <div>
+      <h2>深潜知识点（工程专项）</h2>
+      <div class="subtitle">在复试版8个基础上，额外增加7个工程知识点</div>
+    </div>
+  </div>
+
+  <button class="expand-btn" onclick="toggleAllDeepDives('panel-job')">
+    <span>📂</span> 全部展开 / 收起
+  </button>
+
+  <div class="key-point">
+    <div class="key-point-title">💡 提示</div>
+    <p style="font-size:14px;color:var(--text2);">复试版的8个深潜点请切换到复试版查看。以下是求职版额外需要准备的工程知识点。</p>
+  </div>
+
+  <div class="deep-dive" id="j-dd-9">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--green-bg);color:var(--green);">9</div>
+      <div class="dd-title">Spring Boot 分层架构</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>像一家公司的组织架构。Controller 是前台接待——接电话、记客户要求、转给部门。Service 是业务部门——真正干活。Repository 是档案室——存取数据。Config 是行政部——配置规章制度。大家各干各的，前台不需要知道档案室怎么管文件。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>标准三层架构。Controller 层（3个）负责接收请求、参数校验、返回统一响应 R&lt;T&gt;。Service 层（4个）负责核心业务逻辑。Repository 层（10个）继承 JpaRepository 提供标准 CRUD。横切关注点通过 AOP 切面处理：ControllerLogAspect 记录请求日志，FacadeAspect 统一参数校验和异常处理。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"分层的核心好处是解耦。比如要把知识检索从关键词换成向量检索，只改 Service 层，Controller 和 Repository 完全不用动。AOP 切面也一样——加请求耗时统计，不需要在每个 Controller 方法里写，加个切面统一处理。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 为什么用 AOP 做日志？</div>
+          <div class="qa-a">不侵入业务代码，Service 只关注业务逻辑；统一管理，所有 Controller 请求日志格式一致，修改只改一处。这就是 AOP 的核心价值——横切关注点集中管理。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: @Facade 注解是干什么的？</div>
+          <div class="qa-a">自定义组合注解，把参数校验和异常处理绑在一起。加了 @Facade 就自动校验参数、出异常自动包装成统一响应格式，减少模板代码。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="j-dd-10">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--accent-glow);color:var(--accent);">10</div>
+      <div class="dd-title">JPA 10 张表设计与关联</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>开了个客服部门准备文件柜。第一排"对话记录"——每个客户一个文件夹（session），按时间放聊天记录（message）。第二排"知识参考"——5个抽屉分放商品手册、促销单页、FAQ手册、行业报告、解决方案。第三排"工作手册"——意图列表、话术模板、业务规则。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>10 张表分三组。对话组：cs_chat_session 和 cs_chat_message（一对多）。知识组：5 张独立表（字段差异大所以不做通用模型），每张有 vectorized 布尔字段。场景组：3 张表预留置信度阈值、优先级等配置。所有表 JPA ddl-auto: update 自动创建。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"考虑过通用 knowledge 表用 type 字段区分。但商品有 price/specifications，FAQ 有 question/answer，通用模型只能用 TEXT 塞 JSON——查询不便、索引建不了。独立表虽然类多，但结构清晰、查询简单、索引灵活。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 10 张表没有外键？</div>
+          <div class="qa-a">关联在应用层维护。JPA 懒加载和外键容易产生 N+1 查询问题；知识表之间本身没关联，是独立五类数据。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: ddl-auto: update 生产环境能用吗？</div>
+          <div class="qa-a">不建议。update 只新增列不删除列，长期可能不一致。生产用 Flyway 或 Liquibase 做版本管理。但开发和教学场景下，update 非常方便。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="j-dd-11">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--orange-bg);color:var(--orange);">11</div>
+      <div class="dd-title">RESTful API 设计（54 个接口的组织）</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>像写字楼门牌号系统。一楼（/api/chat）是对话部门，二楼（/api/knowledge）是知识部门，三楼（/api/scene）是配置部门。每层楼房间号规则统一：大门口（GET 列表）、前台（POST 新增）、会议室（PUT 修改）、后门（DELETE 删除）。知道规则就能找到任何房间。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>54 个接口按模块组织在 3 个 Controller 中。路径规范：/api/chat/*、/api/knowledge/*、/api/scene/*。路径常量统一在 ApiConstants.java 中。所有接口返回统一 R&lt;T&gt; 响应格式，异常通过 GlobalExceptionHandler 统一处理。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"54 个接口拆分后很清晰——知识模块 5 类 × 4 CRUD ≈ 25 个，场景模块类似。关键是命名规范和路径统一，新接口往哪加、老接口在哪找，一看路径就知道。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 有 API 文档吗？</div>
+          <div class="qa-a">可以接入 SpringDoc 自动生成。目前靠代码结构的清晰度——ApiConstants 管路径，前端 API 文件和后端一一对应。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: GET/POST/PUT/DELETE 规范？</div>
+          <div class="qa-a">GET 获取（幂等），POST 创建（非幂等），PUT 全量更新（幂等），DELETE 删除。消息发送用 POST+UUID 消息 ID 避免重复提交。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="j-dd-12">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--cyan-bg);color:var(--cyan);">12</div>
+      <div class="dd-title">前后端分离架构</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>餐厅的"前厅"和"后厨"分开管理。前厅（前端）接待客人、展示菜单；后厨（后端）做菜、管库存。通过"传菜窗口"（API）沟通——前厅递点单，后厨递菜。前厅不需要知道菜怎么做，后厨不关心客人坐哪桌。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>前端 Vue 3 + Vite 运行在 3100 端口，通过 Vite proxy 把 /api/* 代理到后端 10002 端口。Axios 实例统一处理 Token、错误拦截。后端 WebConfig 配置 CORS。前端 TypeScript 类型（model 目录）和后端 DTO/VO 一一对应。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"最大好处是独立开发部署。前端改 UI 不重启后端，后端改逻辑不影响前端。前端从 Vue 2 升 Vue 3 后端完全不动，只要 API 契约不变。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 跨域怎么解决的？</div>
+          <div class="qa-a">开发环境用 Vite proxy 代理不存在跨域。生产环境后端 WebConfig 配置 CORS——addCorsMappings 允许前端域名跨域。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 前后端数据格式怎么保持一致？</div>
+          <div class="qa-a">后端定义 VO/DTO，前端 model 目录定义对应 TypeScript interface，目前手动同步。项目更大可用 Swagger Codegen 自动生成前端类型。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="j-dd-13">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--red-bg);color:var(--red);">13</div>
+      <div class="dd-title">事务管理 @Transactional</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>银行转账——从 A 扣 1000，往 B 加 1000。如果扣完钱系统崩了 B 没加上怎么办？事务保证"两步要么都成功，要么都不做"。客服系统里，"保存用户消息"和"保存 AI 回复"就像转账两步——不能只存了问题没存回答。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>sendMessage() 标注 @Transactional，8 步流水线在一个事务中。步骤 1 保存用户消息和步骤 6 保存 AI 回复共享事务——中间抛出运行时异常则自动回滚。LLM 调用异常在 LlmService 里 catch 返回 null，不触发事务回滚——LLM 失败不应导致整个流程失败。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"事务边界很重要。LLM 异常在 LlmService 就 catch 掉了，返回 null 触发降级而不是回滚。如果让异常冒泡到 @Transactional 外面，用户消息也会被回滚——但用户消息本身是正确的，回滚反而不对。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: @Transactional 传播行为了解吗？</div>
+          <div class="qa-a">默认 REQUIRED——有事务就加入，没有就新建。REQUIRES_NEW 是独立事务。NESTED 是嵌套事务。我的场景默认 REQUIRED 够了。</div>
+        </div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 事务太长有什么问题？</div>
+          <div class="qa-a">长时间占用连接和锁。我的方法里有 LLM 网络 IO，响应慢时事务会很长。优化：把 LLM 调用拆到事务外——先拿结果再开事务做数据库操作。目前量级不大，问题不突出。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="j-dd-14">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:var(--yellow-bg);color:var(--yellow);">14</div>
+      <div class="dd-title">连接池 Druid</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>数据库连接像打电话——每次都拨号、等接通、通话、挂断。一天 1000 个电话每次都拨号太慢。连接池就是一次性开 10 条电话线一直不挂断，需要时拿一条来用，用完放回去。Druid 就是"电话线管理员"，还附带"通话记录"功能（SQL 监控）。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>Druid 是阿里开源数据库连接池，通过 druid-spring-boot-3-starter 集成。预先创建连接放池中，应用按需获取归还，省去 TCP 握手和数据库认证开销。额外提供 SQL 监控面板，可看每条 SQL 的执行次数、耗时、慢查询等信息。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"连接池是后端必备基础设施，选 Druid 因为国内使用广泛、文档全，SQL 监控在开发阶段特别有用——可以直接看哪些查询慢、有没有 N+1 问题。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: Druid 和 HikariCP 区别？</div>
+          <div class="qa-a">HikariCP 是 Spring Boot 默认连接池，微基准测试性能更快，代码更简洁。Druid 优势在监控更强，有内置 Web 面板看 SQL 详情。追求极致性能选 HikariCP，需要 SQL 监控选 Druid。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="deep-dive" id="j-dd-15">
+    <div class="dd-header" onclick="toggleDD(this)">
+      <div class="dd-num" style="background:rgba(244,114,182,0.08);color:var(--pink);">15</div>
+      <div class="dd-title">前端四栏布局的组件化设计</div>
+      <div class="dd-toggle">▼</div>
+    </div>
+    <div class="dd-body"><div class="dd-content">
+      <div class="dd-block">
+        <div class="dd-block-title">🎯 通俗比喻</div>
+        <p>客服工作台。左边是常见问题速查手册，中间是聊天窗口（核心工作区），右上角是产品目录（随时查信息），右下角是"思考过程记录本"（AI 每步怎么决策的）。四个区域独立但通过"传纸条"（组件通信）协同工作。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">📖 技术本质</div>
+        <p>index.vue 是布局容器管理四个子组件。QuestionSidebar 点击通过 emit 事件通知父组件发送消息。KnowledgeSelect 选中的商品/活动 ID 通过 props/emit 传递注入对话请求。AgentWorkArea 接收 reasoningProcess 数组渲染推理链。组件不直接通信，全部通过父组件中转——单向数据流原则。</p>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">💭 我的理解</div>
+        <div class="quote">"四栏布局重点是数据流。用户右上角选商品，ID 要一路传到后端 retrieveKnowledge() 影响检索结果。我用 props down, events up 标准模式，没用 Pinia 全局状态——数据只在这一个页面内流转，不需要全局化。"</div>
+      </div>
+      <div class="dd-block">
+        <div class="dd-block-title">❓ 可能追问</div>
+        <div class="qa-item">
+          <div class="qa-q">Q: 组件通信层级太深怎么办？</div>
+          <div class="qa-a">嵌套超 2-3 层 props drilling 就麻烦了。可以用 provide/inject 做依赖注入，或 Pinia store 全局状态。我只有一层嵌套，props/emit 足够。</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Section 4: 防雷指南 -->
+<div class="section" id="j-thunder">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--red-bg);color:var(--red);">⚡</div>
+    <div>
+      <h2>防雷指南（求职版补充）</h2>
+      <div class="subtitle">高频追问的从容应答</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📊 高并发怎么办？</div>
+    <div class="qa-item">
+      <div class="qa-q">Q: 系统能支撑多少并发？QPS 大概多少？</div>
+      <div class="qa-a">"几个瓶颈点：① LLM 调用是最大延迟瓶颈——可以引入请求队列和限流，改成异步+SSE 推送；② 知识检索目前全表扫描——数据量大时需要加索引或接 Elasticsearch；③ 历史消息可以加 Redis 缓存——同 session 消息变化不大；④ 连接池已经用了 Druid 做连接复用，Redis+Redisson 也内置了，扩展有基础。"</div>
+    </div>
+    <div class="star-note">
+      <span class="star">⭐</span>
+      <span>没测过就说没测过，然后从架构层面分析瓶颈，比编一个数字强一百倍。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏭 数据库表设计为什么不用通用模型？</div>
+    <div class="qa-item">
+      <div class="qa-q">Q: 为什么不用一个表加 type 字段？</div>
+      <div class="qa-a">"考虑过通用模型——一个表加 type 字段，extra_data 存 JSON。但问题是：JSON 字段不好建索引和查询；每次都要 JSON 解析影响性能；代码层面不好做类型安全。独立表虽然 Entity 多了几个，但每张表字段清晰、查询简单、索引灵活。这是在'表的数量'和'代码质量'之间的取舍。"</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 54 个接口怎么管理的？</div>
+    <div class="qa-item">
+      <div class="qa-q">Q: 这么多接口怎么组织？</div>
+      <div class="qa-a">"三个层面：① 路径管理——所有 API 路径定义在 ApiConstants 常量类中，避免硬编码；② 代码组织——按业务模块分 3 个 Controller，各管各的接口；③ 前端对齐——API 调用函数也按模块分文件（chat.ts / knowledge.ts / scene.ts），和后端一一对应。"</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">👥 你们团队几个人？</div>
+    <div class="quote">"这个项目是我独立完成的——从需求分析、架构设计到前后端开发。独立开发让我对系统每个环节都有完整理解。比如为什么做双引擎、为什么用 8 步流水线，代码里每个设计决策我都能讲清楚为什么这么做。"</div>
+    <div class="star-note">
+      <span class="star">⭐</span>
+      <span>说独立完成没问题，但不要显得很轻松——要让面试官知道这有工作量。</span>
+    </div>
+  </div>
+</div>
+
+<!-- Section 5: 技术亮点速查卡 -->
+<div class="section" id="j-highlights">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--green-bg);color:var(--green);">⚡</div>
+    <div>
+      <h2>技术亮点速查卡</h2>
+      <div class="subtitle">面试中可以主动抛出的亮点——用一句"钩子句"勾住面试官兴趣</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">1. 8 步对话流水线</div>
+    <div class="quote">"一条用户消息从进入系统到生成回复，要走 8 个处理步骤，像工厂流水线一样串联。"</div>
+    <p style="font-size:13px;color:var(--text2);">面试官一追问 → 展开：保存消息→LLM分析→知识检索→多轮上下文→LLM生成→卡片选择→推理链构建→响应返回。每步有明确输入输出和日志。</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">2. 双引擎无感降级</div>
+    <div class="quote">"LLM 挂了用户感觉不到——系统自动切到关键词规则引擎，回复质量下降但服务不中断。"</div>
+    <p style="font-size:13px;color:var(--text2);">面试官一追问 → 展开：两个降级点（分析和回复各一个），通过 null 返回值做切换，全链路异常 catch 不冒泡，日志标注引擎类型。</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">3. 推理过程可视化</div>
+    <div class="quote">"每次对话，前端都能看到 AI 的完整推理链——6 步，每步用了什么引擎、检索到什么知识。"</div>
+    <p style="font-size:13px;color:var(--text2);">面试官一追问 → 展开：6步推理链（输入解析→场景识别→意图分析→情绪判断→知识检索→生成回复），前端 AgentWorkArea.vue 组件实时渲染。</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">4. 知识约束的 LLM 输出</div>
+    <div class="quote">"大模型最怕幻觉。我用知识检索来约束它，让它基于真实数据回答。"</div>
+    <p style="font-size:13px;color:var(--text2);">面试官一追问 → 展开：数据库检索→buildKnowledgeText()格式化→注入系统提示词→Prompt明确要求"基于知识回答"→减少幻觉。</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">5. 两次 LLM 调用 + 不同温度策略</div>
+    <div class="quote">"一次对话调了两次 LLM——第一次做'选择题'用低温度，第二次做'写作文'用高温度。"</div>
+    <p style="font-size:13px;color:var(--text2);">面试官一追问 → 展开：analyzeUserInput() temperature=0.1 做结构化分析；generateReply() temperature=0.7 做自然语言生成。同模型、不同参数、不同效果。</p>
+  </div>
+</div>
+
+<!-- Section 6: 故事线自洽包 -->
+<div class="section" id="j-story">
+  <div class="section-header">
+    <div class="section-icon" style="background:var(--yellow-bg);color:var(--yellow);">📖</div>
+    <div>
+      <h2>故事线自洽包</h2>
+      <div class="subtitle">工程视角的自我叙事</div>
+    </div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">🎯 为什么选这个方向</div>
+    <div class="quote">"两个原因。第一，RAG 和大模型应用是目前最主流的技术方向，从招聘需求来看企业对这类经验需求在快速增长。第二，这个项目涉及的技术栈比较全——前端 Vue、后端 Spring Boot、Python 微服务、向量检索、API 调用——做一遍下来全栈能力和 AI 工程能力都得到了锻炼。"</div>
+  </div>
+
+  <div class="story-card">
+    <div class="story-title">💪 对这个岗位的价值</div>
+    <div class="quote">"通过这个项目积累了三方面能力：一是全栈开发能力（前端 Vue + 后端 Spring Boot + Python 微服务），二是 AI 应用工程化能力（RAG 全链路、Prompt 设计、效果评估），三是系统设计能力（模块划分、API 设计、存储选型、异步处理）。"</div>
+  </div>
+</div>
+
+</div><!-- end panel-job -->
+
+<!-- Closing -->
+<div class="section" style="text-align:center;padding:60px 0 40px;">
+  <div class="key-point" style="max-width:560px;margin:0 auto;text-align:left;">
+    <div class="key-point-title" style="text-align:center;font-size:16px;">🎯 记住三条核心原则</div>
+    <div style="margin-top:16px;">
+      <p style="font-size:15px;color:var(--text);margin-bottom:8px;"><strong>1. 用比喻开头</strong> — 让面试官知道你能讲明白</p>
+      <p style="font-size:15px;color:var(--text);margin-bottom:8px;"><strong>2. 用技术深入</strong> — 让面试官知道你真懂</p>
+      <p style="font-size:15px;color:var(--text);"><strong>3. 用第一人称收尾</strong> — 让面试官知道你有自己的思考</p>
+    </div>
+  </div>
+  <p style="margin-top:32px;color:var(--text3);font-size:14px;">祝面试顺利 🍀</p>
+</div>
+
+</main>
+</div>
+
+<!-- Back to Top -->
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0})">↑</button>
+
+<script>
+const sidebarData = {
+  grad: [
+    { title: '导航', items: [
+      { text: '🎤 开场锚点', target: 'g-anchor' },
+      { text: '🌳 主线路径', target: 'g-paths' },
+      { text: '🔬 深潜知识点', target: 'g-deep' },
+      { text: '⚡ 防雷指南', target: 'g-thunder' },
+      { text: '📖 故事线自洽包', target: 'g-story' },
+    ]},
+    { title: '深潜快跳', items: [
+      { text: '1. 意图识别', target: 'g-dd-1' },
+      { text: '2. 双引擎降级', target: 'g-dd-2' },
+      { text: '3. 知识检索', target: 'g-dd-3' },
+      { text: '4. 多轮对话', target: 'g-dd-4' },
+      { text: '5. Prompt 工程', target: 'g-dd-5' },
+      { text: '6. 幻觉问题', target: 'g-dd-6' },
+      { text: '7. Temperature', target: 'g-dd-7' },
+      { text: '8. 评估方法', target: 'g-dd-8' },
+    ]}
+  ],
+  job: [
+    { title: '导航', items: [
+      { text: '🎤 开场锚点', target: 'j-anchor' },
+      { text: '🌳 主线路径', target: 'j-paths' },
+      { text: '🔬 深潜知识点', target: 'j-deep' },
+      { text: '⚡ 防雷指南', target: 'j-thunder' },
+      { text: '⚡ 技术亮点速查卡', target: 'j-highlights' },
+      { text: '📖 故事线自洽包', target: 'j-story' },
+    ]},
+    { title: '工程专项深潜', items: [
+      { text: '9. Spring Boot 分层', target: 'j-dd-9' },
+      { text: '10. JPA 表设计', target: 'j-dd-10' },
+      { text: '11. REST API', target: 'j-dd-11' },
+      { text: '12. 前后端分离', target: 'j-dd-12' },
+      { text: '13. 事务管理', target: 'j-dd-13' },
+      { text: '14. 连接池 Druid', target: 'j-dd-14' },
+      { text: '15. 前端组件化', target: 'j-dd-15' },
+    ]}
+  ]
+};
+
+let currentTab = 'grad';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+  if (tab === 'grad') {
+    document.querySelectorAll('.nav-tab')[0].classList.add('active');
+    document.getElementById('panel-grad').classList.add('active');
+  } else {
+    document.querySelectorAll('.nav-tab')[1].classList.add('active');
+    document.getElementById('panel-job').classList.add('active');
+  }
+
+  buildSidebar(tab);
+  window.scrollTo({ top: 0 });
+}
+
+function buildSidebar(tab) {
+  const sidebar = document.getElementById('sidebar');
+  let html = '';
+  const sections = sidebarData[tab];
+  sections.forEach(sec => {
+    html += `<div class="sidebar-section"><div class="sidebar-title">${sec.title}</div>`;
+    sec.items.forEach(item => {
+      html += `<a class="sidebar-link" onclick="scrollToEl('${item.target}')">${item.text}</a>`;
+    });
+    html += '</div>';
+  });
+  sidebar.innerHTML = html;
+}
+
+function scrollToEl(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el.classList.contains('deep-dive') && !el.classList.contains('open')) {
+      el.classList.add('open');
+    }
+  }
+}
+
+function toggleDD(header) {
+  header.closest('.deep-dive').classList.toggle('open');
+}
+
+function toggleAllDeepDives(panelId) {
+  const panel = document.getElementById(panelId);
+  const dds = panel.querySelectorAll('.deep-dive');
+  const allOpen = Array.from(dds).every(dd => dd.classList.contains('open'));
+  dds.forEach(dd => {
+    if (allOpen) dd.classList.remove('open');
+    else dd.classList.add('open');
+  });
+}
+
+window.addEventListener('scroll', () => {
+  const btn = document.getElementById('backTop');
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+
+buildSidebar('grad');
+</script>
+
+</body>
+</html>

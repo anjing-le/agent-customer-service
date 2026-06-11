@@ -22,11 +22,11 @@ spring:
 # ==========================================
 # 🤖 LLM 大模型配置（OneRouter 统一网关）
 # ==========================================
-# 注册地址：https://onerouter.top
+# 注册地址：https://onerouter.pro （注册后获取 API Key）
 # 注册后获取 API Key，填入下方即可
 llm:
   enabled: false                                 # ← 改为 true 启用 LLM（默认关闭，使用规则引擎兜底）
-  api-url: https://api.onerouter.top/v1/chat/completions
+  api-url: https://llm.onerouter.pro/v1/chat/completions
   api-key: your_api_key_here                     # ← 填你的 API Key
   model: gpt-4o-mini                             # ← 可选模型：gpt-4o-mini / deepseek-chat 等
 

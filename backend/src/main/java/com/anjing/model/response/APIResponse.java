@@ -2,6 +2,8 @@ package com.anjing.model.response;
 
 import lombok.Data;
 
+import java.util.UUID;
+
 /**
  * 统一API响应结果
  */
@@ -39,8 +41,14 @@ public class APIResponse<T>
      */
     private Long timestamp;
 
+    /**
+     * 请求链路ID。V1 先在响应对象内生成，后续接入 RequestContext 后从上下文透传。
+     */
+    private String requestId;
+
     public APIResponse() {
         this.timestamp = System.currentTimeMillis();
+        this.requestId = UUID.randomUUID().toString();
     }
 
     public APIResponse(String code, String message, T data) {
@@ -48,12 +56,14 @@ public class APIResponse<T>
         this.message = message;
         this.data = data;
         this.timestamp = System.currentTimeMillis();
+        this.requestId = UUID.randomUUID().toString();
     }
 
     public APIResponse(String code, String message) {
         this.code = code;
         this.message = message;
         this.timestamp = System.currentTimeMillis();
+        this.requestId = UUID.randomUUID().toString();
     }
 
     /**
