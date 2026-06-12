@@ -47,6 +47,22 @@ public class ChatVO {
         private List<RuntimeTrendVO> dailyTrends;
         /** 最近运行快照 */
         private RuntimeSnapshotVO latestSnapshot;
+        /** 转人工统计 */
+        private TransferSummaryVO transferSummary;
+        /** 最近转人工工单 */
+        private List<TransferTicketVO> recentTransferTickets;
+    }
+
+    /**
+     * 转人工统计。
+     */
+    @Data
+    public static class TransferSummaryVO {
+        private Long pendingTickets;
+        private Long todayCreatedTickets;
+        private Long todayResolvedTickets;
+        private Long highPriorityPendingTickets;
+        private Double averageResolveMinutes;
     }
 
     /**

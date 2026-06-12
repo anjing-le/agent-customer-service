@@ -51,7 +51,15 @@ const overview = ref({
     averagePromptRenderCount: 0
   },
   dailyTrends: [] as any[],
-  latestSnapshot: null as any
+  latestSnapshot: null as any,
+  transferSummary: {
+    pendingTickets: 0,
+    todayCreatedTickets: 0,
+    todayResolvedTickets: 0,
+    highPriorityPendingTickets: 0,
+    averageResolveMinutes: 0
+  },
+  recentTransferTickets: [] as any[]
 })
 
 const loadOverview = async () => {
@@ -143,6 +151,24 @@ onMounted(() => {
         <div>
           <span>不安全率</span>
           <strong>{{ overview.qualitySummary?.unsafeRate }}%</strong>
+        </div>
+      </div>
+      <div class="runtime-transfer">
+        <div>
+          <span>待转人工</span>
+          <strong>{{ overview.transferSummary?.pendingTickets || 0 }}</strong>
+        </div>
+        <div>
+          <span>今日新增 / 解决</span>
+          <strong>{{ overview.transferSummary?.todayCreatedTickets || 0 }} / {{ overview.transferSummary?.todayResolvedTickets || 0 }}</strong>
+        </div>
+        <div>
+          <span>高优先级</span>
+          <strong>{{ overview.transferSummary?.highPriorityPendingTickets || 0 }}</strong>
+        </div>
+        <div>
+          <span>平均解决</span>
+          <strong>{{ overview.transferSummary?.averageResolveMinutes || 0 }} min</strong>
         </div>
       </div>
       <div class="runtime-trend">
@@ -276,6 +302,41 @@ onMounted(() => {
     color: #2d2a24;
     font-size: 18px;
     line-height: 24px;
+  }
+}
+
+.runtime-transfer {
+  grid-column: span 4;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid #dedbd1;
+  border-radius: 8px;
+  background: #fffdf7;
+  box-sizing: border-box;
+
+  span {
+    display: block;
+    overflow: hidden;
+    color: #7b7567;
+    font-size: 12px;
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: #2d2a24;
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

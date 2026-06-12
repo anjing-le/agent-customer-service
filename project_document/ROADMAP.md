@@ -35,8 +35,9 @@
 - 已补 Scene Runtime Trend，基于近 7 日 Agent 审计聚合场景、规则命中和 Prompt 消费趋势。
 - 已补 Transfer Recommendation，低置信度、安全拦截或转人工规则命中时输出转人工建议、原因和优先级。
 - 已补 Transfer Queue Simulation，自动生成转人工工单，支持 `PENDING` 到 `RESOLVED` 的模拟人工接管回写。
+- 已补 Transfer Runtime Metrics，展示待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补转人工统计和人工接管时效指标。
+- 下一步补知识检索命中解释和证据可信度标签。
 - 支持 SSE 流式回复和人工接管状态同步。
 
 ## V3: 生产化扩展

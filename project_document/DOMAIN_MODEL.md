@@ -93,6 +93,16 @@ Chat 运行趋势：
 | `PENDING` | 已进入转人工队列，等待人工客服接管 |
 | `RESOLVED` | 人工客服已接管并回写处理结果 |
 
+转人工统计：
+
+| 指标 | 说明 |
+|---|---|
+| `transferSummary.pendingTickets` | 当前待处理转人工工单数 |
+| `transferSummary.todayCreatedTickets` | 今日新增转人工工单数 |
+| `transferSummary.todayResolvedTickets` | 今日已解决转人工工单数 |
+| `transferSummary.highPriorityPendingTickets` | 高优先级待处理工单数 |
+| `transferSummary.averageResolveMinutes` | 已解决工单的平均处理分钟数 |
+
 Chat 运行快照：
 
 | 字段 | 说明 |
@@ -213,4 +223,5 @@ flowchart LR
 19. 已完成：Scene Runtime Trend，基于 Agent 审计聚合近 7 日场景、规则命中和 Prompt 消费趋势。
 20. 已完成：Transfer Recommendation，低置信度、安全拦截或转人工规则命中时沉淀转人工建议、原因和优先级。
 21. 已完成：Transfer Queue Simulation，自动生成转人工工单并支持人工接管结果回写。
-22. 下一步：补转人工统计和人工接管时效指标。
+22. 已完成：Transfer Runtime Metrics，展示转人工待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
+23. 下一步：补知识检索命中解释和证据可信度标签。

@@ -27,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -83,6 +84,8 @@ public class ChatService {
         vo.setQualitySummary(buildQualitySummary());
         vo.setDailyTrends(buildDailyTrends());
         vo.setLatestSnapshot(loadLatestSnapshot());
+        vo.setTransferSummary(buildTransferSummary(startOfDay, now));
+        vo.setRecentTransferTickets(loadRecentTransferTickets());
         return vo;
     }
 
@@ -660,6 +663,29 @@ public class ChatService {
         vo.setUpdatedAt(ticket.getUpdatedAt());
         vo.setResolvedAt(ticket.getResolvedAt());
         return vo;
+    }
+
+    private ChatVO.TransferSummaryVO buildTransferSummary(LocalDateTime startOfDay, LocalDateTime now) {
+        List<ChatTransferTicket> resolvedTickets = transferTicketRepository.findAll().stream()
+                .filter(ticket -> "RESOLVED".equals(ticket.getStatus()))
+                .filter(ticket -> ticket.getCreatedAt() != null && ticket.getResolvedAt() != null)
+                .toList();
+
+        ChatVO.TransferSummaryVO vo = new ChatVO.TransferSummaryVO();
+        vo.setPendingTickets(transferTicketRepository.countByStatus("PENDING"));
+        vo.setTodayCreatedTickets(transferTicketRepository.countByCreatedAtBetween(startOfDay, now));
+        vo.setTodayResolvedTickets(transferTicketRepository.countByStatusAndResolvedAtBetween("RESOLVED", startOfDay, now));
+        vo.setHighPriorityPendingTickets(transferTicketRepository.countByStatusAndPriority("PENDING", "HIGH"));
+        vo.setAverageResolveMinutes(roundAverage(resolvedTickets.stream()
+                .map(ticket -> (double) Duration.between(ticket.getCreatedAt(), ticket.getResolvedAt()).toMinutes())
+                .toList()));
+        return vo;
+    }
+
+    private List<ChatVO.TransferTicketVO> loadRecentTransferTickets() {
+        return transferTicketRepository.findTop5ByOrderByCreatedAtDesc().stream()
+                .map(this::toTransferTicketVO)
+                .toList();
     }
 
     private ChatVO.QualitySummaryVO buildQualitySummary() {
