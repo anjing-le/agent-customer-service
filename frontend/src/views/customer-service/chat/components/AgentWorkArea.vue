@@ -44,6 +44,24 @@ const reliability = ref<any>({
   ruleHits: [],
   promptRenders: []
 })
+const sessionQuality = ref<any>({
+  totalAuditedReplies: 0,
+  fallbackReplies: 0,
+  unsafeReplies: 0,
+  lowConfidenceReplies: 0,
+  averageConfidence: 0,
+  fallbackRate: 0,
+  unsafeRate: 0,
+  reliabilityScore: 100,
+  riskLevel: 'LOW',
+  primaryFallbackReason: ''
+})
+
+const riskTagType = computed(() => {
+  if (sessionQuality.value.riskLevel === 'HIGH') return 'danger'
+  if (sessionQuality.value.riskLevel === 'MEDIUM') return 'warning'
+  return 'success'
+})
 
 const formatTime = (ts: string | null) => {
   if (!ts) return ''
@@ -108,6 +126,18 @@ watch(() => props.aiResponse, (res) => {
     policyTags: res.reliability?.policyTags || [],
     ruleHits: res.reliability?.ruleHits || [],
     promptRenders: res.reliability?.promptRenders || []
+  }
+  sessionQuality.value = {
+    totalAuditedReplies: res.sessionQuality?.totalAuditedReplies || 0,
+    fallbackReplies: res.sessionQuality?.fallbackReplies || 0,
+    unsafeReplies: res.sessionQuality?.unsafeReplies || 0,
+    lowConfidenceReplies: res.sessionQuality?.lowConfidenceReplies || 0,
+    averageConfidence: res.sessionQuality?.averageConfidence || 0,
+    fallbackRate: res.sessionQuality?.fallbackRate || 0,
+    unsafeRate: res.sessionQuality?.unsafeRate || 0,
+    reliabilityScore: res.sessionQuality?.reliabilityScore ?? 100,
+    riskLevel: res.sessionQuality?.riskLevel || 'LOW',
+    primaryFallbackReason: res.sessionQuality?.primaryFallbackReason || ''
   }
 
   userProfile.value.lastActive = '刚刚'
@@ -280,6 +310,42 @@ watch(() => props.aiResponse, (res) => {
                     {{ reliability.fallbackRequired ? '已兜底' : '未兜底' }}
                   </el-tag>
                 </div>
+              </div>
+            </div>
+
+            <div class="session-quality">
+              <div class="session-quality__header">
+                <div>
+                  <div class="session-quality__title">会话质检摘要</div>
+                  <div class="session-quality__desc">基于当前会话已审计回复聚合</div>
+                </div>
+                <el-tag :type="riskTagType" size="small">{{ sessionQuality.riskLevel }}</el-tag>
+              </div>
+              <div class="session-quality__score">
+                <span>可靠性评分</span>
+                <strong>{{ sessionQuality.reliabilityScore }}</strong>
+              </div>
+              <div class="session-quality__grid">
+                <div>
+                  <span>已审计</span>
+                  <strong>{{ sessionQuality.totalAuditedReplies }}</strong>
+                </div>
+                <div>
+                  <span>平均置信度</span>
+                  <strong>{{ sessionQuality.averageConfidence }}</strong>
+                </div>
+                <div>
+                  <span>兜底率</span>
+                  <strong>{{ sessionQuality.fallbackRate }}%</strong>
+                </div>
+                <div>
+                  <span>不安全率</span>
+                  <strong>{{ sessionQuality.unsafeRate }}%</strong>
+                </div>
+              </div>
+              <div class="session-quality__reasons">
+                <span>主要兜底原因</span>
+                <strong>{{ sessionQuality.primaryFallbackReason || '暂无' }}</strong>
               </div>
             </div>
 
@@ -745,6 +811,109 @@ watch(() => props.aiResponse, (res) => {
 
     &--muted {
       color: #999;
+    }
+  }
+}
+
+.session-quality {
+  padding: 12px;
+  border: 1px solid #e8eef7;
+  border-radius: 6px;
+  background-color: #f8fbff;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  &__title {
+    color: #333;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  &__desc {
+    color: #8a94a6;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  &__score {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+
+    span {
+      color: #606a7a;
+      font-size: 12px;
+    }
+
+    strong {
+      color: #1f5fbf;
+      font-size: 24px;
+      line-height: 28px;
+      font-weight: 700;
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+
+    div {
+      min-width: 0;
+      padding: 8px;
+      border-radius: 6px;
+      background-color: #fff;
+    }
+
+    span,
+    strong {
+      display: block;
+    }
+
+    span {
+      color: #8a94a6;
+      font-size: 11px;
+      line-height: 16px;
+    }
+
+    strong {
+      color: #2f3747;
+      font-size: 13px;
+      line-height: 18px;
+    }
+  }
+
+  &__reasons {
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background-color: #fff;
+
+    span,
+    strong {
+      display: block;
+    }
+
+    span {
+      color: #8a94a6;
+      font-size: 11px;
+      line-height: 16px;
+    }
+
+    strong {
+      color: #2f3747;
+      font-size: 12px;
+      line-height: 18px;
+      word-break: break-word;
     }
   }
 }

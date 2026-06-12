@@ -50,6 +50,23 @@ public class ChatVO {
     }
 
     /**
+     * 会话级质检摘要。
+     */
+    @Data
+    public static class SessionQualityVO {
+        private Long totalAuditedReplies;
+        private Long fallbackReplies;
+        private Long unsafeReplies;
+        private Long lowConfidenceReplies;
+        private Double averageConfidence;
+        private Double fallbackRate;
+        private Double unsafeRate;
+        private Double reliabilityScore;
+        private String riskLevel;
+        private String primaryFallbackReason;
+    }
+
+    /**
      * 最近会话摘要。
      */
     @Data
@@ -169,6 +186,8 @@ public class ChatVO {
         private ContextVO context;
         /** 消息列表 */
         private List<MessageVO> messages;
+        /** 会话质检摘要 */
+        private SessionQualityVO sessionQuality;
         /** 创建时间 */
         private LocalDateTime createdAt;
     }
@@ -215,6 +234,8 @@ public class ChatVO {
         private List<ReasoningStepVO> reasoningProcess;
         /** 可靠性决策 */
         private ReliabilityVO reliability;
+        /** 会话质检摘要 */
+        private SessionQualityVO sessionQuality;
         /** 创建时间 */
         private LocalDateTime createdAt;
     }

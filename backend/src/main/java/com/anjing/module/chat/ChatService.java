@@ -191,6 +191,7 @@ public class ChatService {
             List<ChatMessage> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
             detail.setMessages(messages.stream().map(this::toMessageVO).toList());
             detail.setContext(new ChatVO.ContextVO());
+            detail.setSessionQuality(buildSessionQuality(sessionId));
             return detail;
         }).orElse(null);
     }
@@ -233,7 +234,7 @@ public class ChatService {
 
         agentReply.setMessageId(aiMessage.getMessageId());
         saveAgentAudit(dto.getSessionId(), aiMessage, agentReply);
-        return toSendMessageVO(agentReply, aiMessage);
+        return toSendMessageVO(agentReply, aiMessage, buildSessionQuality(sessionId));
     }
 
     /**
@@ -294,7 +295,11 @@ public class ChatService {
         return context;
     }
 
-    private ChatVO.SendMessageVO toSendMessageVO(AgentReply agentReply, ChatMessage aiMessage) {
+    private ChatVO.SendMessageVO toSendMessageVO(
+            AgentReply agentReply,
+            ChatMessage aiMessage,
+            ChatVO.SessionQualityVO sessionQuality
+    ) {
         ChatVO.SendMessageVO response = new ChatVO.SendMessageVO();
         response.setMessageId(aiMessage.getMessageId());
         response.setContent(agentReply.getContent());
@@ -305,6 +310,7 @@ public class ChatService {
         response.setKnowledgeRecall(toKnowledgeRecallVO(agentReply.getKnowledgeRecall()));
         response.setReasoningProcess(toReasoningProcess(agentReply.getReasoningSteps()));
         response.setReliability(toReliabilityVO(agentReply));
+        response.setSessionQuality(sessionQuality);
         response.setCreatedAt(aiMessage.getCreatedAt());
         return response;
     }
@@ -544,6 +550,60 @@ public class ChatService {
                 .map(Integer::doubleValue)
                 .toList()));
         return vo;
+    }
+
+    private ChatVO.SessionQualityVO buildSessionQuality(String sessionId) {
+        List<ChatAgentAudit> audits = auditRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        long total = audits.size();
+        long fallbackCount = countFallback(audits);
+        long unsafeCount = countUnsafe(audits);
+        long lowConfidenceCount = audits.stream()
+                .filter(audit -> audit.getConfidence() != null && audit.getConfidence() < 0.6)
+                .count();
+
+        double averageConfidence = roundAverage(audits.stream()
+                .map(ChatAgentAudit::getConfidence)
+                .filter(value -> value != null)
+                .toList());
+        double fallbackRate = roundRate(fallbackCount, total);
+        double unsafeRate = roundRate(unsafeCount, total);
+        double lowConfidenceRate = roundRate(lowConfidenceCount, total);
+
+        ChatVO.SessionQualityVO vo = new ChatVO.SessionQualityVO();
+        vo.setTotalAuditedReplies(total);
+        vo.setFallbackReplies(fallbackCount);
+        vo.setUnsafeReplies(unsafeCount);
+        vo.setLowConfidenceReplies(lowConfidenceCount);
+        vo.setAverageConfidence(averageConfidence);
+        vo.setFallbackRate(fallbackRate);
+        vo.setUnsafeRate(unsafeRate);
+        vo.setReliabilityScore(calculateReliabilityScore(fallbackRate, unsafeRate, lowConfidenceRate));
+        vo.setRiskLevel(resolveRiskLevel(vo.getReliabilityScore(), unsafeCount, fallbackRate));
+        vo.setPrimaryFallbackReason(resolvePrimaryFallbackReason(audits));
+        return vo;
+    }
+
+    private double calculateReliabilityScore(double fallbackRate, double unsafeRate, double lowConfidenceRate) {
+        double score = 100D - fallbackRate * 0.35D - unsafeRate * 0.45D - lowConfidenceRate * 0.20D;
+        return Math.max(0D, Math.round(score * 100) / 100D);
+    }
+
+    private String resolveRiskLevel(double reliabilityScore, long unsafeCount, double fallbackRate) {
+        if (unsafeCount > 0 || reliabilityScore < 70D || fallbackRate >= 50D) return "HIGH";
+        if (reliabilityScore < 85D || fallbackRate > 0D) return "MEDIUM";
+        return "LOW";
+    }
+
+    private String resolvePrimaryFallbackReason(List<ChatAgentAudit> audits) {
+        return audits.stream()
+                .map(ChatAgentAudit::getFallbackReason)
+                .filter(reason -> reason != null && !reason.isBlank())
+                .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     private List<ChatVO.RuntimeTrendVO> buildDailyTrends() {

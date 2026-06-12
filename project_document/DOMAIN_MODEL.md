@@ -15,6 +15,7 @@
 | `AgentReply` | 一轮回复的完整结果 | `ChatVO.SendMessageVO` |
 | `ReasoningStep` | 可审计推理过程 | `ChatVO.ReasoningStepVO` |
 | `ChatAgentAudit` | Agent 单轮回复审计事实 | `AgentReply`、`ChatMessage` |
+| `SessionQuality` | 会话级可靠性质检摘要 | `ChatAgentAudit` 聚合 |
 | `ChatRuntimeSnapshot` | Chat Runtime 汇总快照 | `ChatVO.RuntimeOverviewVO` |
 
 ## Application Ports
@@ -64,6 +65,15 @@ Chat 运行趋势：
 | `dailyTrends.replies` | 近 7 日每日 Agent 回复数 |
 | `dailyTrends.fallbackReplies` | 近 7 日每日兜底回复数 |
 | `dailyTrends.unsafeReplies` | 近 7 日每日不安全回复数 |
+
+会话质检摘要：
+
+| 指标 | 说明 |
+|---|---|
+| `sessionQuality.reliabilityScore` | 根据兜底率、不安全率和低置信度回复扣分后的会话可靠性评分 |
+| `sessionQuality.riskLevel` | `LOW`、`MEDIUM`、`HIGH`，用于运营判断是否需要复盘 |
+| `sessionQuality.primaryFallbackReason` | 当前会话最主要的兜底原因 |
+| `sessionQuality.fallbackRate` / `unsafeRate` | 当前会话内兜底和不安全回复占比 |
 
 Chat 运行快照：
 
@@ -169,5 +179,6 @@ flowchart LR
 13. 已完成：Chat Runtime Trend，基于审计事实展示平均置信度、兜底率、不安全率和 7 日趋势。
 14. 已完成：Chat Runtime Snapshot，支持手动采样和可配置定时采样，沉淀长期趋势基础数据。
 15. 已完成：Scene Runtime Insight，展示规则/Prompt 平均使用和集中度，辅助配置运营。
-16. 下一步：将关键词检索升级为向量检索 + rerank。
-17. 下一步：增加跨 Scene/Prompt/Rule 的长期命中趋势和会话质检摘要。
+16. 已完成：Session Quality Summary，基于会话审计事实生成可靠性评分、风险等级和主要兜底原因。
+17. 下一步：将关键词检索升级为向量检索 + rerank。
+18. 下一步：增加跨 Scene/Prompt/Rule 的长期命中趋势和质检明细下钻。

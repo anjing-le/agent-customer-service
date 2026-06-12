@@ -18,5 +18,7 @@ public interface ChatAgentAuditRepository extends JpaRepository<ChatAgentAudit, 
 
     List<ChatAgentAudit> findByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
 
+    List<ChatAgentAudit> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
     List<ChatAgentAudit> findTop5ByOrderByCreatedAtDesc();
 }
