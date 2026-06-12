@@ -86,6 +86,9 @@ public class ApiConstants {
      * 意图识别、提示词模板、场景规则配置
      */
     public static class Scene {
+        // 运行概览
+        public static final String RUNTIME_OVERVIEW = "/api/scene/runtime/overview";
+
         // 意图管理
         public static final String INTENT_LIST = "/api/scene/intent/list";
         public static final String INTENT_CREATE = "/api/scene/intent/create";

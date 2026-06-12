@@ -5,6 +5,13 @@
 import request from '@/utils/http'
 import { ApiPaths } from '@/api/apiPaths'
 
+export function fetchSceneRuntimeOverview() {
+  return request.post<any>({
+    url: ApiPaths.scene.runtimeOverview,
+    data: {}
+  })
+}
+
 // ==================== 意图管理 ====================
 
 export function fetchListIntents(data?: { keyword?: string; sceneType?: string; status?: string; page?: number; size?: number }) {

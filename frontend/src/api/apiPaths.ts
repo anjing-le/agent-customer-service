@@ -49,6 +49,7 @@ export const ApiPaths = {
     vectorizeStatus: '/api/knowledge/vectorize/status'
   },
   scene: {
+    runtimeOverview: '/api/scene/runtime/overview',
     intentList: '/api/scene/intent/list',
     intentCreate: '/api/scene/intent/create',
     intentUpdate: '/api/scene/intent/update',

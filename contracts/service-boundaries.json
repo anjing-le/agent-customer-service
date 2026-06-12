@@ -65,6 +65,7 @@
       "openapi": false,
       "copyAction": "keep CRUD and lightweight runtime integration; RuleEngine and PromptRuntime are already wired in lightweight mode",
       "routes": [
+        { "name": "runtimeOverview", "path": "/api/scene/runtime/overview", "methods": ["POST"] },
         { "name": "intentList", "path": "/api/scene/intent/list", "methods": ["POST"] },
         { "name": "promptList", "path": "/api/scene/prompt/list", "methods": ["POST"] },
         { "name": "promptTest", "path": "/api/scene/prompt/test", "methods": ["POST"] },

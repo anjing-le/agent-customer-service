@@ -10,6 +10,27 @@ import java.util.List;
 public class SceneVO {
 
     /**
+     * 场景运行概览。
+     */
+    @Data
+    public static class RuntimeOverviewVO {
+        private Long activeIntentCount;
+        private Long activeSystemPromptCount;
+        private Long activeRuleCount;
+        private Long totalRuleHits;
+        private Long totalPromptUsage;
+        private List<RuntimeRankVO> topRules;
+        private List<RuntimeRankVO> topPrompts;
+    }
+
+    @Data
+    public static class RuntimeRankVO {
+        private String code;
+        private String name;
+        private Integer count;
+    }
+
+    /**
      * 分页包装
      */
     @Data

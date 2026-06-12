@@ -17,6 +17,11 @@ public class SceneController {
 
     private final SceneService sceneService;
 
+    @PostMapping(ApiConstants.Scene.RUNTIME_OVERVIEW)
+    public APIResponse<SceneVO.RuntimeOverviewVO> getRuntimeOverview() {
+        return APIResponse.success(sceneService.getRuntimeOverview());
+    }
+
     // ==================== 意图管理 ====================
 
     @PostMapping(ApiConstants.Scene.INTENT_LIST)

@@ -154,6 +154,32 @@ public class SceneService {
         log.info("场景配置数据初始化完成");
     }
 
+    public SceneVO.RuntimeOverviewVO getRuntimeOverview() {
+        List<Intent> intents = StreamSupport.stream(intentRepository.findAll().spliterator(), false).toList();
+        List<Prompt> prompts = StreamSupport.stream(promptRepository.findAll().spliterator(), false).toList();
+        List<Rule> rules = StreamSupport.stream(ruleRepository.findAll().spliterator(), false).toList();
+
+        SceneVO.RuntimeOverviewVO overview = new SceneVO.RuntimeOverviewVO();
+        overview.setActiveIntentCount(intents.stream().filter(intent -> "启用".equals(intent.getStatus())).count());
+        overview.setActiveSystemPromptCount(prompts.stream()
+                .filter(prompt -> "启用".equals(prompt.getStatus()) && "SYSTEM".equals(prompt.getPromptType()))
+                .count());
+        overview.setActiveRuleCount(rules.stream().filter(rule -> Boolean.TRUE.equals(rule.getEnabled())).count());
+        overview.setTotalRuleHits(rules.stream().mapToLong(rule -> safeCount(rule.getTriggerCount())).sum());
+        overview.setTotalPromptUsage(prompts.stream().mapToLong(prompt -> safeCount(prompt.getUsageCount())).sum());
+        overview.setTopRules(rules.stream()
+                .sorted(Comparator.comparing((Rule rule) -> safeCount(rule.getTriggerCount())).reversed())
+                .limit(5)
+                .map(rule -> toRuntimeRankVO(rule.getRuleCode(), rule.getRuleName(), rule.getTriggerCount()))
+                .toList());
+        overview.setTopPrompts(prompts.stream()
+                .sorted(Comparator.comparing((Prompt prompt) -> safeCount(prompt.getUsageCount())).reversed())
+                .limit(5)
+                .map(prompt -> toRuntimeRankVO(prompt.getPromptCode(), prompt.getPromptName(), prompt.getUsageCount()))
+                .toList());
+        return overview;
+    }
+
     // ==================== 意图管理 ====================
 
     public SceneVO.PageVO<SceneVO.IntentVO> listIntents(SceneDTO.QueryIntentDTO dto) {
@@ -563,6 +589,18 @@ public class SceneService {
     private List<String> commaSeparatedToList(String str) {
         if (str == null || str.trim().isEmpty()) return Collections.emptyList();
         return Arrays.stream(str.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+    }
+
+    private SceneVO.RuntimeRankVO toRuntimeRankVO(String code, String name, Integer count) {
+        SceneVO.RuntimeRankVO vo = new SceneVO.RuntimeRankVO();
+        vo.setCode(code);
+        vo.setName(name);
+        vo.setCount(count != null ? count : 0);
+        return vo;
+    }
+
+    private long safeCount(Integer count) {
+        return count != null ? count : 0;
     }
 
     private String variablesToJson(List<SceneDTO.PromptVariableDTO> variables) {
