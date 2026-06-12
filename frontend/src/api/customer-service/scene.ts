@@ -136,3 +136,21 @@ export function fetchDisableRule(id: number) {
     data: { id }
   })
 }
+
+export function fetchTestRule(data: {
+  ruleId: number
+  userMessage?: string
+  sceneType?: string
+  intentCode?: string
+  intentName?: string
+  confidence?: number
+  emotion?: string
+  knowledgeCount?: number
+  hasReliableKnowledge?: boolean
+  context?: Record<string, any>
+}) {
+  return request.post<any>({
+    url: ApiPaths.scene.ruleTest,
+    data
+  })
+}

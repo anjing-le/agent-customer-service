@@ -46,6 +46,10 @@ public class RuleEngine {
         return hits;
     }
 
+    public Optional<RuleHit> evaluateSingle(Rule rule, ConversationTurn turn, IntentAnalysis analysis, KnowledgeRecall recall) {
+        return Optional.ofNullable(evaluateRule(rule, turn, analysis, recall));
+    }
+
     private RuleHit evaluateRule(Rule rule, ConversationTurn turn, IntentAnalysis analysis, KnowledgeRecall recall) {
         Optional<RuleHit> expressionHit = evaluateJsonCondition(rule, turn, analysis, recall);
         if (expressionHit.isPresent()) {

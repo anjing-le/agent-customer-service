@@ -134,5 +134,27 @@ public class SceneVO {
         /** 更新时间 */
         private LocalDateTime updatedAt;
     }
-}
 
+    /**
+     * 场景规则测试结果。
+     */
+    @Data
+    public static class RuleTestResultVO {
+        private Boolean hit;
+        private RuleHitVO ruleHit;
+    }
+
+    /**
+     * 命中的运行时规则。
+     */
+    @Data
+    public static class RuleHitVO {
+        private String ruleCode;
+        private String ruleName;
+        private String ruleType;
+        private Integer priority;
+        private String reason;
+        private String action;
+        private String conditionSource;
+    }
+}

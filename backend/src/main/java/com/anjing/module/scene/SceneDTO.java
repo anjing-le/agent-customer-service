@@ -163,5 +163,18 @@ public class SceneDTO {
         private String expireTime;
         private Boolean enabled;
     }
-}
 
+    @Data
+    public static class TestRuleDTO {
+        private Long ruleId;
+        private String userMessage;
+        private String sceneType;
+        private String intentCode;
+        private String intentName;
+        private Double confidence;
+        private String emotion;
+        private Integer knowledgeCount;
+        private Boolean hasReliableKnowledge;
+        private Map<String, Object> context;
+    }
+}

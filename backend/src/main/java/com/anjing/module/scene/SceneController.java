@@ -135,5 +135,10 @@ public class SceneController {
         sceneService.disableRule(dto.getId());
         return APIResponse.success();
     }
-}
 
+    @PostMapping(ApiConstants.Scene.RULE_TEST)
+    public APIResponse<SceneVO.RuleTestResultVO> testRule(@RequestBody SceneDTO.TestRuleDTO dto) {
+        log.info("测试规则: {}", dto);
+        return APIResponse.success(sceneService.testRule(dto));
+    }
+}

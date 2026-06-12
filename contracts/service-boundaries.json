@@ -63,12 +63,13 @@
       "apiPathsKey": "scene",
       "controller": "backend/src/main/java/com/anjing/module/scene/SceneController.java",
       "openapi": false,
-      "copyAction": "keep CRUD and lightweight runtime integration; full RuleEngine/PromptRuntime remains roadmap",
+      "copyAction": "keep CRUD and lightweight runtime integration; RuleEngine and PromptRuntime are already wired in lightweight mode",
       "routes": [
         { "name": "intentList", "path": "/api/scene/intent/list", "methods": ["POST"] },
         { "name": "promptList", "path": "/api/scene/prompt/list", "methods": ["POST"] },
         { "name": "promptTest", "path": "/api/scene/prompt/test", "methods": ["POST"] },
-        { "name": "ruleList", "path": "/api/scene/rule/list", "methods": ["POST"] }
+        { "name": "ruleList", "path": "/api/scene/rule/list", "methods": ["POST"] },
+        { "name": "ruleTest", "path": "/api/scene/rule/test", "methods": ["POST"] }
       ]
     }
   ]

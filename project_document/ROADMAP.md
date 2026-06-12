@@ -22,10 +22,10 @@
 - 已轻量接入 Scene 配置：动态 Intent、SYSTEM Prompt、基础 Rule 护栏。
 - 已将 `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 接入真实 runtime。
 - 已补 RuleEngine 命中结果、轻量 JSON 条件表达式和 PromptRuntime 基础变量渲染。
-- 已补 Rule 条件/动作编辑器、JSON 格式化和前后端校验。
+- 已补 Rule 条件/动作编辑器、JSON 格式化、表达式测试和前后端校验。
 - 已补 Prompt 变量 schema、运行时变量快捷填充、编辑态校验和测试入口。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补 Rule 表达式测试、运行统计和命中趋势。
+- 下一步补运行统计和命中趋势。
 - 支持 SSE 流式回复和低置信度转人工策略。
 
 ## V3: 生产化扩展

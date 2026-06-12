@@ -8,7 +8,8 @@ import {
   fetchUpdateRule,
   fetchDeleteRule,
   fetchEnableRule,
-  fetchDisableRule
+  fetchDisableRule,
+  fetchTestRule
 } from '@/api/customer-service/scene'
 
 interface Rule {
@@ -30,6 +31,7 @@ interface Rule {
 const tableData = ref<Rule[]>([])
 const loading = ref(false)
 const dialogVisible = ref(false)
+const testDialogVisible = ref(false)
 const currentRule = ref<Rule | null>(null)
 const submitting = ref(false)
 const ruleFormRef = ref()
@@ -45,6 +47,18 @@ const ruleForm = reactive({
   effectiveTime: '',
   expireTime: '',
   enabled: true
+})
+const testForm = reactive({
+  userMessage: '我想退货，但是不确定要怎么操作',
+  sceneType: '售后服务',
+  intentCode: 'RETURN_EXCHANGE',
+  intentName: '退换货咨询',
+  confidence: 0.62,
+  emotion: '中性',
+  knowledgeCount: 1,
+  hasReliableKnowledge: true,
+  contextText: '{}',
+  result: null as any
 })
 
 const conditionExample = `{
@@ -189,6 +203,44 @@ const handleSubmit = async () => {
   }
 }
 
+const handleTest = (row: Rule) => {
+  currentRule.value = row
+  Object.assign(testForm, {
+    userMessage: '我想退货，但是不确定要怎么操作',
+    sceneType: '售后服务',
+    intentCode: 'RETURN_EXCHANGE',
+    intentName: '退换货咨询',
+    confidence: 0.62,
+    emotion: '中性',
+    knowledgeCount: 1,
+    hasReliableKnowledge: true,
+    contextText: '{}',
+    result: null
+  })
+  testDialogVisible.value = true
+}
+
+const handleRunTest = async () => {
+  if (!currentRule.value) return
+  try {
+    const context = testForm.contextText.trim() ? JSON.parse(testForm.contextText) : {}
+    testForm.result = await fetchTestRule({
+      ruleId: currentRule.value.id,
+      userMessage: testForm.userMessage,
+      sceneType: testForm.sceneType,
+      intentCode: testForm.intentCode,
+      intentName: testForm.intentName,
+      confidence: testForm.confidence,
+      emotion: testForm.emotion,
+      knowledgeCount: testForm.knowledgeCount,
+      hasReliableKnowledge: testForm.hasReliableKnowledge,
+      context
+    })
+  } catch {
+    ElMessage.warning('上下文必须是合法 JSON')
+  }
+}
+
 const handleDelete = (row: Rule) => {
   ElMessageBox.confirm('确定要删除该规则吗？', '提示', {
     type: 'warning'
@@ -290,8 +342,9 @@ const getRuleTypeColor = (type: string): RuleTagType => {
           />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
+          <el-button type="primary" link size="small" @click="handleTest(row)">测试</el-button>
           <el-button type="primary" link size="small" @click="handleEdit(row)">编辑</el-button>
           <el-button type="danger" link size="small" @click="handleDelete(row)">删除</el-button>
         </template>
@@ -388,6 +441,64 @@ const getRuleTypeColor = (type: string): RuleTagType => {
         <el-button type="primary" :loading="submitting" @click="handleSubmit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="testDialogVisible"
+      title="测试规则"
+      width="760px"
+      destroy-on-close
+    >
+      <el-form label-width="96px">
+        <el-form-item label="用户输入">
+          <el-input v-model="testForm.userMessage" type="textarea" :rows="2" />
+        </el-form-item>
+        <div class="form-grid">
+          <el-form-item label="场景">
+            <el-input v-model="testForm.sceneType" />
+          </el-form-item>
+          <el-form-item label="意图编码">
+            <el-input v-model="testForm.intentCode" />
+          </el-form-item>
+          <el-form-item label="意图名称">
+            <el-input v-model="testForm.intentName" />
+          </el-form-item>
+          <el-form-item label="置信度">
+            <el-input-number v-model="testForm.confidence" :min="0" :max="1" :step="0.01" />
+          </el-form-item>
+          <el-form-item label="情绪">
+            <el-input v-model="testForm.emotion" />
+          </el-form-item>
+          <el-form-item label="知识数量">
+            <el-input-number v-model="testForm.knowledgeCount" :min="0" :max="99" />
+          </el-form-item>
+        </div>
+        <el-form-item label="可靠知识">
+          <el-switch v-model="testForm.hasReliableKnowledge" />
+        </el-form-item>
+        <el-form-item label="上下文">
+          <el-input v-model="testForm.contextText" type="textarea" :rows="4" spellcheck="false" />
+        </el-form-item>
+      </el-form>
+
+      <div class="test-result">
+        <div class="test-result__header">
+          <el-tag v-if="testForm.result" :type="testForm.result.hit ? 'success' : 'info'">
+            {{ testForm.result.hit ? '已命中' : '未命中' }}
+          </el-tag>
+          <span v-else class="test-result__empty">尚未运行</span>
+        </div>
+        <div v-if="testForm.result?.ruleHit" class="test-result__content">
+          <div><strong>来源：</strong>{{ testForm.result.ruleHit.conditionSource }}</div>
+          <div><strong>动作：</strong>{{ testForm.result.ruleHit.action }}</div>
+          <div><strong>原因：</strong>{{ testForm.result.ruleHit.reason }}</div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="testDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="handleRunTest">运行</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -455,6 +566,31 @@ const getRuleTypeColor = (type: string): RuleTagType => {
     justify-content: flex-end;
     gap: 8px;
     margin-bottom: 8px;
+  }
+}
+
+.test-result {
+  padding: 12px;
+  border-radius: 6px;
+  background-color: #fafafa;
+
+  &__header {
+    min-height: 24px;
+    margin-bottom: 8px;
+  }
+
+  &__empty {
+    color: #999;
+    font-size: 12px;
+  }
+
+  &__content {
+    display: grid;
+    gap: 6px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
   }
 }
 </style>

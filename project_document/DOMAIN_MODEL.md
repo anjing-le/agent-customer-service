@@ -46,7 +46,7 @@ Scene 配置接入点：
 |---|---|
 | 启用的 `Intent` | LLM 分析失败时，按优先级和触发关键词参与意图识别 |
 | 启用的 SYSTEM `Prompt` | 由 `PromptRuntime` 按场景过滤、变量渲染后注入 `LlmService` 上下文 |
-| 启用的 `Rule` | 由 `RuleEngine` 执行；支持 `SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 内置规则码和 JSON 条件表达式 |
+| 启用的 `Rule` | 由 `RuleEngine` 执行；支持 `SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 内置规则码、JSON 条件表达式和表达式测试 |
 
 ## Rule Condition V1
 
@@ -116,5 +116,6 @@ flowchart LR
 6. 已完成：`RuleEngine` 轻量 JSON 条件表达式，支持 `all`/`any`、字段操作符和动作驱动护栏。
 7. 已完成：Rule 条件/动作编辑器和前后端 JSON 校验。
 8. 已完成：Prompt 变量 schema、编辑态校验、运行时变量快捷填充和测试入口。
-9. 下一步：将关键词检索升级为向量检索 + rerank。
-10. 下一步：增加运行统计，沉淀规则命中率、Prompt 使用量和兜底趋势。
+9. 已完成：Rule 表达式测试入口，支持模拟运行时字段并查看命中原因和动作。
+10. 下一步：将关键词检索升级为向量检索 + rerank。
+11. 下一步：增加运行统计，沉淀规则命中率、Prompt 使用量和兜底趋势。

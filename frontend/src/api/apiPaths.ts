@@ -66,6 +66,7 @@ export const ApiPaths = {
     ruleDelete: '/api/scene/rule/delete',
     ruleDetail: '/api/scene/rule/detail',
     ruleEnable: '/api/scene/rule/enable',
-    ruleDisable: '/api/scene/rule/disable'
+    ruleDisable: '/api/scene/rule/disable',
+    ruleTest: '/api/scene/rule/test'
   }
 } as const

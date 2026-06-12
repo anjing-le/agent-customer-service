@@ -109,5 +109,6 @@ public class ApiConstants {
         public static final String RULE_DETAIL = "/api/scene/rule/detail";
         public static final String RULE_ENABLE = "/api/scene/rule/enable";
         public static final String RULE_DISABLE = "/api/scene/rule/disable";
+        public static final String RULE_TEST = "/api/scene/rule/test";
     }
 }

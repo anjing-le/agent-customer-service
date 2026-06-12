@@ -14,7 +14,7 @@
 | 响应 envelope | Ready for V1 | Chat/Knowledge/Scene Controller 已迁移到 `APIResponse<T>`；前端 HTTP 层兼容字符串成功码 `"0"` |
 | Agent 领域模型 | In runtime | `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 已接入对话主链路 |
 | RuleEngine | Lightweight runtime | 支持内置规则码和轻量 JSON 条件表达式；命中后返回来源、原因和动作，并累加触发次数 |
-| Rule 配置 | Runtime editable | 前端支持规则新增/编辑、条件/动作 JSON 格式化和校验；后端 create/update 拦截非法 JSON |
+| Rule 配置 | Runtime editable | 前端支持规则新增/编辑、条件/动作 JSON 格式化、表达式测试和校验；后端 create/update 拦截非法 JSON |
 | PromptRuntime | Lightweight runtime | 支持 SYSTEM Prompt 场景过滤、基础变量渲染、使用次数累加，并返回渲染结果 |
 | Prompt 配置 | Runtime editable | 前端支持 Prompt 新增/编辑、变量 schema、运行时变量快捷填充和测试；后端校验变量名、重复项和必填占位符 |
 | 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
@@ -27,7 +27,7 @@
 - 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
 - V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
 - 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已轻量接入运行时，规则表达式测试和运行统计看板下一阶段继续补。
+- Scene 已轻量接入运行时，运行统计看板下一阶段继续补。
 
 ## 验证入口
 

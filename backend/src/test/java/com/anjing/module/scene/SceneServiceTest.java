@@ -2,6 +2,7 @@ package com.anjing.module.scene;
 
 import com.anjing.model.exception.BizException;
 import com.anjing.module.chat.LlmService;
+import com.anjing.module.agent.runtime.RuleEngine;
 import com.anjing.module.scene.repository.IntentRepository;
 import com.anjing.module.scene.repository.PromptRepository;
 import com.anjing.module.scene.repository.RuleRepository;
@@ -20,7 +21,8 @@ class SceneServiceTest {
             mock(PromptRepository.class),
             mock(RuleRepository.class),
             mock(LlmService.class),
-            new ObjectMapper()
+            new ObjectMapper(),
+            mock(RuleEngine.class)
     );
 
     @Test

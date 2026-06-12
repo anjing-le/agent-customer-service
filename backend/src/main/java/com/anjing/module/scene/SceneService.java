@@ -2,6 +2,13 @@ package com.anjing.module.scene;
 
 import com.anjing.model.errorcode.CommonErrorCode;
 import com.anjing.model.exception.BizException;
+import com.anjing.module.agent.domain.ConversationTurn;
+import com.anjing.module.agent.domain.IntentAnalysis;
+import com.anjing.module.agent.domain.KnowledgeEvidence;
+import com.anjing.module.agent.domain.KnowledgeRecall;
+import com.anjing.module.agent.domain.KnowledgeSource;
+import com.anjing.module.agent.domain.RuleHit;
+import com.anjing.module.agent.runtime.RuleEngine;
 import com.anjing.module.chat.LlmService;
 import com.anjing.module.scene.entity.Intent;
 import com.anjing.module.scene.entity.Prompt;
@@ -37,6 +44,7 @@ public class SceneService {
     private final RuleRepository ruleRepository;
     private final LlmService llmService;
     private final ObjectMapper objectMapper;
+    private final RuleEngine ruleEngine;
 
     private static final Pattern PROMPT_VARIABLE_NAME_PATTERN = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]*$");
 
@@ -401,6 +409,30 @@ public class SceneService {
         return ruleRepository.findById(id).map(this::ruleToVO).orElse(null);
     }
 
+    public SceneVO.RuleTestResultVO testRule(SceneDTO.TestRuleDTO dto) {
+        Rule rule = ruleRepository.findById(dto.getRuleId())
+                .orElseThrow(() -> new BizException("规则不存在", CommonErrorCode.PARAM_INVALID));
+
+        ConversationTurn turn = new ConversationTurn();
+        turn.setUserMessage(dto.getUserMessage());
+        turn.setContext(dto.getContext() != null ? dto.getContext() : Map.of());
+
+        IntentAnalysis analysis = new IntentAnalysis();
+        analysis.setSceneType(dto.getSceneType());
+        analysis.setIntentCode(dto.getIntentCode());
+        analysis.setIntentName(dto.getIntentName());
+        analysis.setConfidence(dto.getConfidence());
+        analysis.setEmotion(dto.getEmotion());
+
+        KnowledgeRecall recall = buildTestRecall(dto);
+        Optional<RuleHit> hit = ruleEngine.evaluateSingle(rule, turn, analysis, recall);
+
+        SceneVO.RuleTestResultVO result = new SceneVO.RuleTestResultVO();
+        result.setHit(hit.isPresent());
+        hit.ifPresent(ruleHit -> result.setRuleHit(ruleHitToVO(ruleHit)));
+        return result;
+    }
+
     private void validateRuleJson(String conditions, String actions) {
         if (conditions != null && !conditions.isBlank()) {
             JsonNode conditionNode = parseRuleJson(conditions, "规则条件");
@@ -414,6 +446,21 @@ public class SceneService {
                 throw new BizException("规则动作必须是 JSON 对象", CommonErrorCode.PARAM_INVALID);
             }
         }
+    }
+
+    private KnowledgeRecall buildTestRecall(SceneDTO.TestRuleDTO dto) {
+        KnowledgeRecall recall = new KnowledgeRecall();
+        int count = dto.getKnowledgeCount() != null ? Math.max(dto.getKnowledgeCount(), 0) : 0;
+        boolean reliable = Boolean.TRUE.equals(dto.getHasReliableKnowledge());
+        for (int i = 0; i < count; i++) {
+            KnowledgeEvidence evidence = new KnowledgeEvidence();
+            evidence.setEvidenceId("test-" + i);
+            evidence.setSource(KnowledgeSource.FAQ);
+            evidence.setTitle("测试知识 " + (i + 1));
+            evidence.setScore(reliable ? 0.9 : 0.1);
+            recall.getEvidences().add(evidence);
+        }
+        return recall;
     }
 
     private JsonNode parseRuleJson(String json, String label) {
@@ -493,6 +540,18 @@ public class SceneService {
         vo.setExpireTime(entity.getExpireTime());
         vo.setCreatedAt(entity.getCreatedAt());
         vo.setUpdatedAt(entity.getUpdatedAt());
+        return vo;
+    }
+
+    private SceneVO.RuleHitVO ruleHitToVO(RuleHit hit) {
+        SceneVO.RuleHitVO vo = new SceneVO.RuleHitVO();
+        vo.setRuleCode(hit.getRuleCode());
+        vo.setRuleName(hit.getRuleName());
+        vo.setRuleType(hit.getRuleType());
+        vo.setPriority(hit.getPriority());
+        vo.setReason(hit.getReason());
+        vo.setAction(hit.getAction());
+        vo.setConditionSource(hit.getConditionSource());
         return vo;
     }
 
