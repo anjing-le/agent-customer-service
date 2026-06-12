@@ -13,9 +13,11 @@ import com.anjing.module.agent.domain.ReasoningStep;
 import com.anjing.module.agent.domain.RuleHit;
 import com.anjing.module.chat.entity.ChatAgentAudit;
 import com.anjing.module.chat.entity.ChatMessage;
+import com.anjing.module.chat.entity.ChatRuntimeSnapshot;
 import com.anjing.module.chat.entity.ChatSession;
 import com.anjing.module.chat.repository.ChatAgentAuditRepository;
 import com.anjing.module.chat.repository.ChatMessageRepository;
+import com.anjing.module.chat.repository.ChatRuntimeSnapshotRepository;
 import com.anjing.module.chat.repository.ChatSessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +49,7 @@ public class ChatService {
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final ChatAgentAuditRepository auditRepository;
+    private final ChatRuntimeSnapshotRepository snapshotRepository;
     private final AgentRuntime agentRuntime;
 
     /**
@@ -75,7 +78,33 @@ public class ChatService {
         vo.setRecentAudits(loadRecentAudits());
         vo.setQualitySummary(buildQualitySummary());
         vo.setDailyTrends(buildDailyTrends());
+        vo.setLatestSnapshot(loadLatestSnapshot());
         return vo;
+    }
+
+    /**
+     * 采样当前运行态，沉淀为历史快照。
+     */
+    @Transactional
+    public ChatVO.RuntimeSnapshotVO captureRuntimeSnapshot(String snapshotType) {
+        ChatVO.RuntimeOverviewVO overview = getRuntimeOverview();
+        ChatVO.QualitySummaryVO quality = overview.getQualitySummary();
+
+        ChatRuntimeSnapshot snapshot = new ChatRuntimeSnapshot();
+        snapshot.setSnapshotId(UUID.randomUUID().toString());
+        snapshot.setSnapshotDate(LocalDate.now());
+        snapshot.setSnapshotType(snapshotType);
+        snapshot.setTotalSessions(overview.getTotalSessions());
+        snapshot.setActiveSessions(overview.getActiveSessions());
+        snapshot.setTotalMessages(overview.getTotalMessages());
+        snapshot.setTotalAuditedReplies(quality.getTotalAuditedReplies());
+        snapshot.setAverageConfidence(quality.getAverageConfidence());
+        snapshot.setFallbackRate(quality.getFallbackRate());
+        snapshot.setUnsafeRate(quality.getUnsafeRate());
+        snapshot.setAverageKnowledgeEvidenceCount(quality.getAverageKnowledgeEvidenceCount());
+        snapshot.setAverageRuleHitCount(quality.getAverageRuleHitCount());
+        snapshot.setAveragePromptRenderCount(quality.getAveragePromptRenderCount());
+        return toRuntimeSnapshotVO(snapshotRepository.save(snapshot));
     }
 
     /**
@@ -542,6 +571,32 @@ public class ChatService {
             trends.add(trend);
         }
         return trends;
+    }
+
+    private ChatVO.RuntimeSnapshotVO loadLatestSnapshot() {
+        return snapshotRepository.findTop7ByOrderByCreatedAtDesc().stream()
+                .findFirst()
+                .map(this::toRuntimeSnapshotVO)
+                .orElse(null);
+    }
+
+    private ChatVO.RuntimeSnapshotVO toRuntimeSnapshotVO(ChatRuntimeSnapshot snapshot) {
+        ChatVO.RuntimeSnapshotVO vo = new ChatVO.RuntimeSnapshotVO();
+        vo.setSnapshotId(snapshot.getSnapshotId());
+        vo.setSnapshotDate(snapshot.getSnapshotDate() != null ? snapshot.getSnapshotDate().toString() : null);
+        vo.setSnapshotType(snapshot.getSnapshotType());
+        vo.setTotalSessions(snapshot.getTotalSessions());
+        vo.setActiveSessions(snapshot.getActiveSessions());
+        vo.setTotalMessages(snapshot.getTotalMessages());
+        vo.setTotalAuditedReplies(snapshot.getTotalAuditedReplies());
+        vo.setAverageConfidence(snapshot.getAverageConfidence());
+        vo.setFallbackRate(snapshot.getFallbackRate());
+        vo.setUnsafeRate(snapshot.getUnsafeRate());
+        vo.setAverageKnowledgeEvidenceCount(snapshot.getAverageKnowledgeEvidenceCount());
+        vo.setAverageRuleHitCount(snapshot.getAverageRuleHitCount());
+        vo.setAveragePromptRenderCount(snapshot.getAveragePromptRenderCount());
+        vo.setCreatedAt(snapshot.getCreatedAt());
+        return vo;
     }
 
     private long countFallback(List<ChatAgentAudit> audits) {

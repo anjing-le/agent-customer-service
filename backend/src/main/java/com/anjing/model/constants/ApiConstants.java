@@ -18,6 +18,7 @@ public class ApiConstants {
     public static class Chat {
         // 运行概览
         public static final String RUNTIME_OVERVIEW = "/api/chat/runtime/overview";
+        public static final String RUNTIME_SNAPSHOT_CAPTURE = "/api/chat/runtime/snapshot/capture";
 
         // 会话管理
         public static final String CREATE_SESSION = "/api/chat/session/create";

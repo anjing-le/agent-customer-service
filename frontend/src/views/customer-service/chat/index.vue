@@ -11,7 +11,8 @@ import QuestionSidebar from './components/QuestionSidebar.vue'
 import ChatInterface from './components/ChatInterface.vue'
 import KnowledgeSelect from './components/KnowledgeSelect.vue'
 import AgentWorkArea from './components/AgentWorkArea.vue'
-import { fetchChatRuntimeOverview } from '@/api/customer-service/chat'
+import { ElMessage } from 'element-plus'
+import { fetchCaptureChatRuntimeSnapshot, fetchChatRuntimeOverview } from '@/api/customer-service/chat'
 
 // 选中的问题
 const selectedQuestion = ref<string>('')
@@ -25,6 +26,7 @@ const knowledgeSelection = ref<{ selectedProducts: number[]; selectedActivities:
 
 // 最新一次的 AI 响应（传给 AgentWorkArea 展示）
 const lastAiResponse = ref<any>(null)
+const snapshotLoading = ref(false)
 const overview = ref({
   totalSessions: 0,
   activeSessions: 0,
@@ -48,7 +50,8 @@ const overview = ref({
     averageRuleHitCount: 0,
     averagePromptRenderCount: 0
   },
-  dailyTrends: [] as any[]
+  dailyTrends: [] as any[],
+  latestSnapshot: null as any
 })
 
 const loadOverview = async () => {
@@ -77,6 +80,17 @@ const handleKnowledgeChange = (data: { selectedProducts: number[]; selectedActiv
 const handleAiResponse = (response: any) => {
   lastAiResponse.value = response
   loadOverview()
+}
+
+const handleCaptureSnapshot = async () => {
+  snapshotLoading.value = true
+  try {
+    await fetchCaptureChatRuntimeSnapshot()
+    ElMessage.success('运行快照已采样')
+    await loadOverview()
+  } finally {
+    snapshotLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -142,6 +156,21 @@ onMounted(() => {
           <em>{{ item.fallbackReplies }}</em>
         </div>
       </div>
+      <div class="runtime-snapshot">
+        <div>
+          <span>最近快照</span>
+          <strong>{{ overview.latestSnapshot?.snapshotDate || '未采样' }}</strong>
+          <em>{{ overview.latestSnapshot?.snapshotType || 'manual / scheduled' }}</em>
+        </div>
+        <el-button
+          size="small"
+          type="primary"
+          :loading="snapshotLoading"
+          @click="handleCaptureSnapshot"
+        >
+          采样
+        </el-button>
+      </div>
     </div>
 
     <div class="chat-center">
@@ -197,7 +226,8 @@ onMounted(() => {
 .runtime-metric,
 .runtime-recent,
 .runtime-quality,
-.runtime-trend {
+.runtime-trend,
+.runtime-snapshot {
   min-height: 58px;
   padding: 10px 12px;
   border: 1px solid #dedbd1;
@@ -254,6 +284,30 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(7, minmax(46px, 1fr));
   gap: 6px;
+}
+
+.runtime-snapshot {
+  grid-column: span 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  span,
+  em {
+    display: block;
+    color: #7b7567;
+    font-size: 12px;
+    line-height: 18px;
+    font-style: normal;
+  }
+
+  strong {
+    display: block;
+    color: #2d2a24;
+    font-size: 18px;
+    line-height: 24px;
+  }
 }
 
 .trend-item {
@@ -326,7 +380,8 @@ onMounted(() => {
   }
 
   .runtime-quality,
-  .runtime-trend {
+  .runtime-trend,
+  .runtime-snapshot {
     grid-column: span 3;
   }
 
@@ -357,7 +412,8 @@ onMounted(() => {
   }
 
   .runtime-quality,
-  .runtime-trend {
+  .runtime-trend,
+  .runtime-snapshot {
     grid-column: span 2;
   }
 

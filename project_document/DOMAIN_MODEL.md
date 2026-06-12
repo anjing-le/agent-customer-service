@@ -15,6 +15,7 @@
 | `AgentReply` | 一轮回复的完整结果 | `ChatVO.SendMessageVO` |
 | `ReasoningStep` | 可审计推理过程 | `ChatVO.ReasoningStepVO` |
 | `ChatAgentAudit` | Agent 单轮回复审计事实 | `AgentReply`、`ChatMessage` |
+| `ChatRuntimeSnapshot` | Chat Runtime 汇总快照 | `ChatVO.RuntimeOverviewVO` |
 
 ## Application Ports
 
@@ -63,6 +64,18 @@ Chat 运行趋势：
 | `dailyTrends.replies` | 近 7 日每日 Agent 回复数 |
 | `dailyTrends.fallbackReplies` | 近 7 日每日兜底回复数 |
 | `dailyTrends.unsafeReplies` | 近 7 日每日不安全回复数 |
+
+Chat 运行快照：
+
+| 字段 | 说明 |
+|---|---|
+| `snapshotDate` | 快照归属日期 |
+| `snapshotType` | `manual` 手动采样或 `scheduled` 定时采样 |
+| `totalSessions` / `totalMessages` | 采样时累计会话和消息 |
+| `totalAuditedReplies` | 采样时累计已审计回复 |
+| `averageConfidence` / `fallbackRate` / `unsafeRate` | 采样时质量摘要 |
+
+定时采样默认关闭，可通过 `CS_RUNTIME_SNAPSHOT_ENABLED=true` 开启，并用 `CS_RUNTIME_SNAPSHOT_CRON` 覆盖默认 cron。
 
 Scene 配置接入点：
 
@@ -145,5 +158,6 @@ flowchart LR
 11. 已完成：Chat Runtime Overview，展示会话、消息、活跃状态、今日消息和最近会话。
 12. 已完成：Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
 13. 已完成：Chat Runtime Trend，基于审计事实展示平均置信度、兜底率、不安全率和 7 日趋势。
-14. 下一步：将关键词检索升级为向量检索 + rerank。
-15. 下一步：增加定时运行历史快照，沉淀长期规则命中率、Prompt 使用量和兜底趋势。
+14. 已完成：Chat Runtime Snapshot，支持手动采样和可配置定时采样，沉淀长期趋势基础数据。
+15. 下一步：将关键词检索升级为向量检索 + rerank。
+16. 下一步：增加跨 Scene/Prompt/Rule 的命中趋势和会话质检摘要。

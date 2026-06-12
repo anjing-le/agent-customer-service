@@ -45,6 +45,8 @@ public class ChatVO {
         private QualitySummaryVO qualitySummary;
         /** 近 7 日趋势 */
         private List<RuntimeTrendVO> dailyTrends;
+        /** 最近运行快照 */
+        private RuntimeSnapshotVO latestSnapshot;
     }
 
     /**
@@ -105,6 +107,27 @@ public class ChatVO {
         private Long fallbackReplies;
         private Long unsafeReplies;
         private Double averageConfidence;
+    }
+
+    /**
+     * Chat Runtime 历史快照。
+     */
+    @Data
+    public static class RuntimeSnapshotVO {
+        private String snapshotId;
+        private String snapshotDate;
+        private String snapshotType;
+        private Long totalSessions;
+        private Long activeSessions;
+        private Long totalMessages;
+        private Long totalAuditedReplies;
+        private Double averageConfidence;
+        private Double fallbackRate;
+        private Double unsafeRate;
+        private Double averageKnowledgeEvidenceCount;
+        private Double averageRuleHitCount;
+        private Double averagePromptRenderCount;
+        private LocalDateTime createdAt;
     }
 
 

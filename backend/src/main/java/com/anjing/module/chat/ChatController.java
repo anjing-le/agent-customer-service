@@ -27,6 +27,14 @@ public class ChatController {
         return APIResponse.success(chatService.getRuntimeOverview());
     }
 
+    /**
+     * 手动生成对话运行快照
+     */
+    @PostMapping(ApiConstants.Chat.RUNTIME_SNAPSHOT_CAPTURE)
+    public APIResponse<ChatVO.RuntimeSnapshotVO> captureRuntimeSnapshot() {
+        return APIResponse.success(chatService.captureRuntimeSnapshot("manual"));
+    }
+
     // ==================== 会话管理 ====================
 
     /**

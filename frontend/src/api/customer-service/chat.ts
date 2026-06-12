@@ -12,6 +12,13 @@ export function fetchChatRuntimeOverview() {
   })
 }
 
+export function fetchCaptureChatRuntimeSnapshot() {
+  return request.post<any>({
+    url: ApiPaths.chat.runtimeSnapshotCapture,
+    data: {}
+  })
+}
+
 // ==================== 会话管理 ====================
 
 /**
