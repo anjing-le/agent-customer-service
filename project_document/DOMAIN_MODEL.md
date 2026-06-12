@@ -38,13 +38,14 @@
 | `DefaultGuardrailPolicy` | 低置信度、无可靠知识等兜底决策 |
 | `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
 | `RuleEngine` | 执行启用规则，返回命中原因和动作 |
+| `PromptRuntime` | 渲染启用 SYSTEM Prompt，注入变量并返回可观测结果 |
 
 Scene 配置接入点：
 
 | 配置 | Runtime 影响 |
 |---|---|
 | 启用的 `Intent` | LLM 分析失败时，按优先级和触发关键词参与意图识别 |
-| 启用的 SYSTEM `Prompt` | 注入 `LlmService` 的增强系统提示词 |
+| 启用的 SYSTEM `Prompt` | 由 `PromptRuntime` 按场景过滤、变量渲染后注入 `LlmService` 上下文 |
 | 启用的 `Rule` | 由 `RuleEngine` 执行；`SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 已有命中结果 |
 
 ## Runtime Boundary
@@ -67,7 +68,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     A["Scene Config"] --> B["Rule Condition Engine"]
-    A --> C["Prompt Variable Renderer"]
+    A --> C["Prompt Variable Schema"]
     A --> D["Intent Statistics"]
     E["Vector Store"] --> F["KnowledgeRetriever"]
     G["Reliability Dashboard"] --> H["AgentReply Audit"]
@@ -87,6 +88,7 @@ flowchart LR
 2. 已完成：抽出 `IntentAnalyzer`、`KnowledgeRetriever`、`GuardrailPolicy`、`ReplyGenerator`。
 3. 已完成：Scene 配置轻量接入 `IntentAnalyzer`、`ReplyGenerator` 和 `GuardrailPolicy`。
 4. 已完成：轻量 `RuleEngine`，支持内置规则码命中和动作解释。
-5. 下一步：实现 JSON 条件表达式和 Prompt 变量渲染。
-6. 下一步：将关键词检索升级为向量检索 + rerank。
-7. 下一步：增加可靠性看板，展示兜底原因、知识证据和回复引擎。
+5. 已完成：`PromptRuntime` 基础变量渲染，前端可靠性面板展示渲染结果。
+6. 下一步：实现 JSON 条件表达式、Prompt 变量 schema 和编辑态校验。
+7. 下一步：将关键词检索升级为向量检索 + rerank。
+8. 下一步：增加运行统计，沉淀规则命中率、Prompt 使用量和兜底趋势。

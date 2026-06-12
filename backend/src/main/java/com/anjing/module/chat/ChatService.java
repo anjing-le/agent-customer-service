@@ -8,6 +8,7 @@ import com.anjing.module.agent.domain.ConversationTurn;
 import com.anjing.module.agent.domain.KnowledgeEvidence;
 import com.anjing.module.agent.domain.KnowledgeRecall;
 import com.anjing.module.agent.domain.KnowledgeSource;
+import com.anjing.module.agent.domain.PromptRenderResult;
 import com.anjing.module.agent.domain.ReasoningStep;
 import com.anjing.module.agent.domain.RuleHit;
 import com.anjing.module.chat.entity.ChatMessage;
@@ -256,6 +257,7 @@ public class ChatService {
             vo.setPolicyTags(agentReply.getGuardrailDecision().getPolicyTags());
             vo.setRuleHits(toRuleHitVOs(agentReply.getGuardrailDecision().getRuleHits()));
         }
+        vo.setPromptRenders(toPromptRenderVOs(agentReply.getPromptRenderResults()));
         return vo;
     }
 
@@ -269,6 +271,19 @@ public class ChatService {
             vo.setPriority(hit.getPriority());
             vo.setReason(hit.getReason());
             vo.setAction(hit.getAction());
+            return vo;
+        }).toList();
+    }
+
+    private List<ChatVO.PromptRenderVO> toPromptRenderVOs(List<PromptRenderResult> renderResults) {
+        if (renderResults == null) return List.of();
+        return renderResults.stream().map(result -> {
+            ChatVO.PromptRenderVO vo = new ChatVO.PromptRenderVO();
+            vo.setPromptCode(result.getPromptCode());
+            vo.setPromptName(result.getPromptName());
+            vo.setPromptType(result.getPromptType());
+            vo.setSceneType(result.getSceneType());
+            vo.setRenderedContent(result.getRenderedContent());
             return vo;
         }).toList();
     }

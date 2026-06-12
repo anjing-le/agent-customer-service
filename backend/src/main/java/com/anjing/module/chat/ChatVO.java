@@ -117,6 +117,8 @@ public class ChatVO {
         private List<String> policyTags;
         /** 命中规则 */
         private List<RuleHitVO> ruleHits;
+        /** 运行时渲染提示词 */
+        private List<PromptRenderVO> promptRenders;
     }
 
     /**
@@ -130,6 +132,18 @@ public class ChatVO {
         private Integer priority;
         private String reason;
         private String action;
+    }
+
+    /**
+     * 运行时渲染后的提示词。
+     */
+    @Data
+    public static class PromptRenderVO {
+        private String promptCode;
+        private String promptName;
+        private String promptType;
+        private String sceneType;
+        private String renderedContent;
     }
 
     /**

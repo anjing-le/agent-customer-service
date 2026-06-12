@@ -41,7 +41,8 @@ const reliability = ref<any>({
   fallbackReason: '',
   userVisibleNotice: '',
   policyTags: [],
-  ruleHits: []
+  ruleHits: [],
+  promptRenders: []
 })
 
 const formatTime = (ts: string | null) => {
@@ -105,7 +106,8 @@ watch(() => props.aiResponse, (res) => {
     fallbackReason: res.reliability?.fallbackReason || '',
     userVisibleNotice: res.reliability?.userVisibleNotice || '',
     policyTags: res.reliability?.policyTags || [],
-    ruleHits: res.reliability?.ruleHits || []
+    ruleHits: res.reliability?.ruleHits || [],
+    promptRenders: res.reliability?.promptRenders || []
   }
 
   userProfile.value.lastActive = '刚刚'
@@ -330,6 +332,30 @@ watch(() => props.aiResponse, (res) => {
               </div>
               <div v-else class="reliability-block__content reliability-block__content--muted">
                 暂无命中规则
+              </div>
+            </div>
+
+            <div class="reliability-block">
+              <div class="reliability-block__label">渲染提示词</div>
+              <div v-if="reliability.promptRenders.length" class="prompt-render-list">
+                <div
+                  v-for="prompt in reliability.promptRenders"
+                  :key="prompt.promptCode"
+                  class="prompt-render-item"
+                >
+                  <div class="prompt-render-item__header">
+                    <span class="prompt-render-item__name">{{ prompt.promptName }}</span>
+                    <code class="prompt-render-item__code">{{ prompt.promptCode }}</code>
+                  </div>
+                  <div class="prompt-render-item__meta">
+                    <span>{{ prompt.promptType }}</span>
+                    <span>{{ prompt.sceneType || '全局' }}</span>
+                  </div>
+                  <pre class="prompt-render-item__content">{{ prompt.renderedContent }}</pre>
+                </div>
+              </div>
+              <div v-else class="reliability-block__content reliability-block__content--muted">
+                暂无渲染提示词
               </div>
             </div>
           </div>
@@ -734,6 +760,12 @@ watch(() => props.aiResponse, (res) => {
   gap: 8px;
 }
 
+.prompt-render-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .rule-hit-item {
   padding: 10px;
   background-color: #fff;
@@ -777,6 +809,61 @@ watch(() => props.aiResponse, (res) => {
     color: #666;
     font-size: 12px;
     line-height: 1.5;
+  }
+}
+
+.prompt-render-item {
+  padding: 10px;
+  background-color: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  &__name {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  &__code {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    color: #666;
+    font-size: 11px;
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #999;
+    font-size: 11px;
+  }
+
+  &__content {
+    max-height: 160px;
+    margin: 0;
+    padding: 8px;
+    overflow: auto;
+    border-radius: 4px;
+    background-color: #fafafa;
+    color: #555;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 }
 </style>

@@ -16,5 +16,6 @@ public class AgentReply {
     private IntentAnalysis intentAnalysis;
     private KnowledgeRecall knowledgeRecall;
     private GuardrailDecision guardrailDecision;
+    private List<PromptRenderResult> promptRenderResults;
     private List<ReasoningStep> reasoningSteps;
 }

@@ -22,8 +22,8 @@
 ## Runtime Truth
 
 - 当前真实链路：用户消息 -> `AgentRuntime` -> 意图分析 -> Product/Activity/FAQ 检索 -> 护栏决策 -> LLM/规则回复 -> 推理和可靠性结果返回。
-- Scene 当前接入：启用 Intent 参与关键词兜底识别；启用 SYSTEM Prompt 注入 LLM 上下文；启用 Rule 由轻量 RuleEngine 产生命中原因和动作。
-- 当前预留链路：Industry/Solution 向量化、RuleEngine JSON 条件表达式、Prompt 变量渲染、向量检索和 rerank。
+- Scene 当前接入：启用 Intent 参与关键词兜底识别；启用 SYSTEM Prompt 由 PromptRuntime 渲染后注入 LLM 上下文；启用 Rule 由轻量 RuleEngine 产生命中原因和动作。
+- 当前预留链路：Industry/Solution 向量化、RuleEngine JSON 条件表达式、Prompt 变量 schema、向量检索和 rerank。
 
 ## Update Rules
 
