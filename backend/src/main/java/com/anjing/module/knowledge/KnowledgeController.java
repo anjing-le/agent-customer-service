@@ -154,6 +154,24 @@ public class KnowledgeController {
         return APIResponse.success(knowledgeService.getFaqDetail(dto.getId()));
     }
 
+    // ==================== 知识缺口 ====================
+
+    /**
+     * 获取运行时知识缺口列表
+     */
+    @PostMapping(ApiConstants.Knowledge.GAP_LIST)
+    public APIResponse<KnowledgeVO.PageVO<KnowledgeVO.KnowledgeGapVO>> listKnowledgeGaps(@RequestBody KnowledgeDTO.QueryGapDTO dto) {
+        return APIResponse.success(knowledgeService.listKnowledgeGaps(dto));
+    }
+
+    /**
+     * 处理知识缺口，可补成 FAQ 或仅标记已处理
+     */
+    @PostMapping(ApiConstants.Knowledge.GAP_RESOLVE)
+    public APIResponse<KnowledgeVO.KnowledgeGapVO> resolveKnowledgeGap(@RequestBody KnowledgeDTO.ResolveGapDTO dto) {
+        return APIResponse.success(knowledgeService.resolveKnowledgeGap(dto));
+    }
+
     // ==================== 行业知识 ====================
 
     /**

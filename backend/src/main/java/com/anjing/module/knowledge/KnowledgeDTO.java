@@ -101,6 +101,25 @@ public class KnowledgeDTO {
         private String status;
     }
 
+    // ==================== 知识缺口 ====================
+
+    @Data
+    public static class QueryGapDTO extends QueryDTO {
+        private String noAnswerReason;
+        private String priority;
+    }
+
+    @Data
+    public static class ResolveGapDTO {
+        private Long id;
+        private String resolutionType;
+        private String question;
+        private String answer;
+        private String category;
+        private List<String> tags;
+        private String resolutionNote;
+    }
+
     // ==================== 行业知识 ====================
     
     @Data

@@ -48,6 +48,8 @@
         { "name": "productList", "path": "/api/knowledge/product/list", "methods": ["POST"] },
         { "name": "activityList", "path": "/api/knowledge/activity/list", "methods": ["POST"] },
         { "name": "faqList", "path": "/api/knowledge/faq/list", "methods": ["POST"] },
+        { "name": "gapList", "path": "/api/knowledge/gap/list", "methods": ["POST"] },
+        { "name": "gapResolve", "path": "/api/knowledge/gap/resolve", "methods": ["POST"] },
         { "name": "industryList", "path": "/api/knowledge/industry/list", "methods": ["POST"] },
         { "name": "solutionList", "path": "/api/knowledge/solution/list", "methods": ["POST"] },
         { "name": "vectorize", "path": "/api/knowledge/vectorize", "methods": ["POST"] }

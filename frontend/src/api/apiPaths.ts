@@ -40,6 +40,8 @@ export const ApiPaths = {
     faqDelete: '/api/knowledge/faq/delete',
     faqDetail: '/api/knowledge/faq/detail',
     faqImport: '/api/knowledge/faq/import',
+    gapList: '/api/knowledge/gap/list',
+    gapResolve: '/api/knowledge/gap/resolve',
     industryList: '/api/knowledge/industry/list',
     industryCreate: '/api/knowledge/industry/create',
     industryUpdate: '/api/knowledge/industry/update',

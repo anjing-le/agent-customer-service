@@ -1,5 +1,7 @@
 package com.anjing.module.knowledge;
 
+import com.anjing.module.agent.domain.AgentReply;
+import com.anjing.module.agent.domain.KnowledgeRecall;
 import com.anjing.module.knowledge.entity.*;
 import com.anjing.module.knowledge.repository.*;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -27,6 +29,7 @@ public class KnowledgeService {
     private final FaqRepository faqRepository;
     private final IndustryRepository industryRepository;
     private final SolutionRepository solutionRepository;
+    private final KnowledgeGapRepository knowledgeGapRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -261,6 +264,32 @@ public class KnowledgeService {
         return vo;
     }
 
+    private KnowledgeVO.KnowledgeGapVO toKnowledgeGapVO(KnowledgeGap entity) {
+        if (entity == null) return null;
+        KnowledgeVO.KnowledgeGapVO vo = new KnowledgeVO.KnowledgeGapVO();
+        vo.setId(entity.getId());
+        vo.setSessionId(entity.getSessionId());
+        vo.setMessageId(entity.getMessageId());
+        vo.setUserQuestion(entity.getUserQuestion());
+        vo.setIntentCode(entity.getIntentCode());
+        vo.setIntentName(entity.getIntentName());
+        vo.setSceneType(entity.getSceneType());
+        vo.setNoAnswerReason(entity.getNoAnswerReason());
+        vo.setNoAnswerDetail(entity.getNoAnswerDetail());
+        vo.setStatus(entity.getStatus());
+        vo.setPriority(entity.getPriority());
+        vo.setOccurrenceCount(entity.getOccurrenceCount());
+        vo.setResolvedKnowledgeType(entity.getResolvedKnowledgeType());
+        vo.setResolvedKnowledgeId(entity.getResolvedKnowledgeId());
+        vo.setResolutionNote(entity.getResolutionNote());
+        vo.setFirstSeenAt(entity.getFirstSeenAt());
+        vo.setLastSeenAt(entity.getLastSeenAt());
+        vo.setResolvedAt(entity.getResolvedAt());
+        vo.setCreatedAt(entity.getCreatedAt());
+        vo.setUpdatedAt(entity.getUpdatedAt());
+        return vo;
+    }
+
     private KnowledgeVO.IndustryVO toIndustryVO(Industry entity) {
         if (entity == null) return null;
         KnowledgeVO.IndustryVO vo = new KnowledgeVO.IndustryVO();
@@ -307,6 +336,7 @@ public class KnowledgeService {
         overview.setFaqCount(faqRepository.count());
         overview.setIndustryCount(industryRepository.count());
         overview.setSolutionCount(solutionRepository.count());
+        overview.setGapCount(knowledgeGapRepository.countByStatus("OPEN"));
         overview.setTotalCount(overview.getProductCount() + overview.getActivityCount()
                 + overview.getFaqCount() + overview.getIndustryCount()
                 + overview.getSolutionCount());
@@ -554,6 +584,113 @@ public class KnowledgeService {
             return toFaqVO(faq);
         }
         return null;
+    }
+
+    // ==================== 知识缺口 ====================
+
+    @Transactional
+    public void captureRuntimeKnowledgeGap(String sessionId, String messageId, String userQuestion, AgentReply agentReply) {
+        if (agentReply == null || agentReply.getKnowledgeRecall() == null) {
+            return;
+        }
+        KnowledgeRecall recall = agentReply.getKnowledgeRecall();
+        if (!Boolean.TRUE.equals(recall.getHallucinationBlocked())) {
+            return;
+        }
+        String question = normalizeQuestion(userQuestion);
+        if (question.isEmpty()) {
+            return;
+        }
+
+        KnowledgeGap gap = knowledgeGapRepository
+                .findFirstByUserQuestionAndNoAnswerReasonAndStatusOrderByUpdatedAtDesc(
+                        question,
+                        recall.getNoAnswerReason(),
+                        "OPEN"
+                )
+                .orElseGet(KnowledgeGap::new);
+        gap.setSessionId(sessionId);
+        gap.setMessageId(messageId);
+        gap.setUserQuestion(question);
+        if (agentReply.getIntentAnalysis() != null) {
+            gap.setIntentCode(agentReply.getIntentAnalysis().getIntentCode());
+            gap.setIntentName(agentReply.getIntentAnalysis().getIntentName());
+            gap.setSceneType(agentReply.getIntentAnalysis().getSceneType());
+        }
+        gap.setNoAnswerReason(recall.getNoAnswerReason());
+        gap.setNoAnswerDetail(recall.getNoAnswerDetail());
+        gap.setStatus("OPEN");
+        gap.setPriority(resolveGapPriority(recall.getNoAnswerReason(), agentReply));
+        gap.setOccurrenceCount(gap.getOccurrenceCount() == null ? 1 : gap.getOccurrenceCount() + 1);
+        gap.setLastSeenAt(LocalDateTime.now());
+        knowledgeGapRepository.save(gap);
+    }
+
+    public KnowledgeVO.PageVO<KnowledgeVO.KnowledgeGapVO> listKnowledgeGaps(KnowledgeDTO.QueryGapDTO dto) {
+        List<KnowledgeVO.KnowledgeGapVO> list = (dto.getStatus() != null && !dto.getStatus().isEmpty()
+                ? knowledgeGapRepository.findByStatusOrderByUpdatedAtDesc(dto.getStatus())
+                : knowledgeGapRepository.findAllByOrderByUpdatedAtDesc()).stream()
+                .map(this::toKnowledgeGapVO)
+                .collect(Collectors.toList());
+
+        if (dto.getKeyword() != null && !dto.getKeyword().isEmpty()) {
+            String keyword = dto.getKeyword().toLowerCase();
+            list.removeIf(g -> !safeLower(g.getUserQuestion()).contains(keyword)
+                    && !safeLower(g.getNoAnswerDetail()).contains(keyword));
+        }
+        if (dto.getNoAnswerReason() != null && !dto.getNoAnswerReason().isEmpty()) {
+            list.removeIf(g -> !dto.getNoAnswerReason().equals(g.getNoAnswerReason()));
+        }
+        if (dto.getPriority() != null && !dto.getPriority().isEmpty()) {
+            list.removeIf(g -> !dto.getPriority().equals(g.getPriority()));
+        }
+        return buildPage(list, dto.getPage(), dto.getSize());
+    }
+
+    @Transactional
+    public KnowledgeVO.KnowledgeGapVO resolveKnowledgeGap(KnowledgeDTO.ResolveGapDTO dto) {
+        KnowledgeGap gap = knowledgeGapRepository.findById(dto.getId()).orElse(null);
+        if (gap == null) {
+            return null;
+        }
+
+        if ("CREATE_FAQ".equals(dto.getResolutionType())) {
+            KnowledgeDTO.CreateFaqDTO faqDTO = new KnowledgeDTO.CreateFaqDTO();
+            faqDTO.setQuestion(dto.getQuestion() != null && !dto.getQuestion().isBlank()
+                    ? dto.getQuestion()
+                    : gap.getUserQuestion());
+            faqDTO.setAnswer(dto.getAnswer());
+            faqDTO.setCategory(dto.getCategory() != null ? dto.getCategory() : "售后服务");
+            faqDTO.setTags(dto.getTags());
+            faqDTO.setPriority(3);
+            KnowledgeVO.FaqVO faq = createFaq(faqDTO);
+            gap.setResolvedKnowledgeType("FAQ");
+            gap.setResolvedKnowledgeId(faq != null ? faq.getId() : null);
+        } else {
+            gap.setResolvedKnowledgeType("MANUAL");
+        }
+
+        gap.setStatus("RESOLVED");
+        gap.setResolutionNote(dto.getResolutionNote());
+        gap.setResolvedAt(LocalDateTime.now());
+        return toKnowledgeGapVO(knowledgeGapRepository.save(gap));
+    }
+
+    private String normalizeQuestion(String question) {
+        return question == null ? "" : question.trim().replaceAll("\\s+", " ");
+    }
+
+    private String safeLower(String text) {
+        return text == null ? "" : text.toLowerCase();
+    }
+
+    private String resolveGapPriority(String noAnswerReason, AgentReply agentReply) {
+        if ("NO_EVIDENCE".equals(noAnswerReason)) return "HIGH";
+        if (agentReply.getGuardrailDecision() != null && agentReply.getGuardrailDecision().isTransferRecommended()) {
+            return "HIGH";
+        }
+        if ("LOW_TRUST_EVIDENCE".equals(noAnswerReason)) return "MEDIUM";
+        return "LOW";
     }
 
     // ==================== 行业知识 ====================

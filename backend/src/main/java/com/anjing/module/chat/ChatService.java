@@ -21,6 +21,7 @@ import com.anjing.module.chat.repository.ChatMessageRepository;
 import com.anjing.module.chat.repository.ChatRuntimeSnapshotRepository;
 import com.anjing.module.chat.repository.ChatSessionRepository;
 import com.anjing.module.chat.repository.ChatTransferTicketRepository;
+import com.anjing.module.knowledge.KnowledgeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -56,6 +57,7 @@ public class ChatService {
     private final ChatRuntimeSnapshotRepository snapshotRepository;
     private final ChatTransferTicketRepository transferTicketRepository;
     private final AgentRuntime agentRuntime;
+    private final KnowledgeService knowledgeService;
 
     /**
      * 获取对话运行概览。
@@ -244,6 +246,7 @@ public class ChatService {
 
         agentReply.setMessageId(aiMessage.getMessageId());
         saveAgentAudit(dto.getSessionId(), aiMessage, agentReply);
+        knowledgeService.captureRuntimeKnowledgeGap(sessionId, aiMessage.getMessageId(), dto.getContent(), agentReply);
         ChatVO.TransferTicketVO transferTicket = ensureTransferTicket(sessionId, aiMessage, agentReply);
         return toSendMessageVO(agentReply, aiMessage, buildSessionQuality(sessionId), transferTicket);
     }

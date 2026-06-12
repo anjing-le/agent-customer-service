@@ -9,6 +9,7 @@ import ActivityKnowledge from './tabs/ActivityKnowledge.vue'
 import FaqKnowledge from './tabs/FaqKnowledge.vue'
 import SolutionKnowledge from './tabs/SolutionKnowledge.vue'
 import IndustryKnowledge from './tabs/IndustryKnowledge.vue'
+import KnowledgeGap from './tabs/KnowledgeGap.vue'
 import { fetchGetOverview } from '@/api/customer-service/knowledge'
 
 // 当前激活的tab
@@ -19,6 +20,7 @@ const tabs = [
   { name: 'product', label: '商品知识', icon: '🛍️', desc: '对话时作为商品上下文注入LLM' },
   { name: 'activity', label: '活动知识', icon: '🎁', desc: '对话时作为优惠上下文注入LLM' },
   { name: 'faq', label: 'FAQ问答', icon: '❓', desc: '对话时关键词匹配，命中后作为回复参考' },
+  { name: 'gap', label: '知识缺口', icon: '🧩', desc: '对话无可靠证据时自动沉淀，支持补充FAQ' },
   { name: 'industry', label: '行业知识（模拟）', icon: '📚', desc: 'CRUD真实，未接入对话链路，预留RAG扩展' },
   { name: 'solution', label: '解决方案（模拟）', icon: '🎯', desc: 'CRUD真实，未接入对话链路，预留流程编排' }
 ]
@@ -29,12 +31,13 @@ const stats = ref({
   product: 0,
   activity: 0,
   faq: 0,
-  industry: 0
+  industry: 0,
+  gap: 0
 })
 
 // 总知识数
 const totalKnowledge = computed(() => {
-  return Object.values(stats.value).reduce((a, b) => a + b, 0)
+  return stats.value.solution + stats.value.product + stats.value.activity + stats.value.faq + stats.value.industry
 })
 
 // 加载统计数据
@@ -46,7 +49,8 @@ const loadOverview = async () => {
       product: res.productCount || 0,
       activity: res.activityCount || 0,
       faq: res.faqCount || 0,
-      industry: res.industryCount || 0
+      industry: res.industryCount || 0,
+      gap: res.gapCount || 0
     }
   } catch {
     // 后端不可用时保持默认值
@@ -83,6 +87,10 @@ onMounted(() => {
           <div class="stat-card__value">{{ stats.activity }}</div>
           <div class="stat-card__label">活动知识</div>
         </div>
+        <div class="stat-card stat-card--gap">
+          <div class="stat-card__value">{{ stats.gap }}</div>
+          <div class="stat-card__label">待补缺口</div>
+        </div>
       </div>
     </div>
 
@@ -110,6 +118,9 @@ onMounted(() => {
           </template>
           <template v-else-if="activeTab === 'faq'">
             <FaqKnowledge />
+          </template>
+          <template v-else-if="activeTab === 'gap'">
+            <KnowledgeGap />
           </template>
           <template v-else-if="activeTab === 'industry'">
             <IndustryKnowledge />
@@ -170,6 +181,15 @@ onMounted(() => {
     .stat-card__value,
     .stat-card__label {
       color: #fff;
+    }
+  }
+
+  &--gap {
+    border: 1px solid #faecd8;
+    background-color: #fff8ed;
+
+    .stat-card__value {
+      color: #d46b08;
     }
   }
 

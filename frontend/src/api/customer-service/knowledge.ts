@@ -129,6 +129,37 @@ export function fetchGetFaqDetail(id: number) {
   })
 }
 
+// ==================== 知识缺口 ====================
+
+export function fetchListKnowledgeGaps(data?: {
+  keyword?: string
+  status?: string
+  noAnswerReason?: string
+  priority?: string
+  page?: number
+  size?: number
+}) {
+  return request.post<any>({
+    url: ApiPaths.knowledge.gapList,
+    data: data || {}
+  })
+}
+
+export function fetchResolveKnowledgeGap(data: {
+  id: number
+  resolutionType: string
+  question?: string
+  answer?: string
+  category?: string
+  tags?: string[]
+  resolutionNote?: string
+}) {
+  return request.post<any>({
+    url: ApiPaths.knowledge.gapResolve,
+    data
+  })
+}
+
 // ==================== 行业知识 ====================
 
 export function fetchListIndustries(data?: { keyword?: string; industryType?: string; status?: string; page?: number; size?: number }) {

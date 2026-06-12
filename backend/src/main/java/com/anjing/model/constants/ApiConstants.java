@@ -70,6 +70,10 @@ public class ApiConstants {
         public static final String FAQ_DELETE = "/api/knowledge/faq/delete";
         public static final String FAQ_DETAIL = "/api/knowledge/faq/detail";
         public static final String FAQ_IMPORT = "/api/knowledge/faq/import";
+
+        // 知识缺口
+        public static final String GAP_LIST = "/api/knowledge/gap/list";
+        public static final String GAP_RESOLVE = "/api/knowledge/gap/resolve";
         
         // 行业知识
         public static final String INDUSTRY_LIST = "/api/knowledge/industry/list";

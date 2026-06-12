@@ -120,6 +120,15 @@ Chat 运行趋势：
 | `noAnswerDetail` | 面向运营和前端展示的原因说明 |
 | `hallucinationBlocked` | 是否已阻止 LLM 在缺少可靠证据时自由生成 |
 
+知识缺口池：
+
+| 模型 | 说明 |
+|---|---|
+| `KnowledgeGap` | 对话运行时暴露的无答案问题，记录会话、消息、意图、无答案原因和出现次数 |
+| `OPEN` | 等待运营补知识或人工确认 |
+| `RESOLVED` | 已补充 FAQ 或人工关闭 |
+| `resolvedKnowledgeType` / `resolvedKnowledgeId` | 缺口处理后关联的知识类型和知识 ID |
+
 Chat 运行快照：
 
 | 字段 | 说明 |
@@ -243,4 +252,5 @@ flowchart LR
 22. 已完成：Transfer Runtime Metrics，展示转人工待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
 23. 已完成：Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用。
 24. 已完成：Knowledge No-answer Boundary，无可靠证据时返回无答案原因并阻止自由生成。
-25. 下一步：沉淀知识缺口池和补知识任务。
+25. 已完成：Knowledge Gap Queue，无可靠证据问题自动沉淀为知识缺口，支持补 FAQ 或人工关闭。
+26. 下一步：补知识缺口运营统计和 Top 缺口分析。

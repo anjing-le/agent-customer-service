@@ -28,6 +28,7 @@ public class KnowledgeVO {
         private Long faqCount;
         private Long industryCount;
         private Long solutionCount;
+        private Long gapCount;
         private Long vectorizedCount;
         private String lastUpdateTime;
     }
@@ -89,6 +90,32 @@ public class KnowledgeVO {
         private Integer priority;
         private String status;
         private Boolean vectorized;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+    }
+
+    // ==================== 知识缺口 ====================
+
+    @Data
+    public static class KnowledgeGapVO {
+        private Long id;
+        private String sessionId;
+        private String messageId;
+        private String userQuestion;
+        private String intentCode;
+        private String intentName;
+        private String sceneType;
+        private String noAnswerReason;
+        private String noAnswerDetail;
+        private String status;
+        private String priority;
+        private Integer occurrenceCount;
+        private String resolvedKnowledgeType;
+        private Long resolvedKnowledgeId;
+        private String resolutionNote;
+        private LocalDateTime firstSeenAt;
+        private LocalDateTime lastSeenAt;
+        private LocalDateTime resolvedAt;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
