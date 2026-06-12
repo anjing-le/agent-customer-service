@@ -6,6 +6,7 @@
 
 | 领域 | 状态 | 说明 |
 |---|---|---|
+| 脚手架继承 | Ready | 技术栈、结构、契约、脚本、质量门禁沿用 `infra-dev-scaffolding`，业务只扩展客服 Agent |
 | 对话中心 | V2 runtime started | 会话/消息持久化仍在 `ChatService`，分析、检索、护栏、回复生成已由 `AgentRuntime` 编排 |
 | 知识中心 | In progress | Product/Activity/FAQ 参与当前对话检索；Industry/Solution 为预留 |
 | 场景配置 | Runtime connected | 启用 Intent 参与关键词识别；启用 SYSTEM Prompt 注入 LLM 上下文；启用 Rule 参与护栏标签和基础策略 |

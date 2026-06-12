@@ -1,14 +1,15 @@
 # Project Constraints
 
-本文档定义 `agent-customer-service` 的长期工程约束。目标不是套模板，而是把“可靠 Agent 客服”做成清晰、可验证、可演进的工程系统。
+本文档定义 `agent-customer-service` 的长期工程约束。项目必须保持从 `infra-dev-scaffolding` 生长出来的工程习惯，目标不是套模板，而是把“可靠 Agent 客服”做成清晰、可验证、可演进的工程系统。
 
 ## 总体边界
 
 - 项目定位是智能客服：多轮会话、RAG 检索增强、规则兜底、防幻觉、会话管理和历史记录。
+- 底层技术栈、目录习惯、契约、脚本和质量门禁继承脚手架；业务项目只扩展客服 Agent 设计。
 - V1 保留当前单体架构，先把运行链路、接口契约和模块边界讲清楚。
 - 不默认引入网关、注册中心、MQ、对象存储或链路追踪平台；重型能力只保留接口、配置样例和扩展点。
 - Product、Activity、FAQ 是 V1 真实参与对话链路的知识；Industry、Solution 是预留能力，未接入前必须在页面和文档中标明。
-- Scene 的 Intent、Prompt、Rule 当前是管理和演示能力；接入对话链路前不得声称为运行时规则引擎。
+- Scene 的 Intent、Prompt、Rule 已轻量接入运行时；完整条件表达式和 RuleEngine 未完成前，文档必须标明当前能力边界。
 
 ## 后端约束
 

@@ -54,7 +54,7 @@
     {
       "id": "scene",
       "name": "Scene Configuration",
-      "kind": "reserved-runtime",
+      "kind": "runtime",
       "owner": "agent-customer-service",
       "currentHost": "agent-customer-service",
       "basePath": "/api/scene",
@@ -63,7 +63,7 @@
       "apiPathsKey": "scene",
       "controller": "backend/src/main/java/com/anjing/module/scene/SceneController.java",
       "openapi": false,
-      "copyAction": "keep CRUD, but mark as not consumed by the chat runtime until RuleEngine/PromptRuntime is implemented",
+      "copyAction": "keep CRUD and lightweight runtime integration; full RuleEngine/PromptRuntime remains roadmap",
       "routes": [
         { "name": "intentList", "path": "/api/scene/intent/list", "methods": ["POST"] },
         { "name": "promptList", "path": "/api/scene/prompt/list", "methods": ["POST"] },

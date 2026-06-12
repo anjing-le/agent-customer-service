@@ -14,6 +14,7 @@ required_files=(
   "project_document/STATUS.md"
   "project_document/API_CONTRACT_GUIDE.md"
   "project_document/SERVICE_BOUNDARY_GUIDE.md"
+  "project_document/SCAFFOLD_INHERITANCE.md"
   "project_document/LOCAL_STARTUP_GUIDE.md"
 )
 

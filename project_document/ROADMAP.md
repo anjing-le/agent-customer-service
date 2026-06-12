@@ -4,9 +4,12 @@
 
 `agent-customer-service` 是可靠 Agent 客服项目，核心关注多轮对话、RAG 检索增强、规则兜底、防幻觉、会话管理和历史记录。
 
+它也是 `infra-dev-scaffolding` 的业务生长样例：脚手架负责通用工程能力，项目本身只讲客服 Agent 的领域设计。
+
 ## V1: 工程对齐与可靠 Demo
 
 - 补齐脚手架工程骨架：contracts、scripts、project_document、质量门禁入口。
+- 明确脚手架继承关系：技术栈、工程习惯、API 契约和质量门禁都来自 `infra-dev-scaffolding`。
 - 保留现有对话中心、知识中心、场景配置三大页面。
 - 将当前真实/模拟边界写入 README、文档和 service boundary。
 - 统一项目身份、端口、环境说明和生产 API 地址。
