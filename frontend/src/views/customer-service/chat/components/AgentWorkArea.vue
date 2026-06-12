@@ -71,6 +71,12 @@ const riskTagType = computed(() => {
   return 'success'
 })
 
+const trustTagType = (trustLevel?: string) => {
+  if (trustLevel === 'HIGH') return 'success'
+  if (trustLevel === 'MEDIUM') return 'warning'
+  return 'info'
+}
+
 const formatTime = (ts: string | null) => {
   if (!ts) return ''
   try {
@@ -103,18 +109,27 @@ watch(() => props.aiResponse, (res) => {
       id: p.productId,
       name: p.productName,
       score: p.score ?? 0.8,
-      source: p.source || '知识库'
+      source: p.source || '知识库',
+      matchReason: p.matchReason || '',
+      trustLevel: p.trustLevel || 'MEDIUM',
+      quotable: p.quotable ?? true
     })),
     faqs: (res.knowledgeRecall?.faqs || []).map((f: any) => ({
       id: f.faqId,
       question: f.question,
       answer: f.answer,
-      score: f.score ?? 0.8
+      score: f.score ?? 0.8,
+      matchReason: f.matchReason || '',
+      trustLevel: f.trustLevel || 'MEDIUM',
+      quotable: f.quotable ?? true
     })),
     activities: (res.knowledgeRecall?.activities || []).map((a: any) => ({
       id: a.activityId,
       name: a.activityName,
-      score: a.score ?? 0.8
+      score: a.score ?? 0.8,
+      matchReason: a.matchReason || '',
+      trustLevel: a.trustLevel || 'MEDIUM',
+      quotable: a.quotable ?? true
     }))
   }
 
@@ -278,6 +293,13 @@ const handleResolveTransfer = async () => {
                   <span class="recall-item__source">{{ item.source }}</span>
                   <span class="recall-item__score">{{ (item.score * 100).toFixed(0) }}%</span>
                 </div>
+                <div class="recall-item__tags">
+                  <el-tag :type="trustTagType(item.trustLevel)" size="small">{{ item.trustLevel }}</el-tag>
+                  <el-tag :type="item.quotable ? 'success' : 'info'" size="small">
+                    {{ item.quotable ? '可引用' : '仅参考' }}
+                  </el-tag>
+                </div>
+                <div v-if="item.matchReason" class="recall-item__reason">{{ item.matchReason }}</div>
               </div>
             </div>
 
@@ -294,6 +316,13 @@ const handleResolveTransfer = async () => {
                 <div class="recall-item__meta">
                   <span class="recall-item__score">匹配度：{{ (item.score * 100).toFixed(0) }}%</span>
                 </div>
+                <div class="recall-item__tags">
+                  <el-tag :type="trustTagType(item.trustLevel)" size="small">{{ item.trustLevel }}</el-tag>
+                  <el-tag :type="item.quotable ? 'success' : 'info'" size="small">
+                    {{ item.quotable ? '可引用' : '仅参考' }}
+                  </el-tag>
+                </div>
+                <div v-if="item.matchReason" class="recall-item__reason">{{ item.matchReason }}</div>
               </div>
             </div>
 
@@ -309,6 +338,13 @@ const handleResolveTransfer = async () => {
                 <div class="recall-item__meta">
                   <span class="recall-item__score">{{ (item.score * 100).toFixed(0) }}%</span>
                 </div>
+                <div class="recall-item__tags">
+                  <el-tag :type="trustTagType(item.trustLevel)" size="small">{{ item.trustLevel }}</el-tag>
+                  <el-tag :type="item.quotable ? 'success' : 'info'" size="small">
+                    {{ item.quotable ? '可引用' : '仅参考' }}
+                  </el-tag>
+                </div>
+                <div v-if="item.matchReason" class="recall-item__reason">{{ item.matchReason }}</div>
               </div>
             </div>
           </div>
@@ -866,6 +902,7 @@ const handleResolveTransfer = async () => {
 
   &__meta {
     display: flex;
+    gap: 8px;
     justify-content: space-between;
     font-size: 11px;
     color: #999;
@@ -874,6 +911,21 @@ const handleResolveTransfer = async () => {
   &__score {
     color: #1890ff;
     font-weight: 500;
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  &__reason {
+    margin-top: 6px;
+    color: #666;
+    font-size: 12px;
+    line-height: 18px;
+    word-break: break-word;
   }
 }
 

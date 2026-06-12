@@ -119,6 +119,7 @@ public class JpaKnowledgeRetriever implements KnowledgeRetriever {
         evidence.setTitle(product.getProductName());
         evidence.setContent(product.getDescription());
         evidence.setScore(score);
+        enrichReliability(evidence, matchMode);
         evidence.setAttributes(attributes(
                 "productName", product.getProductName(),
                 "matchMode", matchMode
@@ -133,6 +134,7 @@ public class JpaKnowledgeRetriever implements KnowledgeRetriever {
         evidence.setTitle(activity.getActivityName());
         evidence.setContent(activity.getDescription());
         evidence.setScore(score);
+        enrichReliability(evidence, matchMode);
         evidence.setAttributes(attributes(
                 "activityName", activity.getActivityName(),
                 "description", activity.getDescription(),
@@ -148,11 +150,41 @@ public class JpaKnowledgeRetriever implements KnowledgeRetriever {
         evidence.setTitle(faq.getQuestion());
         evidence.setContent(faq.getAnswer());
         evidence.setScore(score);
+        enrichReliability(evidence, "FAQ匹配");
         evidence.setAttributes(attributes(
                 "question", faq.getQuestion(),
-                "answer", faq.getAnswer()
+                "answer", faq.getAnswer(),
+                "matchMode", "FAQ匹配"
         ));
         return evidence;
+    }
+
+    private void enrichReliability(KnowledgeEvidence evidence, String matchMode) {
+        double score = evidence.getScore() != null ? evidence.getScore() : 0D;
+        String trustLevel;
+        if (score >= 0.85D || "人工选择".equals(matchMode)) {
+            trustLevel = "HIGH";
+        } else if (score >= 0.55D) {
+            trustLevel = "MEDIUM";
+        } else {
+            trustLevel = "LOW";
+        }
+        evidence.setTrustLevel(trustLevel);
+        evidence.setQuotable(!"LOW".equals(trustLevel));
+        evidence.setMatchReason(buildMatchReason(matchMode, trustLevel, score));
+    }
+
+    private String buildMatchReason(String matchMode, String trustLevel, double score) {
+        if ("人工选择".equals(matchMode)) {
+            return "人工在知识选择区指定，可信度高，可直接引用。";
+        }
+        if ("FAQ匹配".equals(matchMode)) {
+            return "用户问题与 FAQ 问答内容匹配，可信度为 " + trustLevel + "。";
+        }
+        if ("关键词触发".equals(matchMode)) {
+            return "用户提到优惠、活动或价格相关表达，触发活动知识召回。";
+        }
+        return "用户输入与知识标题或正文存在关键词匹配，匹配分 " + Math.round(score * 100) + "%。";
     }
 
     private Map<String, Object> attributes(Object... pairs) {

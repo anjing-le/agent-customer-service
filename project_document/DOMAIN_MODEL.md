@@ -10,7 +10,7 @@
 | `ConversationMessage` | 会话历史中的单条消息 | `ChatMessage` |
 | `IntentAnalysis` | 场景、意图、置信度、情绪和分析引擎 | `LlmService.analyzeUserInput` 或关键词兜底 |
 | `KnowledgeRecall` | RAG 或关键词检索返回的知识证据集合 | Product、Activity、FAQ 检索结果 |
-| `KnowledgeEvidence` | 可被回复引用的一条证据 | 商品、活动、FAQ、行业、解决方案、人工选择 |
+| `KnowledgeEvidence` | 可被回复引用的一条证据，包含命中解释、可信度和是否可引用 | 商品、活动、FAQ、行业、解决方案、人工选择 |
 | `GuardrailDecision` | 防幻觉、安全和兜底决策 | 规则兜底、低置信度、无可靠知识、LLM 不可用 |
 | `AgentReply` | 一轮回复的完整结果 | `ChatVO.SendMessageVO` |
 | `ReasoningStep` | 可审计推理过程 | `ChatVO.ReasoningStepVO` |
@@ -102,6 +102,14 @@ Chat 运行趋势：
 | `transferSummary.todayResolvedTickets` | 今日已解决转人工工单数 |
 | `transferSummary.highPriorityPendingTickets` | 高优先级待处理工单数 |
 | `transferSummary.averageResolveMinutes` | 已解决工单的平均处理分钟数 |
+
+知识证据解释：
+
+| 字段 | 说明 |
+|---|---|
+| `matchReason` | 为什么召回这条证据，例如人工选择、FAQ 匹配、关键词触发 |
+| `trustLevel` | `HIGH`、`MEDIUM`、`LOW`，用于判断证据可信度 |
+| `quotable` | 是否允许作为回复依据直接引用 |
 
 Chat 运行快照：
 
@@ -224,4 +232,5 @@ flowchart LR
 20. 已完成：Transfer Recommendation，低置信度、安全拦截或转人工规则命中时沉淀转人工建议、原因和优先级。
 21. 已完成：Transfer Queue Simulation，自动生成转人工工单并支持人工接管结果回写。
 22. 已完成：Transfer Runtime Metrics，展示转人工待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
-23. 下一步：补知识检索命中解释和证据可信度标签。
+23. 已完成：Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用。
+24. 下一步：补知识检索负样本兜底和无答案原因展示。

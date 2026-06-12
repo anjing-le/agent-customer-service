@@ -384,6 +384,12 @@ public class ChatVO {
         private Double score;
         /** 来源 */
         private String source;
+        /** 命中解释 */
+        private String matchReason;
+        /** 可信度等级 */
+        private String trustLevel;
+        /** 是否可直接引用 */
+        private Boolean quotable;
     }
 
     /**
@@ -399,6 +405,12 @@ public class ChatVO {
         private String answer;
         /** 匹配分数 */
         private Double score;
+        /** 命中解释 */
+        private String matchReason;
+        /** 可信度等级 */
+        private String trustLevel;
+        /** 是否可直接引用 */
+        private Boolean quotable;
     }
 
     /**
@@ -414,6 +426,12 @@ public class ChatVO {
         private String description;
         /** 匹配分数 */
         private Double score;
+        /** 命中解释 */
+        private String matchReason;
+        /** 可信度等级 */
+        private String trustLevel;
+        /** 是否可直接引用 */
+        private Boolean quotable;
     }
 
     /**

@@ -443,6 +443,9 @@ public class ChatService {
         vo.setProductName(evidence.getTitle());
         vo.setScore(evidence.getScore());
         vo.setSource(String.valueOf(attributeOrDefault(evidence, "matchMode", evidence.getSource().name())));
+        vo.setMatchReason(evidence.getMatchReason());
+        vo.setTrustLevel(evidence.getTrustLevel());
+        vo.setQuotable(evidence.getQuotable());
         return vo;
     }
 
@@ -452,6 +455,9 @@ public class ChatService {
         vo.setActivityName(evidence.getTitle());
         vo.setDescription(evidence.getContent());
         vo.setScore(evidence.getScore());
+        vo.setMatchReason(evidence.getMatchReason());
+        vo.setTrustLevel(evidence.getTrustLevel());
+        vo.setQuotable(evidence.getQuotable());
         return vo;
     }
 
@@ -461,6 +467,9 @@ public class ChatService {
         vo.setQuestion(evidence.getTitle());
         vo.setAnswer(evidence.getContent());
         vo.setScore(evidence.getScore());
+        vo.setMatchReason(evidence.getMatchReason());
+        vo.setTrustLevel(evidence.getTrustLevel());
+        vo.setQuotable(evidence.getQuotable());
         return vo;
     }
 

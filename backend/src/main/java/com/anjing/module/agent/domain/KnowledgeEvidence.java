@@ -14,5 +14,8 @@ public class KnowledgeEvidence {
     private String title;
     private String content;
     private Double score;
+    private String matchReason;
+    private String trustLevel;
+    private Boolean quotable;
     private Map<String, Object> attributes;
 }
