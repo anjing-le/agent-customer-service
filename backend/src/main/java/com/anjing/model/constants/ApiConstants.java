@@ -33,6 +33,10 @@ public class ApiConstants {
         // 上下文管理
         public static final String UPDATE_CONTEXT = "/api/chat/context/update";
         public static final String GET_CONTEXT = "/api/chat/context/get";
+
+        // 转人工流程
+        public static final String LIST_TRANSFER_TICKETS = "/api/chat/transfer/list";
+        public static final String RESOLVE_TRANSFER_TICKET = "/api/chat/transfer/resolve";
     }
 
     /**

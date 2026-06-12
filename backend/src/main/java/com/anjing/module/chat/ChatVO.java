@@ -50,6 +50,25 @@ public class ChatVO {
     }
 
     /**
+     * 转人工工单。
+     */
+    @Data
+    public static class TransferTicketVO {
+        private String ticketId;
+        private String sessionId;
+        private String messageId;
+        private String status;
+        private String priority;
+        private String reason;
+        private String assignedAgentId;
+        private String assignedAgentName;
+        private String resolutionNote;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private LocalDateTime resolvedAt;
+    }
+
+    /**
      * 会话级质检摘要。
      */
     @Data
@@ -195,6 +214,10 @@ public class ChatVO {
         private SessionQualityVO sessionQuality;
         /** 会话审计明细 */
         private List<AgentAuditVO> sessionAudits;
+        /** 最近转人工工单 */
+        private TransferTicketVO latestTransferTicket;
+        /** 会话转人工工单 */
+        private List<TransferTicketVO> transferTickets;
         /** 创建时间 */
         private LocalDateTime createdAt;
     }
@@ -245,6 +268,8 @@ public class ChatVO {
         private SessionQualityVO sessionQuality;
         /** 会话审计明细 */
         private List<AgentAuditVO> sessionAudits;
+        /** 最近转人工工单 */
+        private TransferTicketVO latestTransferTicket;
         /** 创建时间 */
         private LocalDateTime createdAt;
     }

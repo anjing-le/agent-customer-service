@@ -4,6 +4,8 @@
  * 展示用户画像、服务流程、知识召回、推理过程
  * 数据来源：后端 ChatService.sendMessage 返回的真实处理结果
  */
+import { ElMessage } from 'element-plus'
+import { fetchResolveTransferTicket } from '@/api/customer-service/chat'
 
 interface Props {
   aiResponse?: any
@@ -60,6 +62,8 @@ const sessionQuality = ref<any>({
   primaryFallbackReason: ''
 })
 const sessionAudits = ref<any[]>([])
+const latestTransferTicket = ref<any>(null)
+const resolvingTransfer = ref(false)
 
 const riskTagType = computed(() => {
   if (sessionQuality.value.riskLevel === 'HIGH') return 'danger'
@@ -147,9 +151,26 @@ watch(() => props.aiResponse, (res) => {
     primaryFallbackReason: res.sessionQuality?.primaryFallbackReason || ''
   }
   sessionAudits.value = res.sessionAudits || []
+  latestTransferTicket.value = res.latestTransferTicket || null
 
   userProfile.value.lastActive = '刚刚'
 })
+
+const handleResolveTransfer = async () => {
+  if (!latestTransferTicket.value?.ticketId || resolvingTransfer.value) return
+  resolvingTransfer.value = true
+  try {
+    latestTransferTicket.value = await fetchResolveTransferTicket({
+      ticketId: latestTransferTicket.value.ticketId,
+      agentId: 'agent_demo',
+      agentName: '演示坐席',
+      resolutionNote: '人工已接管并完成处理'
+    })
+    ElMessage.success('人工接管结果已回写')
+  } finally {
+    resolvingTransfer.value = false
+  }
+}
 </script>
 
 <template>
@@ -417,6 +438,43 @@ watch(() => props.aiResponse, (res) => {
               <div class="reliability-block__content">
                 {{ reliability.transferPriority || 'MEDIUM' }}：{{ reliability.transferReason || '建议人工客服继续跟进' }}
               </div>
+            </div>
+
+            <div v-if="latestTransferTicket" class="transfer-ticket">
+              <div class="transfer-ticket__header">
+                <div>
+                  <div class="transfer-ticket__title">转人工队列</div>
+                  <div class="transfer-ticket__id">{{ latestTransferTicket.ticketId }}</div>
+                </div>
+                <el-tag
+                  :type="latestTransferTicket.status === 'RESOLVED' ? 'success' : 'warning'"
+                  size="small"
+                >
+                  {{ latestTransferTicket.status }}
+                </el-tag>
+              </div>
+              <div class="transfer-ticket__body">
+                <div>
+                  <span>优先级</span>
+                  <strong>{{ latestTransferTicket.priority || 'MEDIUM' }}</strong>
+                </div>
+                <div>
+                  <span>坐席</span>
+                  <strong>{{ latestTransferTicket.assignedAgentName || '待分配' }}</strong>
+                </div>
+              </div>
+              <div class="transfer-ticket__reason">
+                {{ latestTransferTicket.resolutionNote || latestTransferTicket.reason || '等待人工客服接管' }}
+              </div>
+              <el-button
+                v-if="latestTransferTicket.status !== 'RESOLVED'"
+                size="small"
+                type="primary"
+                :loading="resolvingTransfer"
+                @click="handleResolveTransfer"
+              >
+                模拟接管完成
+              </el-button>
             </div>
 
             <div class="reliability-block">
@@ -980,6 +1038,80 @@ watch(() => props.aiResponse, (res) => {
       line-height: 18px;
       word-break: break-word;
     }
+  }
+}
+
+.transfer-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #faecd8;
+  border-radius: 6px;
+  background-color: #fffaf2;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__title {
+    color: #333;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  &__id {
+    max-width: 220px;
+    overflow: hidden;
+    color: #9a5b13;
+    font-size: 11px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+
+    div {
+      min-width: 0;
+      padding: 8px;
+      border-radius: 6px;
+      background-color: #fff;
+    }
+
+    span,
+    strong {
+      display: block;
+    }
+
+    span {
+      color: #9a8a72;
+      font-size: 11px;
+      line-height: 16px;
+    }
+
+    strong {
+      overflow: hidden;
+      color: #4a3320;
+      font-size: 13px;
+      line-height: 18px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__reason {
+    color: #704214;
+    font-size: 12px;
+    line-height: 18px;
+    word-break: break-word;
   }
 }
 

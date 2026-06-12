@@ -16,7 +16,9 @@ export const ApiPaths = {
     sendMessage: '/api/chat/message/send',
     listMessages: '/api/chat/message/list',
     updateContext: '/api/chat/context/update',
-    getContext: '/api/chat/context/get'
+    getContext: '/api/chat/context/get',
+    listTransferTickets: '/api/chat/transfer/list',
+    resolveTransferTicket: '/api/chat/transfer/resolve'
   },
   knowledge: {
     overview: '/api/knowledge/overview',

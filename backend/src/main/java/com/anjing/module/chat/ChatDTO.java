@@ -88,5 +88,30 @@ public class ChatDTO {
         /** 用户画像信息 */
         private Map<String, Object> userProfile;
     }
-}
 
+    /**
+     * 查询转人工工单请求。
+     */
+    @Data
+    public static class QueryTransferTicketDTO {
+        /** 会话ID */
+        private String sessionId;
+        /** 状态：PENDING/ASSIGNED/RESOLVED/CANCELED */
+        private String status;
+    }
+
+    /**
+     * 人工接管结果回写请求。
+     */
+    @Data
+    public static class ResolveTransferTicketDTO {
+        /** 工单ID */
+        private String ticketId;
+        /** 人工客服ID */
+        private String agentId;
+        /** 人工客服名称 */
+        private String agentName;
+        /** 处理说明 */
+        private String resolutionNote;
+    }
+}

@@ -117,3 +117,24 @@ export function fetchGetContext(sessionId: string) {
     data: { sessionId }
   })
 }
+
+// ==================== 转人工流程 ====================
+
+export function fetchListTransferTickets(data?: { sessionId?: string; status?: string }) {
+  return request.post<any[]>({
+    url: ApiPaths.chat.listTransferTickets,
+    data: data || {}
+  })
+}
+
+export function fetchResolveTransferTicket(data: {
+  ticketId: string
+  agentId?: string
+  agentName?: string
+  resolutionNote?: string
+}) {
+  return request.post<any>({
+    url: ApiPaths.chat.resolveTransferTicket,
+    data
+  })
+}

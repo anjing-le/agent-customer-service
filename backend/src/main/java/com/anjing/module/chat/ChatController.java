@@ -115,4 +115,24 @@ public class ChatController {
         log.info("获取上下文: {}", dto);
         return APIResponse.success(chatService.getContext(dto.getSessionId()));
     }
+
+    // ==================== 转人工流程 ====================
+
+    /**
+     * 查询转人工工单
+     */
+    @PostMapping(ApiConstants.Chat.LIST_TRANSFER_TICKETS)
+    public APIResponse<List<ChatVO.TransferTicketVO>> listTransferTickets(@RequestBody ChatDTO.QueryTransferTicketDTO dto) {
+        log.info("查询转人工工单: {}", dto);
+        return APIResponse.success(chatService.listTransferTickets(dto));
+    }
+
+    /**
+     * 模拟人工接管完成并回写结果
+     */
+    @PostMapping(ApiConstants.Chat.RESOLVE_TRANSFER_TICKET)
+    public APIResponse<ChatVO.TransferTicketVO> resolveTransferTicket(@RequestBody ChatDTO.ResolveTransferTicketDTO dto) {
+        log.info("回写转人工结果: {}", dto);
+        return APIResponse.success(chatService.resolveTransferTicket(dto));
+    }
 }

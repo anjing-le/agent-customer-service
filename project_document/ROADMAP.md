@@ -34,8 +34,9 @@
 - 已补 Session Audit Drilldown，在可靠性面板展示每轮审计明细，支持查看意图、置信度、引擎、召回、规则和 Prompt 消费。
 - 已补 Scene Runtime Trend，基于近 7 日 Agent 审计聚合场景、规则命中和 Prompt 消费趋势。
 - 已补 Transfer Recommendation，低置信度、安全拦截或转人工规则命中时输出转人工建议、原因和优先级。
+- 已补 Transfer Queue Simulation，自动生成转人工工单，支持 `PENDING` 到 `RESOLVED` 的模拟人工接管回写。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补转人工队列模拟和人工接管结果回写。
+- 下一步补转人工统计和人工接管时效指标。
 - 支持 SSE 流式回复和人工接管状态同步。
 
 ## V3: 生产化扩展

@@ -15,10 +15,12 @@ import com.anjing.module.chat.entity.ChatAgentAudit;
 import com.anjing.module.chat.entity.ChatMessage;
 import com.anjing.module.chat.entity.ChatRuntimeSnapshot;
 import com.anjing.module.chat.entity.ChatSession;
+import com.anjing.module.chat.entity.ChatTransferTicket;
 import com.anjing.module.chat.repository.ChatAgentAuditRepository;
 import com.anjing.module.chat.repository.ChatMessageRepository;
 import com.anjing.module.chat.repository.ChatRuntimeSnapshotRepository;
 import com.anjing.module.chat.repository.ChatSessionRepository;
+import com.anjing.module.chat.repository.ChatTransferTicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -51,6 +53,7 @@ public class ChatService {
     private final ChatMessageRepository messageRepository;
     private final ChatAgentAuditRepository auditRepository;
     private final ChatRuntimeSnapshotRepository snapshotRepository;
+    private final ChatTransferTicketRepository transferTicketRepository;
     private final AgentRuntime agentRuntime;
 
     /**
@@ -194,6 +197,8 @@ public class ChatService {
             detail.setContext(new ChatVO.ContextVO());
             detail.setSessionQuality(buildSessionQuality(sessionId));
             detail.setSessionAudits(loadSessionAudits(sessionId));
+            detail.setLatestTransferTicket(loadLatestTransferTicket(sessionId));
+            detail.setTransferTickets(listTransferTicketsBySession(sessionId));
             return detail;
         }).orElse(null);
     }
@@ -236,7 +241,8 @@ public class ChatService {
 
         agentReply.setMessageId(aiMessage.getMessageId());
         saveAgentAudit(dto.getSessionId(), aiMessage, agentReply);
-        return toSendMessageVO(agentReply, aiMessage, buildSessionQuality(sessionId));
+        ChatVO.TransferTicketVO transferTicket = ensureTransferTicket(sessionId, aiMessage, agentReply);
+        return toSendMessageVO(agentReply, aiMessage, buildSessionQuality(sessionId), transferTicket);
     }
 
     /**
@@ -263,6 +269,40 @@ public class ChatService {
      */
     public ChatVO.ContextVO getContext(String sessionId) {
         return new ChatVO.ContextVO();
+    }
+
+    /**
+     * 查询转人工工单。
+     */
+    public List<ChatVO.TransferTicketVO> listTransferTickets(ChatDTO.QueryTransferTicketDTO dto) {
+        List<ChatTransferTicket> tickets;
+        if (dto.getSessionId() != null && !dto.getSessionId().isBlank()) {
+            tickets = transferTicketRepository.findBySessionIdOrderByCreatedAtDesc(dto.getSessionId());
+        } else {
+            tickets = transferTicketRepository.findAll();
+        }
+        return tickets.stream()
+                .filter(ticket -> dto.getStatus() == null || dto.getStatus().isBlank() || dto.getStatus().equals(ticket.getStatus()))
+                .sorted((left, right) -> right.getCreatedAt().compareTo(left.getCreatedAt()))
+                .map(this::toTransferTicketVO)
+                .toList();
+    }
+
+    /**
+     * 模拟人工接管完成并回写结果。
+     */
+    @Transactional
+    public ChatVO.TransferTicketVO resolveTransferTicket(ChatDTO.ResolveTransferTicketDTO dto) {
+        ChatTransferTicket ticket = transferTicketRepository.findById(dto.getTicketId()).orElse(null);
+        if (ticket == null) {
+            return null;
+        }
+        ticket.setStatus("RESOLVED");
+        ticket.setAssignedAgentId(dto.getAgentId() != null ? dto.getAgentId() : "agent_demo");
+        ticket.setAssignedAgentName(dto.getAgentName() != null ? dto.getAgentName() : "演示坐席");
+        ticket.setResolutionNote(dto.getResolutionNote() != null ? dto.getResolutionNote() : "人工已接管并完成处理");
+        ticket.setResolvedAt(LocalDateTime.now());
+        return toTransferTicketVO(transferTicketRepository.save(ticket));
     }
 
     private ConversationTurn buildConversationTurn(ChatDTO.SendMessageDTO dto) {
@@ -300,7 +340,8 @@ public class ChatService {
     private ChatVO.SendMessageVO toSendMessageVO(
             AgentReply agentReply,
             ChatMessage aiMessage,
-            ChatVO.SessionQualityVO sessionQuality
+            ChatVO.SessionQualityVO sessionQuality,
+            ChatVO.TransferTicketVO transferTicket
     ) {
         ChatVO.SendMessageVO response = new ChatVO.SendMessageVO();
         response.setMessageId(aiMessage.getMessageId());
@@ -314,6 +355,7 @@ public class ChatService {
         response.setReliability(toReliabilityVO(agentReply));
         response.setSessionQuality(sessionQuality);
         response.setSessionAudits(loadSessionAudits(aiMessage.getSessionId()));
+        response.setLatestTransferTicket(transferTicket);
         response.setCreatedAt(aiMessage.getCreatedAt());
         return response;
     }
@@ -566,6 +608,57 @@ public class ChatService {
         vo.setRuleHitCodes(audit.getRuleHitCodes());
         vo.setPromptCodes(audit.getPromptCodes());
         vo.setCreatedAt(audit.getCreatedAt());
+        return vo;
+    }
+
+    private ChatVO.TransferTicketVO ensureTransferTicket(String sessionId, ChatMessage aiMessage, AgentReply agentReply) {
+        if (agentReply.getGuardrailDecision() == null || !agentReply.getGuardrailDecision().isTransferRecommended()) {
+            return loadLatestTransferTicket(sessionId);
+        }
+
+        ChatTransferTicket ticket = transferTicketRepository
+                .findFirstBySessionIdAndStatusOrderByCreatedAtDesc(sessionId, "PENDING")
+                .orElseGet(() -> {
+                    ChatTransferTicket created = new ChatTransferTicket();
+                    created.setTicketId(UUID.randomUUID().toString());
+                    created.setSessionId(sessionId);
+                    created.setStatus("PENDING");
+                    return created;
+                });
+
+        ticket.setMessageId(aiMessage.getMessageId());
+        ticket.setPriority(agentReply.getGuardrailDecision().getTransferPriority());
+        ticket.setReason(agentReply.getGuardrailDecision().getTransferReason());
+        return toTransferTicketVO(transferTicketRepository.save(ticket));
+    }
+
+    private ChatVO.TransferTicketVO loadLatestTransferTicket(String sessionId) {
+        return transferTicketRepository.findBySessionIdOrderByCreatedAtDesc(sessionId).stream()
+                .findFirst()
+                .map(this::toTransferTicketVO)
+                .orElse(null);
+    }
+
+    private List<ChatVO.TransferTicketVO> listTransferTicketsBySession(String sessionId) {
+        return transferTicketRepository.findBySessionIdOrderByCreatedAtDesc(sessionId).stream()
+                .map(this::toTransferTicketVO)
+                .toList();
+    }
+
+    private ChatVO.TransferTicketVO toTransferTicketVO(ChatTransferTicket ticket) {
+        ChatVO.TransferTicketVO vo = new ChatVO.TransferTicketVO();
+        vo.setTicketId(ticket.getTicketId());
+        vo.setSessionId(ticket.getSessionId());
+        vo.setMessageId(ticket.getMessageId());
+        vo.setStatus(ticket.getStatus());
+        vo.setPriority(ticket.getPriority());
+        vo.setReason(ticket.getReason());
+        vo.setAssignedAgentId(ticket.getAssignedAgentId());
+        vo.setAssignedAgentName(ticket.getAssignedAgentName());
+        vo.setResolutionNote(ticket.getResolutionNote());
+        vo.setCreatedAt(ticket.getCreatedAt());
+        vo.setUpdatedAt(ticket.getUpdatedAt());
+        vo.setResolvedAt(ticket.getResolvedAt());
         return vo;
     }
 
