@@ -88,6 +88,16 @@ Chat 运行快照：
 
 定时采样默认关闭，可通过 `CS_RUNTIME_SNAPSHOT_ENABLED=true` 开启，并用 `CS_RUNTIME_SNAPSHOT_CRON` 覆盖默认 cron。
 
+Scene 运行趋势：
+
+| 指标 | 说明 |
+|---|---|
+| `sceneRuntime.trends.replies` | 每日 Agent 回复数量 |
+| `sceneRuntime.trends.ruleHits` | 每日规则命中总量 |
+| `sceneRuntime.trends.promptRenders` | 每日 Prompt 渲染总量 |
+| `sceneRuntime.trends.topSceneType` | 每日 Top 场景 |
+| `sceneRuntime.trends.topRuleCode` / `topPromptCode` | 每日 Top 规则和 Top Prompt，新审计数据会持续沉淀 |
+
 Scene 配置接入点：
 
 | 配置 | Runtime 影响 |
@@ -183,4 +193,5 @@ flowchart LR
 16. 已完成：Session Quality Summary，基于会话审计事实生成可靠性评分、风险等级和主要兜底原因。
 17. 已完成：Session Audit Drilldown，随会话详情和发送消息返回会话审计明细，并在可靠性面板展示。
 18. 下一步：将关键词检索升级为向量检索 + rerank。
-19. 下一步：增加跨 Scene/Prompt/Rule 的长期命中趋势。
+19. 已完成：Scene Runtime Trend，基于 Agent 审计聚合近 7 日场景、规则命中和 Prompt 消费趋势。
+20. 下一步：补低置信度转人工策略和转人工审计。

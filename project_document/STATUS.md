@@ -22,6 +22,7 @@
 | Agent 审计 | Runtime observable | 每轮助手回复沉淀意图、回复引擎、兜底原因、召回数、规则命中数和 Prompt 渲染数 |
 | 会话质检摘要 | Runtime observable | 基于单轮审计聚合会话可靠性评分、风险等级、兜底率、不安全率、主要兜底原因和质检明细 |
 | Runtime Snapshot | Runtime observable | 支持手动采样和可配置定时采样，沉淀 Chat 运行质量历史快照 |
+| Scene 运行趋势 | Runtime observable | 基于 Agent 审计聚合近 7 日场景、规则命中和 Prompt 消费趋势 |
 | 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
 | OpenAPI typed client | Pending | 后续接入 `/v3/api-docs` 和前端 operation 类型 |
 | 测试与质量门禁 | Ready for V1 | `./scripts/quality-gate.sh` 已通过；后续补单元测试和运行探针 |
@@ -32,7 +33,7 @@
 - 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
 - V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
 - 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已补运行洞察；Chat 已沉淀 Agent 单轮审计事实、会话质检摘要、质检明细、7 日趋势和运行快照。
+- Scene 已补运行洞察和近 7 日趋势；Chat 已沉淀 Agent 单轮审计事实、会话质检摘要、质检明细、7 日趋势和运行快照。
 
 ## 验证入口
 

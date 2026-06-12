@@ -32,8 +32,9 @@
 - 已补 Scene Runtime Insight，展示规则/Prompt 平均使用和集中度。
 - 已补 Session Quality Summary，基于会话审计事实展示可靠性评分、风险等级和主要兜底原因。
 - 已补 Session Audit Drilldown，在可靠性面板展示每轮审计明细，支持查看意图、置信度、引擎、召回、规则和 Prompt 消费。
+- 已补 Scene Runtime Trend，基于近 7 日 Agent 审计聚合场景、规则命中和 Prompt 消费趋势。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补跨 Scene/Prompt/Rule 的命中趋势。
+- 下一步补低置信度转人工策略和转人工审计。
 - 支持 SSE 流式回复和低置信度转人工策略。
 
 ## V3: 生产化扩展

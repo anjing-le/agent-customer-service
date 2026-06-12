@@ -97,6 +97,8 @@ public class ChatVO {
         private Integer knowledgeEvidenceCount;
         private Integer ruleHitCount;
         private Integer promptRenderCount;
+        private String ruleHitCodes;
+        private String promptCodes;
         private LocalDateTime createdAt;
     }
 

@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -491,6 +492,7 @@ public class ChatService {
             audit.setRuleHitCount(agentReply.getGuardrailDecision().getRuleHits() != null
                     ? agentReply.getGuardrailDecision().getRuleHits().size()
                     : 0);
+            audit.setRuleHitCodes(joinCodes(agentReply.getGuardrailDecision().getRuleHits()));
         } else {
             audit.setSafe(true);
             audit.setFallbackRequired(false);
@@ -499,7 +501,30 @@ public class ChatService {
         audit.setPromptRenderCount(agentReply.getPromptRenderResults() != null
                 ? agentReply.getPromptRenderResults().size()
                 : 0);
+        audit.setPromptCodes(joinPromptCodes(agentReply.getPromptRenderResults()));
         auditRepository.save(audit);
+    }
+
+    private String joinCodes(List<RuleHit> ruleHits) {
+        if (ruleHits == null) return null;
+        String codes = ruleHits.stream()
+                .map(RuleHit::getRuleCode)
+                .filter(Objects::nonNull)
+                .filter(code -> !code.isBlank())
+                .distinct()
+                .collect(Collectors.joining(","));
+        return codes.isBlank() ? null : codes;
+    }
+
+    private String joinPromptCodes(List<PromptRenderResult> promptResults) {
+        if (promptResults == null) return null;
+        String codes = promptResults.stream()
+                .map(PromptRenderResult::getPromptCode)
+                .filter(Objects::nonNull)
+                .filter(code -> !code.isBlank())
+                .distinct()
+                .collect(Collectors.joining(","));
+        return codes.isBlank() ? null : codes;
     }
 
     private List<ChatVO.AgentAuditVO> loadRecentAudits() {
@@ -528,6 +553,8 @@ public class ChatService {
         vo.setKnowledgeEvidenceCount(audit.getKnowledgeEvidenceCount());
         vo.setRuleHitCount(audit.getRuleHitCount());
         vo.setPromptRenderCount(audit.getPromptRenderCount());
+        vo.setRuleHitCodes(audit.getRuleHitCodes());
+        vo.setPromptCodes(audit.getPromptCodes());
         vo.setCreatedAt(audit.getCreatedAt());
         return vo;
     }

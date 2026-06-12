@@ -8,6 +8,8 @@ import com.anjing.module.agent.domain.KnowledgeEvidence;
 import com.anjing.module.agent.domain.KnowledgeRecall;
 import com.anjing.module.agent.domain.KnowledgeSource;
 import com.anjing.module.agent.domain.RuleHit;
+import com.anjing.module.chat.entity.ChatAgentAudit;
+import com.anjing.module.chat.repository.ChatAgentAuditRepository;
 import com.anjing.module.agent.runtime.RuleEngine;
 import com.anjing.module.chat.LlmService;
 import com.anjing.module.scene.entity.Intent;
@@ -27,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -45,6 +49,7 @@ public class SceneService {
     private final LlmService llmService;
     private final ObjectMapper objectMapper;
     private final RuleEngine ruleEngine;
+    private final ChatAgentAuditRepository auditRepository;
 
     private static final Pattern PROMPT_VARIABLE_NAME_PATTERN = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]*$");
 
@@ -178,7 +183,65 @@ public class SceneService {
                 .map(prompt -> toRuntimeRankVO(prompt.getPromptCode(), prompt.getPromptName(), prompt.getUsageCount()))
                 .toList());
         overview.setInsights(buildRuntimeInsights(overview));
+        overview.setTrends(buildRuntimeTrends());
         return overview;
+    }
+
+    private List<SceneVO.RuntimeTrendVO> buildRuntimeTrends() {
+        LocalDate startDate = LocalDate.now().minusDays(6);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = LocalDate.now().plusDays(1).atStartOfDay();
+        List<ChatAgentAudit> audits = auditRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(start, end);
+        Map<LocalDate, List<ChatAgentAudit>> auditsByDate = audits.stream()
+                .filter(audit -> audit.getCreatedAt() != null)
+                .collect(Collectors.groupingBy(audit -> audit.getCreatedAt().toLocalDate()));
+
+        List<SceneVO.RuntimeTrendVO> trends = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate date = startDate.plusDays(i);
+            List<ChatAgentAudit> dayAudits = auditsByDate.getOrDefault(date, List.of());
+            SceneVO.RuntimeTrendVO trend = new SceneVO.RuntimeTrendVO();
+            trend.setDate(date.toString());
+            trend.setReplies((long) dayAudits.size());
+            trend.setFallbackReplies(dayAudits.stream()
+                    .filter(audit -> Boolean.TRUE.equals(audit.getFallbackRequired()))
+                    .count());
+            trend.setRuleHits(dayAudits.stream()
+                    .map(ChatAgentAudit::getRuleHitCount)
+                    .filter(Objects::nonNull)
+                    .mapToLong(Integer::longValue)
+                    .sum());
+            trend.setPromptRenders(dayAudits.stream()
+                    .map(ChatAgentAudit::getPromptRenderCount)
+                    .filter(Objects::nonNull)
+                    .mapToLong(Integer::longValue)
+                    .sum());
+            trend.setTopSceneType(topValue(dayAudits.stream().map(ChatAgentAudit::getSceneType).toList()));
+            trend.setTopRuleCode(topDelimitedValue(dayAudits.stream().map(ChatAgentAudit::getRuleHitCodes).toList()));
+            trend.setTopPromptCode(topDelimitedValue(dayAudits.stream().map(ChatAgentAudit::getPromptCodes).toList()));
+            trends.add(trend);
+        }
+        return trends;
+    }
+
+    private String topDelimitedValue(List<String> values) {
+        return topValue(values.stream()
+                .filter(Objects::nonNull)
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(String::trim)
+                .toList());
+    }
+
+    private String topValue(List<String> values) {
+        return values.stream()
+                .filter(Objects::nonNull)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.groupingBy(value -> value, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     // ==================== 意图管理 ====================

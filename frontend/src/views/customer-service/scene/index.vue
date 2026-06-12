@@ -18,7 +18,8 @@ const overview = ref<any>({
   totalPromptUsage: 0,
   topRules: [],
   topPrompts: [],
-  insights: []
+  insights: [],
+  trends: []
 })
 
 // Tab配置
@@ -93,6 +94,24 @@ onMounted(() => {
         <div class="runtime-insight__label">{{ item.label }}</div>
         <div class="runtime-insight__value">{{ item.value }}</div>
         <div class="runtime-insight__desc">{{ item.description }}</div>
+      </div>
+      <div class="runtime-trends">
+        <div class="runtime-trends__header">
+          <span>近 7 日运行趋势</span>
+          <strong>{{ overview.trends?.reduce((sum: number, item: any) => sum + (item.replies || 0), 0) || 0 }}</strong>
+        </div>
+        <div class="runtime-trends__list">
+          <div
+            v-for="item in overview.trends"
+            :key="item.date"
+            class="runtime-trend-item"
+          >
+            <span>{{ item.date.slice(5) }}</span>
+            <strong>{{ item.replies }}</strong>
+            <em>R{{ item.ruleHits || 0 }} / P{{ item.promptRenders || 0 }}</em>
+            <small>{{ item.topSceneType || '-' }}</small>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -244,6 +263,77 @@ onMounted(() => {
   &--danger {
     border-color: #fde2e2;
     background-color: #fff5f5;
+  }
+}
+
+.runtime-trends {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background-color: #fff;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+
+    span {
+      color: #999;
+      font-size: 12px;
+    }
+
+    strong {
+      color: #333;
+      font-size: 18px;
+      line-height: 24px;
+    }
+  }
+
+  &__list {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+  }
+}
+
+.runtime-trend-item {
+  min-width: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background-color: #f7f8fa;
+
+  span,
+  strong,
+  em,
+  small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: #999;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  strong {
+    color: #333;
+    font-size: 16px;
+    line-height: 22px;
+  }
+
+  em,
+  small {
+    color: #666;
+    font-size: 11px;
+    font-style: normal;
+    line-height: 16px;
   }
 }
 

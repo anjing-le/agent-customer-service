@@ -54,6 +54,12 @@ public class ChatAgentAudit {
 
     private Integer promptRenderCount;
 
+    @Column(length = 512)
+    private String ruleHitCodes;
+
+    @Column(length = 512)
+    private String promptCodes;
+
     private LocalDateTime createdAt;
 
     @PrePersist

@@ -22,6 +22,7 @@ public class SceneVO {
         private List<RuntimeRankVO> topRules;
         private List<RuntimeRankVO> topPrompts;
         private List<RuntimeInsightVO> insights;
+        private List<RuntimeTrendVO> trends;
     }
 
     @Data
@@ -37,6 +38,18 @@ public class SceneVO {
         private String value;
         private String level;
         private String description;
+    }
+
+    @Data
+    public static class RuntimeTrendVO {
+        private String date;
+        private Long replies;
+        private Long fallbackReplies;
+        private Long ruleHits;
+        private Long promptRenders;
+        private String topSceneType;
+        private String topRuleCode;
+        private String topPromptCode;
     }
 
     /**
