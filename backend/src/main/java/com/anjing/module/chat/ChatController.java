@@ -19,6 +19,14 @@ public class ChatController {
 
     private final ChatService chatService;
 
+    /**
+     * 获取对话运行概览
+     */
+    @PostMapping(ApiConstants.Chat.RUNTIME_OVERVIEW)
+    public APIResponse<ChatVO.RuntimeOverviewVO> getRuntimeOverview() {
+        return APIResponse.success(chatService.getRuntimeOverview());
+    }
+
     // ==================== 会话管理 ====================
 
     /**
@@ -100,4 +108,3 @@ public class ChatController {
         return APIResponse.success(chatService.getContext(dto.getSessionId()));
     }
 }
-

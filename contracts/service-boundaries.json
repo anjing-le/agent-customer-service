@@ -18,6 +18,7 @@
       "openapi": false,
       "copyAction": "keep and gradually migrate to targetBasePath",
       "routes": [
+        { "name": "runtimeOverview", "path": "/api/chat/runtime/overview", "methods": ["POST"] },
         { "name": "createSession", "path": "/api/chat/session/create", "methods": ["POST"] },
         { "name": "listSessions", "path": "/api/chat/session/list", "methods": ["POST"] },
         { "name": "getSession", "path": "/api/chat/session/get", "methods": ["POST"] },

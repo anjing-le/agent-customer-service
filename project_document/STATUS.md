@@ -7,7 +7,7 @@
 | 领域 | 状态 | 说明 |
 |---|---|---|
 | 脚手架继承 | Ready | 技术栈、结构、契约、脚本、质量门禁沿用 `infra-dev-scaffolding`，业务只扩展客服 Agent |
-| 对话中心 | V2 runtime started | 会话/消息持久化仍在 `ChatService`，分析、检索、护栏、回复生成已由 `AgentRuntime` 编排 |
+| 对话中心 | Runtime observable | 会话/消息持久化仍在 `ChatService`，分析、检索、护栏、回复生成已由 `AgentRuntime` 编排；已补会话运行概览 |
 | 知识中心 | In progress | Product/Activity/FAQ 参与当前对话检索；Industry/Solution 为预留 |
 | 场景配置 | Runtime connected | 启用 Intent 参与关键词识别；启用 SYSTEM Prompt 由 PromptRuntime 渲染后注入 LLM 上下文；启用 Rule 由 RuleEngine 执行 |
 | 工程契约 | Ready for V1 | 已接入 contracts、scripts、project_document；前端 API 路径已集中到 `ApiPaths` |
@@ -18,6 +18,7 @@
 | PromptRuntime | Lightweight runtime | 支持 SYSTEM Prompt 场景过滤、基础变量渲染、使用次数累加，并返回渲染结果 |
 | Prompt 配置 | Runtime editable | 前端支持 Prompt 新增/编辑、变量 schema、运行时变量快捷填充和测试；后端校验变量名、重复项和必填占位符 |
 | Scene 运行概览 | Runtime observable | 展示启用意图、启用 SYSTEM Prompt、启用规则、规则命中、Prompt 使用和 Top 项 |
+| Chat 运行概览 | Runtime observable | 展示总会话、活跃会话、今日会话、今日消息、用户/助手消息和最近会话 |
 | 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
 | OpenAPI typed client | Pending | 后续接入 `/v3/api-docs` 和前端 operation 类型 |
 | 测试与质量门禁 | Ready for V1 | `./scripts/quality-gate.sh` 已通过；后续补单元测试和运行探针 |
@@ -28,7 +29,7 @@
 - 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
 - V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
 - 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已轻量接入运行时，运行历史快照和趋势看板下一阶段继续补。
+- Scene 和 Chat 已轻量接入运行概览，运行历史快照和趋势看板下一阶段继续补。
 
 ## 验证入口
 

@@ -16,6 +16,9 @@ public class ApiConstants {
      * 核心对话功能，包含会话管理和消息处理
      */
     public static class Chat {
+        // 运行概览
+        public static final String RUNTIME_OVERVIEW = "/api/chat/runtime/overview";
+
         // 会话管理
         public static final String CREATE_SESSION = "/api/chat/session/create";
         public static final String LIST_SESSIONS = "/api/chat/session/list";

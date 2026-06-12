@@ -5,6 +5,13 @@
 import request from '@/utils/http'
 import { ApiPaths } from '@/api/apiPaths'
 
+export function fetchChatRuntimeOverview() {
+  return request.post<any>({
+    url: ApiPaths.chat.runtimeOverview,
+    data: {}
+  })
+}
+
 // ==================== 会话管理 ====================
 
 /**

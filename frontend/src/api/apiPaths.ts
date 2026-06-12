@@ -7,6 +7,7 @@
  */
 export const ApiPaths = {
   chat: {
+    runtimeOverview: '/api/chat/runtime/overview',
     createSession: '/api/chat/session/create',
     listSessions: '/api/chat/session/list',
     getSession: '/api/chat/session/get',

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -15,6 +16,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
     List<ChatMessage> findBySessionIdOrderByCreatedAtAsc(String sessionId, Pageable pageable);
 
     long countBySessionId(String sessionId);
+
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    long countByRole(String role);
+
+    long countByRoleAndCreatedAtBetween(String role, LocalDateTime start, LocalDateTime end);
 
     void deleteBySessionId(String sessionId);
 }

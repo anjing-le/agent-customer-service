@@ -21,6 +21,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +44,29 @@ public class ChatService {
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final AgentRuntime agentRuntime;
+
+    /**
+     * 获取对话运行概览。
+     */
+    public ChatVO.RuntimeOverviewVO getRuntimeOverview() {
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime now = LocalDateTime.now();
+
+        long totalSessions = sessionRepository.count();
+        long totalMessages = messageRepository.count();
+
+        ChatVO.RuntimeOverviewVO vo = new ChatVO.RuntimeOverviewVO();
+        vo.setTotalSessions(totalSessions);
+        vo.setActiveSessions(sessionRepository.countByStatus("active"));
+        vo.setTodaySessions(sessionRepository.countByCreatedAtBetween(startOfDay, now));
+        vo.setTotalMessages(totalMessages);
+        vo.setTodayMessages(messageRepository.countByCreatedAtBetween(startOfDay, now));
+        vo.setTodayUserMessages(messageRepository.countByRoleAndCreatedAtBetween("user", startOfDay, now));
+        vo.setTodayAssistantMessages(messageRepository.countByRoleAndCreatedAtBetween("assistant", startOfDay, now));
+        vo.setAverageMessagesPerSession(totalSessions == 0 ? 0D : Math.round((double) totalMessages * 100 / totalSessions) / 100D);
+        vo.setRecentSessions(loadRecentSessions());
+        return vo;
+    }
 
     /**
      * 创建会话
@@ -365,6 +390,29 @@ public class ChatService {
         vo.setContent(message.getContent());
         vo.setCardType(message.getCardType());
         vo.setCreatedAt(message.getCreatedAt());
+        return vo;
+    }
+
+    private List<ChatVO.RecentSessionVO> loadRecentSessions() {
+        return sessionRepository.findAllByOrderByCreatedAtDesc().stream()
+                .limit(5)
+                .map(this::toRecentSessionVO)
+                .toList();
+    }
+
+    private ChatVO.RecentSessionVO toRecentSessionVO(ChatSession session) {
+        ChatVO.RecentSessionVO vo = new ChatVO.RecentSessionVO();
+        vo.setSessionId(session.getSessionId());
+        vo.setUserName(session.getUserName());
+        vo.setChannel(session.getChannel());
+        vo.setStatus(session.getStatus());
+        vo.setUpdatedAt(session.getUpdatedAt());
+        vo.setMessageCount((int) messageRepository.countBySessionId(session.getSessionId()));
+
+        List<ChatMessage> messages = messageRepository.findBySessionIdOrderByCreatedAtAsc(session.getSessionId());
+        if (!messages.isEmpty()) {
+            vo.setLastMessage(messages.get(messages.size() - 1).getContent());
+        }
         return vo;
     }
 

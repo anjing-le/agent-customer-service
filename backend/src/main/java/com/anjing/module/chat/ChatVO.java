@@ -11,6 +11,45 @@ import java.util.Map;
 public class ChatVO {
 
     /**
+     * 对话运行概览。
+     */
+    @Data
+    public static class RuntimeOverviewVO {
+        /** 总会话数 */
+        private Long totalSessions;
+        /** 活跃会话数 */
+        private Long activeSessions;
+        /** 今日新增会话 */
+        private Long todaySessions;
+        /** 总消息数 */
+        private Long totalMessages;
+        /** 今日消息数 */
+        private Long todayMessages;
+        /** 今日用户消息数 */
+        private Long todayUserMessages;
+        /** 今日助手消息数 */
+        private Long todayAssistantMessages;
+        /** 平均每会话消息数 */
+        private Double averageMessagesPerSession;
+        /** 最近会话 */
+        private List<RecentSessionVO> recentSessions;
+    }
+
+    /**
+     * 最近会话摘要。
+     */
+    @Data
+    public static class RecentSessionVO {
+        private String sessionId;
+        private String userName;
+        private String channel;
+        private String status;
+        private Integer messageCount;
+        private String lastMessage;
+        private LocalDateTime updatedAt;
+    }
+
+    /**
      * 会话信息
      */
     @Data
