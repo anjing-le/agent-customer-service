@@ -35,7 +35,7 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
             tags.add("rule-hit-" + hit.getRuleCode());
         }
 
-        RuleHit safetyHit = findHit(decision.getRuleHits(), "SENSITIVE_FILTER");
+        RuleHit safetyHit = findHit(decision.getRuleHits(), "SENSITIVE_FILTER", "SAFETY_BLOCK");
         if (safetyHit != null) {
             decision.setSafe(false);
             decision.setFallbackRequired(true);
@@ -44,7 +44,7 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
             return decision;
         }
 
-        RuleHit transferHit = findHit(decision.getRuleHits(), "TRANSFER_THRESHOLD");
+        RuleHit transferHit = findHit(decision.getRuleHits(), "TRANSFER_THRESHOLD", "TRANSFER_OR_CLARIFY");
         if (transferHit != null) {
             decision.setFallbackRequired(true);
             decision.setFallbackReason(FallbackReason.LOW_CONFIDENCE);
@@ -65,9 +65,9 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
         return decision;
     }
 
-    private RuleHit findHit(List<RuleHit> hits, String ruleCode) {
+    private RuleHit findHit(List<RuleHit> hits, String ruleCode, String action) {
         return hits.stream()
-                .filter(hit -> ruleCode.equals(hit.getRuleCode()))
+                .filter(hit -> ruleCode.equals(hit.getRuleCode()) || action.equals(hit.getAction()))
                 .findFirst()
                 .orElse(null);
     }

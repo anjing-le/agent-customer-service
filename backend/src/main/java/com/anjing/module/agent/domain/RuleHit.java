@@ -13,4 +13,5 @@ public class RuleHit {
     private Integer priority;
     private String reason;
     private String action;
+    private String conditionSource;
 }

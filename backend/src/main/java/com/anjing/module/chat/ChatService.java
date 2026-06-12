@@ -271,6 +271,7 @@ public class ChatService {
             vo.setPriority(hit.getPriority());
             vo.setReason(hit.getReason());
             vo.setAction(hit.getAction());
+            vo.setConditionSource(hit.getConditionSource());
             return vo;
         }).toList();
     }

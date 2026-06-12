@@ -9,7 +9,7 @@
 - V1 保留当前单体架构，先把运行链路、接口契约和模块边界讲清楚。
 - 不默认引入网关、注册中心、MQ、对象存储或链路追踪平台；重型能力只保留接口、配置样例和扩展点。
 - Product、Activity、FAQ 是 V1 真实参与对话链路的知识；Industry、Solution 是预留能力，未接入前必须在页面和文档中标明。
-- Scene 的 Intent、Prompt、Rule 已轻量接入运行时；完整条件表达式和 RuleEngine 未完成前，文档必须标明当前能力边界。
+- Scene 的 Intent、Prompt、Rule 已轻量接入运行时；Rule 条件表达式、Prompt 变量和检索能力必须在文档中标明当前能力边界。
 
 ## 后端约束
 

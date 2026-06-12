@@ -37,7 +37,7 @@
 | `JpaKnowledgeRetriever` | Product/Activity/FAQ 的 JPA 关键词检索和人工选择召回 |
 | `DefaultGuardrailPolicy` | 低置信度、无可靠知识等兜底决策 |
 | `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
-| `RuleEngine` | 执行启用规则，返回命中原因和动作 |
+| `RuleEngine` | 执行启用规则，支持内置规则码和轻量 JSON 条件表达式，返回命中原因和动作 |
 | `PromptRuntime` | 渲染启用 SYSTEM Prompt，注入变量并返回可观测结果 |
 
 Scene 配置接入点：
@@ -46,7 +46,31 @@ Scene 配置接入点：
 |---|---|
 | 启用的 `Intent` | LLM 分析失败时，按优先级和触发关键词参与意图识别 |
 | 启用的 SYSTEM `Prompt` | 由 `PromptRuntime` 按场景过滤、变量渲染后注入 `LlmService` 上下文 |
-| 启用的 `Rule` | 由 `RuleEngine` 执行；`SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 已有命中结果 |
+| 启用的 `Rule` | 由 `RuleEngine` 执行；支持 `SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 内置规则码和 JSON 条件表达式 |
+
+## Rule Condition V1
+
+`Rule.conditions` 支持轻量 JSON 表达式；`Rule.actions` 支持配置命中后的原因和动作。空条件继续走内置规则码。
+
+```json
+{
+  "all": [
+    { "field": "intentCode", "op": "eq", "value": "RETURN_EXCHANGE" },
+    { "field": "confidence", "op": "lt", "value": 0.7 }
+  ]
+}
+```
+
+```json
+{
+  "reason": "退换货意图置信度不足，需要澄清或转人工",
+  "action": "TRANSFER_OR_CLARIFY"
+}
+```
+
+支持字段：`userMessage`、`sceneType`、`intentCode`、`intentName`、`confidence`、`emotion`、`knowledgeCount`、`hasReliableKnowledge`、`context.xxx`。
+
+支持操作符：`eq`、`ne`、`contains`、`not_contains`、`gt`、`gte`、`lt`、`lte`、`in`、`is_empty`、`is_not_empty`。
 
 ## Runtime Boundary
 
@@ -67,7 +91,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["Scene Config"] --> B["Rule Condition Engine"]
+    A["Scene Config"] --> B["Rule Condition Editor"]
     A --> C["Prompt Variable Schema"]
     A --> D["Intent Statistics"]
     E["Vector Store"] --> F["KnowledgeRetriever"]
@@ -89,6 +113,7 @@ flowchart LR
 3. 已完成：Scene 配置轻量接入 `IntentAnalyzer`、`ReplyGenerator` 和 `GuardrailPolicy`。
 4. 已完成：轻量 `RuleEngine`，支持内置规则码命中和动作解释。
 5. 已完成：`PromptRuntime` 基础变量渲染，前端可靠性面板展示渲染结果。
-6. 下一步：实现 JSON 条件表达式、Prompt 变量 schema 和编辑态校验。
-7. 下一步：将关键词检索升级为向量检索 + rerank。
-8. 下一步：增加运行统计，沉淀规则命中率、Prompt 使用量和兜底趋势。
+6. 已完成：`RuleEngine` 轻量 JSON 条件表达式，支持 `all`/`any`、字段操作符和动作驱动护栏。
+7. 下一步：实现 Rule 条件编辑器校验、Prompt 变量 schema 和编辑态校验。
+8. 下一步：将关键词检索升级为向量检索 + rerank。
+9. 下一步：增加运行统计，沉淀规则命中率、Prompt 使用量和兜底趋势。

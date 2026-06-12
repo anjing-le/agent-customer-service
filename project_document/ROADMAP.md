@@ -21,9 +21,9 @@
 - 已开始拆分 `ChatService`：会话/消息保留在 `ChatService`，分析、检索、生成、兜底、防幻觉、审计由 `AgentRuntime` 编排。
 - 已轻量接入 Scene 配置：动态 Intent、SYSTEM Prompt、基础 Rule 护栏。
 - 已将 `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 接入真实 runtime。
-- 已补轻量 RuleEngine 命中结果和 PromptRuntime 基础变量渲染。
+- 已补 RuleEngine 命中结果、轻量 JSON 条件表达式和 PromptRuntime 基础变量渲染。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补 JSON 条件表达式、Prompt 变量 schema、编辑态校验和命中统计。
+- 下一步补 Rule 条件编辑器校验、Prompt 变量 schema、编辑态校验和命中统计。
 - 支持 SSE 流式回复和低置信度转人工策略。
 
 ## V3: 生产化扩展

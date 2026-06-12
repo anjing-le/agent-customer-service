@@ -326,6 +326,7 @@ watch(() => props.aiResponse, (res) => {
                     <span>P{{ rule.priority }}</span>
                     <span>{{ rule.ruleType }}</span>
                     <span>{{ rule.action }}</span>
+                    <span>{{ rule.conditionSource || 'BUILT_IN' }}</span>
                   </div>
                   <div class="rule-hit-item__reason">{{ rule.reason }}</div>
                 </div>
