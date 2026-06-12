@@ -29,10 +29,18 @@ public class ChatVO {
         private Long todayUserMessages;
         /** 今日助手消息数 */
         private Long todayAssistantMessages;
+        /** 今日 Agent 回复数 */
+        private Long todayAgentReplies;
+        /** 今日安全回复数 */
+        private Long todaySafeReplies;
+        /** 今日兜底回复数 */
+        private Long todayFallbackReplies;
         /** 平均每会话消息数 */
         private Double averageMessagesPerSession;
         /** 最近会话 */
         private List<RecentSessionVO> recentSessions;
+        /** 最近 Agent 审计 */
+        private List<AgentAuditVO> recentAudits;
     }
 
     /**
@@ -48,6 +56,27 @@ public class ChatVO {
         private String lastMessage;
         private LocalDateTime updatedAt;
     }
+
+    /**
+     * Agent 单轮回复审计摘要。
+     */
+    @Data
+    public static class AgentAuditVO {
+        private String sessionId;
+        private String messageId;
+        private String sceneType;
+        private String intentName;
+        private Double confidence;
+        private String replyEngine;
+        private Boolean safe;
+        private Boolean fallbackRequired;
+        private String fallbackReason;
+        private Integer knowledgeEvidenceCount;
+        private Integer ruleHitCount;
+        private Integer promptRenderCount;
+        private LocalDateTime createdAt;
+    }
+
 
     /**
      * 会话信息

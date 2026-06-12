@@ -33,8 +33,12 @@ const overview = ref({
   todayMessages: 0,
   todayUserMessages: 0,
   todayAssistantMessages: 0,
+  todayAgentReplies: 0,
+  todaySafeReplies: 0,
+  todayFallbackReplies: 0,
   averageMessagesPerSession: 0,
-  recentSessions: [] as any[]
+  recentSessions: [] as any[],
+  recentAudits: [] as any[]
 })
 
 const loadOverview = async () => {
@@ -90,16 +94,18 @@ onMounted(() => {
         <strong>{{ overview.todayMessages }}</strong>
       </div>
       <div class="runtime-metric">
-        <span>用户 / 助手</span>
-        <strong>{{ overview.todayUserMessages }} / {{ overview.todayAssistantMessages }}</strong>
+        <span>Agent 回复</span>
+        <strong>{{ overview.todayAgentReplies }}</strong>
       </div>
       <div class="runtime-metric">
-        <span>平均轮次</span>
-        <strong>{{ overview.averageMessagesPerSession }}</strong>
+        <span>安全 / 兜底</span>
+        <strong>{{ overview.todaySafeReplies }} / {{ overview.todayFallbackReplies }}</strong>
       </div>
       <div class="runtime-recent">
-        <span>最近会话</span>
-        <strong>{{ overview.recentSessions?.[0]?.lastMessage || '暂无消息' }}</strong>
+        <span>最近审计</span>
+        <strong>
+          {{ overview.recentAudits?.[0]?.intentName || overview.recentSessions?.[0]?.lastMessage || '暂无记录' }}
+        </strong>
       </div>
     </div>
 

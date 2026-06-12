@@ -11,8 +11,10 @@ import com.anjing.module.agent.domain.KnowledgeSource;
 import com.anjing.module.agent.domain.PromptRenderResult;
 import com.anjing.module.agent.domain.ReasoningStep;
 import com.anjing.module.agent.domain.RuleHit;
+import com.anjing.module.chat.entity.ChatAgentAudit;
 import com.anjing.module.chat.entity.ChatMessage;
 import com.anjing.module.chat.entity.ChatSession;
+import com.anjing.module.chat.repository.ChatAgentAuditRepository;
 import com.anjing.module.chat.repository.ChatMessageRepository;
 import com.anjing.module.chat.repository.ChatSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,7 @@ public class ChatService {
 
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
+    private final ChatAgentAuditRepository auditRepository;
     private final AgentRuntime agentRuntime;
 
     /**
@@ -63,8 +66,12 @@ public class ChatService {
         vo.setTodayMessages(messageRepository.countByCreatedAtBetween(startOfDay, now));
         vo.setTodayUserMessages(messageRepository.countByRoleAndCreatedAtBetween("user", startOfDay, now));
         vo.setTodayAssistantMessages(messageRepository.countByRoleAndCreatedAtBetween("assistant", startOfDay, now));
+        vo.setTodayAgentReplies(auditRepository.countByCreatedAtBetween(startOfDay, now));
+        vo.setTodaySafeReplies(auditRepository.countBySafeAndCreatedAtBetween(true, startOfDay, now));
+        vo.setTodayFallbackReplies(auditRepository.countByFallbackRequiredAndCreatedAtBetween(true, startOfDay, now));
         vo.setAverageMessagesPerSession(totalSessions == 0 ? 0D : Math.round((double) totalMessages * 100 / totalSessions) / 100D);
         vo.setRecentSessions(loadRecentSessions());
+        vo.setRecentAudits(loadRecentAudits());
         return vo;
     }
 
@@ -193,6 +200,7 @@ public class ChatService {
         messageRepository.save(aiMessage);
 
         agentReply.setMessageId(aiMessage.getMessageId());
+        saveAgentAudit(dto.getSessionId(), aiMessage, agentReply);
         return toSendMessageVO(agentReply, aiMessage);
     }
 
@@ -413,6 +421,68 @@ public class ChatService {
         if (!messages.isEmpty()) {
             vo.setLastMessage(messages.get(messages.size() - 1).getContent());
         }
+        return vo;
+    }
+
+    private void saveAgentAudit(String sessionId, ChatMessage aiMessage, AgentReply agentReply) {
+        ChatAgentAudit audit = new ChatAgentAudit();
+        audit.setAuditId(UUID.randomUUID().toString());
+        audit.setSessionId(sessionId);
+        audit.setMessageId(aiMessage.getMessageId());
+        audit.setReplyEngine(agentReply.getEngine() != null ? agentReply.getEngine().name() : null);
+
+        if (agentReply.getIntentAnalysis() != null) {
+            audit.setSceneType(agentReply.getIntentAnalysis().getSceneType());
+            audit.setIntentCode(agentReply.getIntentAnalysis().getIntentCode());
+            audit.setIntentName(agentReply.getIntentAnalysis().getIntentName());
+            audit.setConfidence(agentReply.getIntentAnalysis().getConfidence());
+        }
+        if (agentReply.getKnowledgeRecall() != null && agentReply.getKnowledgeRecall().getEvidences() != null) {
+            audit.setKnowledgeEvidenceCount(agentReply.getKnowledgeRecall().getEvidences().size());
+        } else {
+            audit.setKnowledgeEvidenceCount(0);
+        }
+        if (agentReply.getGuardrailDecision() != null) {
+            audit.setSafe(agentReply.getGuardrailDecision().isSafe());
+            audit.setFallbackRequired(agentReply.getGuardrailDecision().isFallbackRequired());
+            audit.setFallbackReason(agentReply.getGuardrailDecision().getFallbackReason() != null
+                    ? agentReply.getGuardrailDecision().getFallbackReason().name()
+                    : null);
+            audit.setRuleHitCount(agentReply.getGuardrailDecision().getRuleHits() != null
+                    ? agentReply.getGuardrailDecision().getRuleHits().size()
+                    : 0);
+        } else {
+            audit.setSafe(true);
+            audit.setFallbackRequired(false);
+            audit.setRuleHitCount(0);
+        }
+        audit.setPromptRenderCount(agentReply.getPromptRenderResults() != null
+                ? agentReply.getPromptRenderResults().size()
+                : 0);
+        auditRepository.save(audit);
+    }
+
+    private List<ChatVO.AgentAuditVO> loadRecentAudits() {
+        return auditRepository.findTop5ByOrderByCreatedAtDesc().stream()
+                .map(this::toAgentAuditVO)
+                .toList();
+    }
+
+    private ChatVO.AgentAuditVO toAgentAuditVO(ChatAgentAudit audit) {
+        ChatVO.AgentAuditVO vo = new ChatVO.AgentAuditVO();
+        vo.setSessionId(audit.getSessionId());
+        vo.setMessageId(audit.getMessageId());
+        vo.setSceneType(audit.getSceneType());
+        vo.setIntentName(audit.getIntentName());
+        vo.setConfidence(audit.getConfidence());
+        vo.setReplyEngine(audit.getReplyEngine());
+        vo.setSafe(audit.getSafe());
+        vo.setFallbackRequired(audit.getFallbackRequired());
+        vo.setFallbackReason(audit.getFallbackReason());
+        vo.setKnowledgeEvidenceCount(audit.getKnowledgeEvidenceCount());
+        vo.setRuleHitCount(audit.getRuleHitCount());
+        vo.setPromptRenderCount(audit.getPromptRenderCount());
+        vo.setCreatedAt(audit.getCreatedAt());
         return vo;
     }
 

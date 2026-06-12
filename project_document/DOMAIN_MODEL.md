@@ -14,6 +14,7 @@
 | `GuardrailDecision` | 防幻觉、安全和兜底决策 | 规则兜底、低置信度、无可靠知识、LLM 不可用 |
 | `AgentReply` | 一轮回复的完整结果 | `ChatVO.SendMessageVO` |
 | `ReasoningStep` | 可审计推理过程 | `ChatVO.ReasoningStepVO` |
+| `ChatAgentAudit` | Agent 单轮回复审计事实 | `AgentReply`、`ChatMessage` |
 
 ## Application Ports
 
@@ -39,6 +40,18 @@
 | `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
 | `RuleEngine` | 执行启用规则，支持内置规则码和轻量 JSON 条件表达式，返回命中原因和动作 |
 | `PromptRuntime` | 渲染启用 SYSTEM Prompt，注入变量并返回可观测结果；变量 schema 在配置阶段校验 |
+
+Chat 运行审计：
+
+| 字段 | 说明 |
+|---|---|
+| `sessionId` / `messageId` | 对应一次助手回复 |
+| `sceneType` / `intentCode` / `intentName` / `confidence` | 意图分析结果 |
+| `replyEngine` | 本轮回复来自 LLM、规则或混合链路 |
+| `safe` / `fallbackRequired` / `fallbackReason` | 护栏和兜底结论 |
+| `knowledgeEvidenceCount` | 本轮召回证据数量 |
+| `ruleHitCount` | 本轮命中规则数量 |
+| `promptRenderCount` | 本轮渲染 Prompt 数量 |
 
 Scene 配置接入点：
 
@@ -119,5 +132,6 @@ flowchart LR
 9. 已完成：Rule 表达式测试入口，支持模拟运行时字段并查看命中原因和动作。
 10. 已完成：Scene Runtime Overview，展示启用配置、规则命中、Prompt 使用和 Top 项。
 11. 已完成：Chat Runtime Overview，展示会话、消息、活跃状态、今日消息和最近会话。
-12. 下一步：将关键词检索升级为向量检索 + rerank。
-13. 下一步：增加运行历史快照，沉淀规则命中率、Prompt 使用量和兜底趋势。
+12. 已完成：Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
+13. 下一步：将关键词检索升级为向量检索 + rerank。
+14. 下一步：增加运行历史快照，沉淀规则命中率、Prompt 使用量和兜底趋势。

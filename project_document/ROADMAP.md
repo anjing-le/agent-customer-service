@@ -26,6 +26,7 @@
 - 已补 Prompt 变量 schema、运行时变量快捷填充、编辑态校验和测试入口。
 - 已补 Scene Runtime Overview，展示启用配置、规则命中、Prompt 使用和 Top 项。
 - 已补 Chat Runtime Overview，展示会话、消息、活跃状态和最近会话。
+- 已补 Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
 - 下一步补运行历史快照、命中趋势和会话质检摘要。
 - 支持 SSE 流式回复和低置信度转人工策略。
