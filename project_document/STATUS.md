@@ -16,6 +16,7 @@
 | RuleEngine | Lightweight runtime | 支持内置规则码和轻量 JSON 条件表达式；命中后返回来源、原因和动作，并累加触发次数 |
 | Rule 配置 | Runtime editable | 前端支持规则新增/编辑、条件/动作 JSON 格式化和校验；后端 create/update 拦截非法 JSON |
 | PromptRuntime | Lightweight runtime | 支持 SYSTEM Prompt 场景过滤、基础变量渲染、使用次数累加，并返回渲染结果 |
+| Prompt 配置 | Runtime editable | 前端支持 Prompt 新增/编辑、变量 schema、运行时变量快捷填充和测试；后端校验变量名、重复项和必填占位符 |
 | 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
 | OpenAPI typed client | Pending | 后续接入 `/v3/api-docs` 和前端 operation 类型 |
 | 测试与质量门禁 | Ready for V1 | `./scripts/quality-gate.sh` 已通过；后续补单元测试和运行探针 |
@@ -26,7 +27,7 @@
 - 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
 - V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
 - 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已轻量接入运行时，Prompt 变量 schema、规则表达式测试和规则统计看板下一阶段继续补。
+- Scene 已轻量接入运行时，规则表达式测试和运行统计看板下一阶段继续补。
 
 ## 验证入口
 

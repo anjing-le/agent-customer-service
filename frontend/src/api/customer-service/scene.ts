@@ -79,7 +79,7 @@ export function fetchGetPromptDetail(id: number) {
   })
 }
 
-export function fetchTestPrompt(data: { promptId: number; variables?: Record<string, string>; testInput?: string }) {
+export function fetchTestPrompt(data: { promptId: number; input?: string; variables?: Record<string, string> }) {
   return request.post<any>({
     url: ApiPaths.scene.promptTest,
     data

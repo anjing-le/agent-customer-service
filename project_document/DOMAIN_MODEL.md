@@ -38,7 +38,7 @@
 | `DefaultGuardrailPolicy` | 低置信度、无可靠知识等兜底决策 |
 | `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
 | `RuleEngine` | 执行启用规则，支持内置规则码和轻量 JSON 条件表达式，返回命中原因和动作 |
-| `PromptRuntime` | 渲染启用 SYSTEM Prompt，注入变量并返回可观测结果 |
+| `PromptRuntime` | 渲染启用 SYSTEM Prompt，注入变量并返回可观测结果；变量 schema 在配置阶段校验 |
 
 Scene 配置接入点：
 
@@ -115,6 +115,6 @@ flowchart LR
 5. 已完成：`PromptRuntime` 基础变量渲染，前端可靠性面板展示渲染结果。
 6. 已完成：`RuleEngine` 轻量 JSON 条件表达式，支持 `all`/`any`、字段操作符和动作驱动护栏。
 7. 已完成：Rule 条件/动作编辑器和前后端 JSON 校验。
-8. 下一步：实现 Prompt 变量 schema 和编辑态校验。
+8. 已完成：Prompt 变量 schema、编辑态校验、运行时变量快捷填充和测试入口。
 9. 下一步：将关键词检索升级为向量检索 + rerank。
 10. 下一步：增加运行统计，沉淀规则命中率、Prompt 使用量和兜底趋势。

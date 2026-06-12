@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -36,6 +37,8 @@ public class SceneService {
     private final RuleRepository ruleRepository;
     private final LlmService llmService;
     private final ObjectMapper objectMapper;
+
+    private static final Pattern PROMPT_VARIABLE_NAME_PATTERN = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]*$");
 
     @PostConstruct
     public void initData() {
@@ -233,6 +236,7 @@ public class SceneService {
 
     @Transactional
     public SceneVO.PromptVO createPrompt(SceneDTO.CreatePromptDTO dto) {
+        validatePromptVariables(dto.getContent(), dto.getVariables());
         Prompt entity = new Prompt();
         entity.setPromptName(dto.getPromptName());
         entity.setPromptCode(dto.getPromptCode());
@@ -252,6 +256,10 @@ public class SceneService {
     public SceneVO.PromptVO updatePrompt(SceneDTO.UpdatePromptDTO dto) {
         Prompt prompt = promptRepository.findById(dto.getId()).orElse(null);
         if (prompt != null) {
+            validatePromptVariables(
+                    dto.getContent() != null ? dto.getContent() : prompt.getPromptContent(),
+                    dto.getVariables() != null ? dto.getVariables() : promptVariablesToDto(jsonToVariables(prompt.getVariables()))
+            );
             if (dto.getPromptName() != null) prompt.setPromptName(dto.getPromptName());
             if (dto.getPromptCode() != null) prompt.setPromptCode(dto.getPromptCode());
             if (dto.getPromptType() != null) prompt.setPromptType(dto.getPromptType());
@@ -510,6 +518,40 @@ public class SceneService {
             voList.add(vo);
         }
         return JsonUtils.toJson(voList);
+    }
+
+    private void validatePromptVariables(String content, List<SceneDTO.PromptVariableDTO> variables) {
+        if (variables == null || variables.isEmpty()) return;
+
+        Set<String> names = new HashSet<>();
+        String template = content == null ? "" : content;
+        for (SceneDTO.PromptVariableDTO variable : variables) {
+            if (variable.getName() == null || variable.getName().isBlank()) {
+                throw new BizException("Prompt 变量名不能为空", CommonErrorCode.PARAM_INVALID);
+            }
+            String name = variable.getName().trim();
+            if (!PROMPT_VARIABLE_NAME_PATTERN.matcher(name).matches()) {
+                throw new BizException("Prompt 变量名只能使用字母、数字和下划线，且以字母开头", CommonErrorCode.PARAM_INVALID);
+            }
+            if (!names.add(name)) {
+                throw new BizException("Prompt 变量名重复: " + name, CommonErrorCode.PARAM_INVALID);
+            }
+            if (Boolean.TRUE.equals(variable.getRequired()) && !template.contains("{{" + name + "}}")) {
+                throw new BizException("必填 Prompt 变量未出现在模板中: " + name, CommonErrorCode.PARAM_INVALID);
+            }
+        }
+    }
+
+    private List<SceneDTO.PromptVariableDTO> promptVariablesToDto(List<SceneVO.PromptVariableVO> variables) {
+        if (variables == null || variables.isEmpty()) return List.of();
+        return variables.stream().map(variable -> {
+            SceneDTO.PromptVariableDTO dto = new SceneDTO.PromptVariableDTO();
+            dto.setName(variable.getName());
+            dto.setDescription(variable.getDescription());
+            dto.setDefaultValue(variable.getDefaultValue());
+            dto.setRequired(variable.getRequired());
+            return dto;
+        }).toList();
     }
 
     private List<SceneVO.PromptVariableVO> jsonToVariables(String json) {
