@@ -192,6 +192,7 @@ public class ChatService {
             detail.setMessages(messages.stream().map(this::toMessageVO).toList());
             detail.setContext(new ChatVO.ContextVO());
             detail.setSessionQuality(buildSessionQuality(sessionId));
+            detail.setSessionAudits(loadSessionAudits(sessionId));
             return detail;
         }).orElse(null);
     }
@@ -311,6 +312,7 @@ public class ChatService {
         response.setReasoningProcess(toReasoningProcess(agentReply.getReasoningSteps()));
         response.setReliability(toReliabilityVO(agentReply));
         response.setSessionQuality(sessionQuality);
+        response.setSessionAudits(loadSessionAudits(aiMessage.getSessionId()));
         response.setCreatedAt(aiMessage.getCreatedAt());
         return response;
     }
@@ -502,6 +504,12 @@ public class ChatService {
 
     private List<ChatVO.AgentAuditVO> loadRecentAudits() {
         return auditRepository.findTop5ByOrderByCreatedAtDesc().stream()
+                .map(this::toAgentAuditVO)
+                .toList();
+    }
+
+    private List<ChatVO.AgentAuditVO> loadSessionAudits(String sessionId) {
+        return auditRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream()
                 .map(this::toAgentAuditVO)
                 .toList();
     }

@@ -188,6 +188,8 @@ public class ChatVO {
         private List<MessageVO> messages;
         /** 会话质检摘要 */
         private SessionQualityVO sessionQuality;
+        /** 会话审计明细 */
+        private List<AgentAuditVO> sessionAudits;
         /** 创建时间 */
         private LocalDateTime createdAt;
     }
@@ -236,6 +238,8 @@ public class ChatVO {
         private ReliabilityVO reliability;
         /** 会话质检摘要 */
         private SessionQualityVO sessionQuality;
+        /** 会话审计明细 */
+        private List<AgentAuditVO> sessionAudits;
         /** 创建时间 */
         private LocalDateTime createdAt;
     }

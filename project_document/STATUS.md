@@ -20,7 +20,7 @@
 | Scene 运行概览 | Runtime observable | 展示启用意图、启用 SYSTEM Prompt、启用规则、规则命中、Prompt 使用、Top 项和运行洞察 |
 | Chat 运行概览 | Runtime observable | 展示总会话、活跃会话、今日会话、今日消息、Agent 回复、安全回复、兜底回复、最近审计、7 日趋势和最近快照 |
 | Agent 审计 | Runtime observable | 每轮助手回复沉淀意图、回复引擎、兜底原因、召回数、规则命中数和 Prompt 渲染数 |
-| 会话质检摘要 | Runtime observable | 基于单轮审计聚合会话可靠性评分、风险等级、兜底率、不安全率和主要兜底原因 |
+| 会话质检摘要 | Runtime observable | 基于单轮审计聚合会话可靠性评分、风险等级、兜底率、不安全率、主要兜底原因和质检明细 |
 | Runtime Snapshot | Runtime observable | 支持手动采样和可配置定时采样，沉淀 Chat 运行质量历史快照 |
 | 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
 | OpenAPI typed client | Pending | 后续接入 `/v3/api-docs` 和前端 operation 类型 |
@@ -32,7 +32,7 @@
 - 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
 - V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
 - 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已补运行洞察；Chat 已沉淀 Agent 单轮审计事实、会话质检摘要、7 日趋势和运行快照。
+- Scene 已补运行洞察；Chat 已沉淀 Agent 单轮审计事实、会话质检摘要、质检明细、7 日趋势和运行快照。
 
 ## 验证入口
 

@@ -31,8 +31,9 @@
 - 已补 Chat Runtime Snapshot，支持手动采样和可配置定时采样。
 - 已补 Scene Runtime Insight，展示规则/Prompt 平均使用和集中度。
 - 已补 Session Quality Summary，基于会话审计事实展示可靠性评分、风险等级和主要兜底原因。
+- 已补 Session Audit Drilldown，在可靠性面板展示每轮审计明细，支持查看意图、置信度、引擎、召回、规则和 Prompt 消费。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补跨 Scene/Prompt/Rule 的命中趋势和质检明细下钻。
+- 下一步补跨 Scene/Prompt/Rule 的命中趋势。
 - 支持 SSE 流式回复和低置信度转人工策略。
 
 ## V3: 生产化扩展

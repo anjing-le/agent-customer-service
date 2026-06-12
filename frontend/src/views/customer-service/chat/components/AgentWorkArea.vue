@@ -56,6 +56,7 @@ const sessionQuality = ref<any>({
   riskLevel: 'LOW',
   primaryFallbackReason: ''
 })
+const sessionAudits = ref<any[]>([])
 
 const riskTagType = computed(() => {
   if (sessionQuality.value.riskLevel === 'HIGH') return 'danger'
@@ -139,6 +140,7 @@ watch(() => props.aiResponse, (res) => {
     riskLevel: res.sessionQuality?.riskLevel || 'LOW',
     primaryFallbackReason: res.sessionQuality?.primaryFallbackReason || ''
   }
+  sessionAudits.value = res.sessionAudits || []
 
   userProfile.value.lastActive = '刚刚'
 })
@@ -346,6 +348,40 @@ watch(() => props.aiResponse, (res) => {
               <div class="session-quality__reasons">
                 <span>主要兜底原因</span>
                 <strong>{{ sessionQuality.primaryFallbackReason || '暂无' }}</strong>
+              </div>
+            </div>
+
+            <div class="reliability-block">
+              <div class="reliability-block__label">质检明细</div>
+              <div v-if="sessionAudits.length" class="audit-detail-list">
+                <div
+                  v-for="audit in sessionAudits"
+                  :key="audit.messageId"
+                  class="audit-detail-item"
+                >
+                  <div class="audit-detail-item__header">
+                    <span>{{ audit.intentName || '通用咨询' }}</span>
+                    <el-tag
+                      :type="audit.safe === false ? 'danger' : audit.fallbackRequired ? 'warning' : 'success'"
+                      size="small"
+                    >
+                      {{ audit.safe === false ? '拦截' : audit.fallbackRequired ? '兜底' : '通过' }}
+                    </el-tag>
+                  </div>
+                  <div class="audit-detail-item__meta">
+                    <span>{{ audit.replyEngine || '-' }}</span>
+                    <span>置信度 {{ audit.confidence ?? 0 }}</span>
+                    <span>召回 {{ audit.knowledgeEvidenceCount || 0 }}</span>
+                    <span>规则 {{ audit.ruleHitCount || 0 }}</span>
+                    <span>Prompt {{ audit.promptRenderCount || 0 }}</span>
+                  </div>
+                  <div v-if="audit.fallbackReason" class="audit-detail-item__reason">
+                    {{ audit.fallbackReason }}
+                  </div>
+                </div>
+              </div>
+              <div v-else class="reliability-block__content reliability-block__content--muted">
+                暂无会话审计明细
               </div>
             </div>
 
@@ -930,10 +966,61 @@ watch(() => props.aiResponse, (res) => {
   gap: 8px;
 }
 
+.audit-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
 .prompt-render-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.audit-detail-item {
+  padding: 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background-color: #fff;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+
+    span {
+      min-width: 0;
+      overflow: hidden;
+      color: #333;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 18px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    color: #999;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  &__reason {
+    margin-top: 6px;
+    color: #666;
+    font-size: 12px;
+    line-height: 18px;
+    word-break: break-word;
+  }
 }
 
 .rule-hit-item {

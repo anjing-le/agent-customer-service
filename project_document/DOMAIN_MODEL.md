@@ -74,6 +74,7 @@ Chat 运行趋势：
 | `sessionQuality.riskLevel` | `LOW`、`MEDIUM`、`HIGH`，用于运营判断是否需要复盘 |
 | `sessionQuality.primaryFallbackReason` | 当前会话最主要的兜底原因 |
 | `sessionQuality.fallbackRate` / `unsafeRate` | 当前会话内兜底和不安全回复占比 |
+| `sessionAudits` | 当前会话每轮 Agent 回复的审计明细，用于质检下钻 |
 
 Chat 运行快照：
 
@@ -180,5 +181,6 @@ flowchart LR
 14. 已完成：Chat Runtime Snapshot，支持手动采样和可配置定时采样，沉淀长期趋势基础数据。
 15. 已完成：Scene Runtime Insight，展示规则/Prompt 平均使用和集中度，辅助配置运营。
 16. 已完成：Session Quality Summary，基于会话审计事实生成可靠性评分、风险等级和主要兜底原因。
-17. 下一步：将关键词检索升级为向量检索 + rerank。
-18. 下一步：增加跨 Scene/Prompt/Rule 的长期命中趋势和质检明细下钻。
+17. 已完成：Session Audit Drilldown，随会话详情和发送消息返回会话审计明细，并在可靠性面板展示。
+18. 下一步：将关键词检索升级为向量检索 + rerank。
+19. 下一步：增加跨 Scene/Prompt/Rule 的长期命中趋势。
