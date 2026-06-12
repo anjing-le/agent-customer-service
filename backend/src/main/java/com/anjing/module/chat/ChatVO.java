@@ -115,6 +115,21 @@ public class ChatVO {
         private String userVisibleNotice;
         /** 策略标签 */
         private List<String> policyTags;
+        /** 命中规则 */
+        private List<RuleHitVO> ruleHits;
+    }
+
+    /**
+     * 命中的运行时规则。
+     */
+    @Data
+    public static class RuleHitVO {
+        private String ruleCode;
+        private String ruleName;
+        private String ruleType;
+        private Integer priority;
+        private String reason;
+        private String action;
     }
 
     /**

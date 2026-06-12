@@ -40,7 +40,8 @@ const reliability = ref<any>({
   fallbackRequired: false,
   fallbackReason: '',
   userVisibleNotice: '',
-  policyTags: []
+  policyTags: [],
+  ruleHits: []
 })
 
 const formatTime = (ts: string | null) => {
@@ -103,7 +104,8 @@ watch(() => props.aiResponse, (res) => {
     fallbackRequired: res.reliability?.fallbackRequired ?? false,
     fallbackReason: res.reliability?.fallbackReason || '',
     userVisibleNotice: res.reliability?.userVisibleNotice || '',
-    policyTags: res.reliability?.policyTags || []
+    policyTags: res.reliability?.policyTags || [],
+    ruleHits: res.reliability?.ruleHits || []
   }
 
   userProfile.value.lastActive = '刚刚'
@@ -303,6 +305,31 @@ watch(() => props.aiResponse, (res) => {
               </div>
               <div v-else class="reliability-block__content reliability-block__content--muted">
                 暂无策略标签
+              </div>
+            </div>
+
+            <div class="reliability-block">
+              <div class="reliability-block__label">命中规则</div>
+              <div v-if="reliability.ruleHits.length" class="rule-hit-list">
+                <div
+                  v-for="rule in reliability.ruleHits"
+                  :key="rule.ruleCode"
+                  class="rule-hit-item"
+                >
+                  <div class="rule-hit-item__header">
+                    <span class="rule-hit-item__name">{{ rule.ruleName }}</span>
+                    <code class="rule-hit-item__code">{{ rule.ruleCode }}</code>
+                  </div>
+                  <div class="rule-hit-item__meta">
+                    <span>P{{ rule.priority }}</span>
+                    <span>{{ rule.ruleType }}</span>
+                    <span>{{ rule.action }}</span>
+                  </div>
+                  <div class="rule-hit-item__reason">{{ rule.reason }}</div>
+                </div>
+              </div>
+              <div v-else class="reliability-block__content reliability-block__content--muted">
+                暂无命中规则
               </div>
             </div>
           </div>
@@ -699,5 +726,57 @@ watch(() => props.aiResponse, (res) => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.rule-hit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-hit-item {
+  padding: 10px;
+  background-color: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  &__name {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  &__code {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    color: #666;
+    font-size: 11px;
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 6px;
+    color: #999;
+    font-size: 11px;
+  }
+
+  &__reason {
+    color: #666;
+    font-size: 12px;
+    line-height: 1.5;
+  }
 }
 </style>

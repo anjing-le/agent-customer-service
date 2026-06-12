@@ -9,6 +9,7 @@ import com.anjing.module.agent.domain.KnowledgeEvidence;
 import com.anjing.module.agent.domain.KnowledgeRecall;
 import com.anjing.module.agent.domain.KnowledgeSource;
 import com.anjing.module.agent.domain.ReasoningStep;
+import com.anjing.module.agent.domain.RuleHit;
 import com.anjing.module.chat.entity.ChatMessage;
 import com.anjing.module.chat.entity.ChatSession;
 import com.anjing.module.chat.repository.ChatMessageRepository;
@@ -253,8 +254,23 @@ public class ChatService {
                     : null);
             vo.setUserVisibleNotice(agentReply.getGuardrailDecision().getUserVisibleNotice());
             vo.setPolicyTags(agentReply.getGuardrailDecision().getPolicyTags());
+            vo.setRuleHits(toRuleHitVOs(agentReply.getGuardrailDecision().getRuleHits()));
         }
         return vo;
+    }
+
+    private List<ChatVO.RuleHitVO> toRuleHitVOs(List<RuleHit> ruleHits) {
+        if (ruleHits == null) return List.of();
+        return ruleHits.stream().map(hit -> {
+            ChatVO.RuleHitVO vo = new ChatVO.RuleHitVO();
+            vo.setRuleCode(hit.getRuleCode());
+            vo.setRuleName(hit.getRuleName());
+            vo.setRuleType(hit.getRuleType());
+            vo.setPriority(hit.getPriority());
+            vo.setReason(hit.getReason());
+            vo.setAction(hit.getAction());
+            return vo;
+        }).toList();
     }
 
     private ChatVO.IntentVO toIntentVO(AgentReply agentReply) {

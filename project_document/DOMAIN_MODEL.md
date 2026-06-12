@@ -37,6 +37,7 @@
 | `JpaKnowledgeRetriever` | Product/Activity/FAQ 的 JPA 关键词检索和人工选择召回 |
 | `DefaultGuardrailPolicy` | 低置信度、无可靠知识等兜底决策 |
 | `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
+| `RuleEngine` | 执行启用规则，返回命中原因和动作 |
 
 Scene 配置接入点：
 
@@ -44,7 +45,7 @@ Scene 配置接入点：
 |---|---|
 | 启用的 `Intent` | LLM 分析失败时，按优先级和触发关键词参与意图识别 |
 | 启用的 SYSTEM `Prompt` | 注入 `LlmService` 的增强系统提示词 |
-| 启用的 `Rule` | 写入护栏策略标签；`SENSITIVE_FILTER` 和 `TRANSFER_THRESHOLD` 已有基础策略 |
+| 启用的 `Rule` | 由 `RuleEngine` 执行；`SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 已有命中结果 |
 
 ## Runtime Boundary
 
@@ -85,6 +86,7 @@ flowchart LR
 1. 已完成：`ChatService` 调用 `AgentRuntime`，现有 API 和前端 VO 不变。
 2. 已完成：抽出 `IntentAnalyzer`、`KnowledgeRetriever`、`GuardrailPolicy`、`ReplyGenerator`。
 3. 已完成：Scene 配置轻量接入 `IntentAnalyzer`、`ReplyGenerator` 和 `GuardrailPolicy`。
-4. 下一步：实现完整 `RuleEngine` 条件表达式和 Prompt 变量渲染。
-5. 下一步：将关键词检索升级为向量检索 + rerank。
-6. 下一步：增加可靠性看板，展示兜底原因、知识证据和回复引擎。
+4. 已完成：轻量 `RuleEngine`，支持内置规则码命中和动作解释。
+5. 下一步：实现 JSON 条件表达式和 Prompt 变量渲染。
+6. 下一步：将关键词检索升级为向量检索 + rerank。
+7. 下一步：增加可靠性看板，展示兜底原因、知识证据和回复引擎。

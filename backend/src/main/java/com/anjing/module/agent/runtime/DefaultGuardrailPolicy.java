@@ -6,8 +6,7 @@ import com.anjing.module.agent.domain.FallbackReason;
 import com.anjing.module.agent.domain.GuardrailDecision;
 import com.anjing.module.agent.domain.IntentAnalysis;
 import com.anjing.module.agent.domain.KnowledgeRecall;
-import com.anjing.module.scene.entity.Rule;
-import com.anjing.module.scene.repository.RuleRepository;
+import com.anjing.module.agent.domain.RuleHit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,10 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DefaultGuardrailPolicy implements GuardrailPolicy {
 
-    private static final double LOW_CONFIDENCE_THRESHOLD = 0.6;
-    private static final List<String> SENSITIVE_WORDS = List.of("骗子", "骗钱", "欺诈", "威胁", "恐吓");
-
-    private final RuleRepository ruleRepository;
+    private final RuleEngine ruleEngine;
 
     @Override
     public GuardrailDecision decide(ConversationTurn turn, IntentAnalysis analysis, KnowledgeRecall recall) {
@@ -32,28 +28,27 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
         decision.setSafe(true);
         decision.setFallbackRequired(false);
         decision.setPolicyTags(new ArrayList<>());
+        decision.setRuleHits(ruleEngine.evaluate(turn, analysis, recall));
 
         List<String> tags = decision.getPolicyTags();
-        List<Rule> enabledRules = ruleRepository.findByEnabledTrueOrderByPriorityAsc();
-        for (Rule rule : enabledRules) {
-            tags.add("scene-rule-" + rule.getRuleCode());
+        for (RuleHit hit : decision.getRuleHits()) {
+            tags.add("rule-hit-" + hit.getRuleCode());
         }
 
-        if (isRuleEnabled(enabledRules, "SENSITIVE_FILTER") && containsSensitiveWord(turn.getUserMessage())) {
+        RuleHit safetyHit = findHit(decision.getRuleHits(), "SENSITIVE_FILTER");
+        if (safetyHit != null) {
             decision.setSafe(false);
             decision.setFallbackRequired(true);
             decision.setFallbackReason(FallbackReason.SAFETY_BLOCKED);
             decision.setUserVisibleNotice("检测到高风险表达，将使用安全客服话术并建议人工跟进。");
-            tags.add("sensitive-filter-hit");
             return decision;
         }
 
-        double lowConfidenceThreshold = isRuleEnabled(enabledRules, "TRANSFER_THRESHOLD") ? LOW_CONFIDENCE_THRESHOLD : 0.5;
-        if (analysis.getConfidence() != null && analysis.getConfidence() < lowConfidenceThreshold) {
+        RuleHit transferHit = findHit(decision.getRuleHits(), "TRANSFER_THRESHOLD");
+        if (transferHit != null) {
             decision.setFallbackRequired(true);
             decision.setFallbackReason(FallbackReason.LOW_CONFIDENCE);
             decision.setUserVisibleNotice("我还不太确定您的具体诉求，可以请您补充更多信息。");
-            tags.add("low-confidence");
             return decision;
         }
 
@@ -70,13 +65,11 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
         return decision;
     }
 
-    private boolean isRuleEnabled(List<Rule> rules, String ruleCode) {
-        return rules.stream().anyMatch(rule -> ruleCode.equals(rule.getRuleCode()));
-    }
-
-    private boolean containsSensitiveWord(String content) {
-        if (content == null) return false;
-        return SENSITIVE_WORDS.stream().anyMatch(content::contains);
+    private RuleHit findHit(List<RuleHit> hits, String ruleCode) {
+        return hits.stream()
+                .filter(hit -> ruleCode.equals(hit.getRuleCode()))
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean requiresEvidence(String intentCode) {

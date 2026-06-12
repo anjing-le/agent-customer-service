@@ -14,4 +14,5 @@ public class GuardrailDecision {
     private FallbackReason fallbackReason;
     private String userVisibleNotice;
     private List<String> policyTags;
+    private List<RuleHit> ruleHits;
 }
