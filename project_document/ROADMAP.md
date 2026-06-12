@@ -29,6 +29,7 @@
 - 已补 Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
 - 已补 Chat Runtime Trend，展示平均置信度、兜底率、不安全率和 7 日回复趋势。
 - 已补 Chat Runtime Snapshot，支持手动采样和可配置定时采样。
+- 已补 Scene Runtime Insight，展示规则/Prompt 平均使用和集中度。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
 - 下一步补跨 Scene/Prompt/Rule 的命中趋势和会话质检摘要。
 - 支持 SSE 流式回复和低置信度转人工策略。

@@ -85,6 +85,15 @@ Scene 配置接入点：
 | 启用的 SYSTEM `Prompt` | 由 `PromptRuntime` 按场景过滤、变量渲染后注入 `LlmService` 上下文 |
 | 启用的 `Rule` | 由 `RuleEngine` 执行；支持 `SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 内置规则码、JSON 条件表达式和表达式测试 |
 
+Scene 运行洞察：
+
+| 指标 | 说明 |
+|---|---|
+| 规则平均命中 | `totalRuleHits / activeRuleCount`，观察规则是否真实参与运行 |
+| Prompt 平均使用 | `totalPromptUsage / activeSystemPromptCount`，观察 SYSTEM Prompt 是否被消费 |
+| 规则集中度 | Top 规则命中占比，过高说明规则策略可能过度集中 |
+| Prompt 集中度 | Top Prompt 使用占比，过高说明提示词模板可能缺少场景分流 |
+
 ## Rule Condition V1
 
 `Rule.conditions` 支持轻量 JSON 表达式；`Rule.actions` 支持配置命中后的原因和动作。空条件继续走内置规则码。
@@ -159,5 +168,6 @@ flowchart LR
 12. 已完成：Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
 13. 已完成：Chat Runtime Trend，基于审计事实展示平均置信度、兜底率、不安全率和 7 日趋势。
 14. 已完成：Chat Runtime Snapshot，支持手动采样和可配置定时采样，沉淀长期趋势基础数据。
-15. 下一步：将关键词检索升级为向量检索 + rerank。
-16. 下一步：增加跨 Scene/Prompt/Rule 的命中趋势和会话质检摘要。
+15. 已完成：Scene Runtime Insight，展示规则/Prompt 平均使用和集中度，辅助配置运营。
+16. 下一步：将关键词检索升级为向量检索 + rerank。
+17. 下一步：增加跨 Scene/Prompt/Rule 的长期命中趋势和会话质检摘要。

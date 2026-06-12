@@ -21,6 +21,7 @@ public class SceneVO {
         private Long totalPromptUsage;
         private List<RuntimeRankVO> topRules;
         private List<RuntimeRankVO> topPrompts;
+        private List<RuntimeInsightVO> insights;
     }
 
     @Data
@@ -28,6 +29,14 @@ public class SceneVO {
         private String code;
         private String name;
         private Integer count;
+    }
+
+    @Data
+    public static class RuntimeInsightVO {
+        private String label;
+        private String value;
+        private String level;
+        private String description;
     }
 
     /**

@@ -17,7 +17,8 @@ const overview = ref<any>({
   totalRuleHits: 0,
   totalPromptUsage: 0,
   topRules: [],
-  topPrompts: []
+  topPrompts: [],
+  insights: []
 })
 
 // Tab配置
@@ -82,6 +83,16 @@ onMounted(() => {
         <div class="runtime-rank__content">
           {{ overview.topPrompts?.[0]?.name || '-' }}
         </div>
+      </div>
+      <div
+        v-for="item in overview.insights"
+        :key="item.label"
+        class="runtime-insight"
+        :class="`runtime-insight--${item.level}`"
+      >
+        <div class="runtime-insight__label">{{ item.label }}</div>
+        <div class="runtime-insight__value">{{ item.value }}</div>
+        <div class="runtime-insight__desc">{{ item.description }}</div>
       </div>
     </div>
 
@@ -154,7 +165,8 @@ onMounted(() => {
 }
 
 .runtime-metric,
-.runtime-rank {
+.runtime-rank,
+.runtime-insight {
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid #f0f0f0;
@@ -190,6 +202,48 @@ onMounted(() => {
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.runtime-insight {
+  min-height: 72px;
+
+  &__label {
+    margin-bottom: 4px;
+    color: #999;
+    font-size: 12px;
+  }
+
+  &__value {
+    color: #333;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  &__desc {
+    overflow: hidden;
+    margin-top: 4px;
+    color: #666;
+    font-size: 12px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &--notice {
+    border-color: #d9ecff;
+    background-color: #f5faff;
+  }
+
+  &--warning {
+    border-color: #faecd8;
+    background-color: #fff8ed;
+  }
+
+  &--danger {
+    border-color: #fde2e2;
+    background-color: #fff5f5;
   }
 }
 

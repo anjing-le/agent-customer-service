@@ -177,6 +177,7 @@ public class SceneService {
                 .limit(5)
                 .map(prompt -> toRuntimeRankVO(prompt.getPromptCode(), prompt.getPromptName(), prompt.getUsageCount()))
                 .toList());
+        overview.setInsights(buildRuntimeInsights(overview));
         return overview;
     }
 
@@ -597,6 +598,71 @@ public class SceneService {
         vo.setName(name);
         vo.setCount(count != null ? count : 0);
         return vo;
+    }
+
+    private List<SceneVO.RuntimeInsightVO> buildRuntimeInsights(SceneVO.RuntimeOverviewVO overview) {
+        List<SceneVO.RuntimeInsightVO> insights = new ArrayList<>();
+        long activeRuleCount = Optional.ofNullable(overview.getActiveRuleCount()).orElse(0L);
+        long activePromptCount = Optional.ofNullable(overview.getActiveSystemPromptCount()).orElse(0L);
+        long totalRuleHits = Optional.ofNullable(overview.getTotalRuleHits()).orElse(0L);
+        long totalPromptUsage = Optional.ofNullable(overview.getTotalPromptUsage()).orElse(0L);
+
+        insights.add(toRuntimeInsightVO(
+                "规则平均命中",
+                formatAverage(totalRuleHits, activeRuleCount),
+                activeRuleCount == 0 ? "danger" : "normal",
+                activeRuleCount == 0 ? "尚未启用规则，护栏和兜底能力不可观测" : "观察规则是否真实进入运行链路"));
+        insights.add(toRuntimeInsightVO(
+                "Prompt 平均使用",
+                formatAverage(totalPromptUsage, activePromptCount),
+                activePromptCount == 0 ? "danger" : "normal",
+                activePromptCount == 0 ? "尚未启用 SYSTEM Prompt，LLM 回复缺少统一运行时约束" : "观察提示词模板是否被运行时消费"));
+
+        SceneVO.RuntimeRankVO topRule = firstRank(overview.getTopRules());
+        insights.add(toRuntimeInsightVO(
+                "规则集中度",
+                formatShare(topRule != null ? topRule.getCount() : 0, totalRuleHits),
+                concentrationLevel(topRule != null ? topRule.getCount() : 0, totalRuleHits),
+                topRule != null ? "Top 规则：" + topRule.getName() : "暂无规则命中"));
+
+        SceneVO.RuntimeRankVO topPrompt = firstRank(overview.getTopPrompts());
+        insights.add(toRuntimeInsightVO(
+                "Prompt 集中度",
+                formatShare(topPrompt != null ? topPrompt.getCount() : 0, totalPromptUsage),
+                concentrationLevel(topPrompt != null ? topPrompt.getCount() : 0, totalPromptUsage),
+                topPrompt != null ? "Top Prompt：" + topPrompt.getName() : "暂无 Prompt 使用"));
+        return insights;
+    }
+
+    private SceneVO.RuntimeInsightVO toRuntimeInsightVO(String label, String value, String level, String description) {
+        SceneVO.RuntimeInsightVO vo = new SceneVO.RuntimeInsightVO();
+        vo.setLabel(label);
+        vo.setValue(value);
+        vo.setLevel(level);
+        vo.setDescription(description);
+        return vo;
+    }
+
+    private SceneVO.RuntimeRankVO firstRank(List<SceneVO.RuntimeRankVO> ranks) {
+        return ranks == null || ranks.isEmpty() ? null : ranks.get(0);
+    }
+
+    private String formatAverage(long total, long count) {
+        if (count == 0) return "0";
+        return String.valueOf(Math.round((double) total * 100 / count) / 100D);
+    }
+
+    private String formatShare(Integer count, long total) {
+        if (total == 0) return "0%";
+        return Math.round((double) safeCount(count) * 10000 / total) / 100D + "%";
+    }
+
+    private String concentrationLevel(Integer count, long total) {
+        if (total == 0) return "normal";
+        double share = (double) safeCount(count) / total;
+        if (share >= 0.8) return "warning";
+        if (share >= 0.6) return "notice";
+        return "normal";
     }
 
     private long safeCount(Integer count) {
