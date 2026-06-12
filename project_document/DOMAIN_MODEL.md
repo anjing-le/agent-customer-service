@@ -54,6 +54,7 @@ Chat 运行审计：
 | `knowledgeEvidenceCount` | 本轮召回证据数量 |
 | `ruleHitCount` | 本轮命中规则数量 |
 | `promptRenderCount` | 本轮渲染 Prompt 数量 |
+| `transferRecommended` / `transferPriority` | 是否建议转人工及优先级 |
 
 Chat 运行趋势：
 
@@ -75,6 +76,14 @@ Chat 运行趋势：
 | `sessionQuality.primaryFallbackReason` | 当前会话最主要的兜底原因 |
 | `sessionQuality.fallbackRate` / `unsafeRate` | 当前会话内兜底和不安全回复占比 |
 | `sessionAudits` | 当前会话每轮 Agent 回复的审计明细，用于质检下钻 |
+
+转人工建议：
+
+| 场景 | 策略 |
+|---|---|
+| 安全规则拦截 | 标记 `transferRecommended=true`，优先级 `HIGH` |
+| 命中转人工阈值规则 | 按置信度输出 `HIGH`、`MEDIUM` 或 `LOW` 优先级 |
+| 意图置信度低于 `0.45` | 自动建议人工客服接手 |
 
 Chat 运行快照：
 
@@ -194,4 +203,5 @@ flowchart LR
 17. 已完成：Session Audit Drilldown，随会话详情和发送消息返回会话审计明细，并在可靠性面板展示。
 18. 下一步：将关键词检索升级为向量检索 + rerank。
 19. 已完成：Scene Runtime Trend，基于 Agent 审计聚合近 7 日场景、规则命中和 Prompt 消费趋势。
-20. 下一步：补低置信度转人工策略和转人工审计。
+20. 已完成：Transfer Recommendation，低置信度、安全拦截或转人工规则命中时沉淀转人工建议、原因和优先级。
+21. 下一步：补转人工队列模拟和人工接管结果回写。

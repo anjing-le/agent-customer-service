@@ -94,6 +94,9 @@ public class ChatVO {
         private Boolean safe;
         private Boolean fallbackRequired;
         private String fallbackReason;
+        private Boolean transferRecommended;
+        private String transferReason;
+        private String transferPriority;
         private Integer knowledgeEvidenceCount;
         private Integer ruleHitCount;
         private Integer promptRenderCount;
@@ -261,6 +264,12 @@ public class ChatVO {
         private String fallbackReason;
         /** 用户可见提示 */
         private String userVisibleNotice;
+        /** 是否建议转人工 */
+        private Boolean transferRecommended;
+        /** 转人工原因 */
+        private String transferReason;
+        /** 转人工优先级 */
+        private String transferPriority;
         /** 策略标签 */
         private List<String> policyTags;
         /** 命中规则 */

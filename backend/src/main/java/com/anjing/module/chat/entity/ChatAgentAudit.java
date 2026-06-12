@@ -48,6 +48,14 @@ public class ChatAgentAudit {
     @Column(length = 64)
     private String fallbackReason;
 
+    private Boolean transferRecommended;
+
+    @Column(length = 512)
+    private String transferReason;
+
+    @Column(length = 32)
+    private String transferPriority;
+
     private Integer knowledgeEvidenceCount;
 
     private Integer ruleHitCount;

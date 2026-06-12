@@ -40,6 +40,9 @@ const reliability = ref<any>({
   fallbackRequired: false,
   fallbackReason: '',
   userVisibleNotice: '',
+  transferRecommended: false,
+  transferReason: '',
+  transferPriority: '',
   policyTags: [],
   ruleHits: [],
   promptRenders: []
@@ -124,6 +127,9 @@ watch(() => props.aiResponse, (res) => {
     fallbackRequired: res.reliability?.fallbackRequired ?? false,
     fallbackReason: res.reliability?.fallbackReason || '',
     userVisibleNotice: res.reliability?.userVisibleNotice || '',
+    transferRecommended: res.reliability?.transferRecommended ?? false,
+    transferReason: res.reliability?.transferReason || '',
+    transferPriority: res.reliability?.transferPriority || '',
     policyTags: res.reliability?.policyTags || [],
     ruleHits: res.reliability?.ruleHits || [],
     promptRenders: res.reliability?.promptRenders || []
@@ -313,6 +319,14 @@ watch(() => props.aiResponse, (res) => {
                   </el-tag>
                 </div>
               </div>
+              <div class="reliability-metric">
+                <div class="reliability-metric__label">转人工</div>
+                <div class="reliability-metric__value">
+                  <el-tag :type="reliability.transferRecommended ? 'warning' : 'success'" size="small">
+                    {{ reliability.transferRecommended ? reliability.transferPriority || '建议' : '无需' }}
+                  </el-tag>
+                </div>
+              </div>
             </div>
 
             <div class="session-quality">
@@ -378,6 +392,9 @@ watch(() => props.aiResponse, (res) => {
                   <div v-if="audit.fallbackReason" class="audit-detail-item__reason">
                     {{ audit.fallbackReason }}
                   </div>
+                  <div v-if="audit.transferRecommended" class="audit-detail-item__transfer">
+                    转人工 {{ audit.transferPriority || 'MEDIUM' }}：{{ audit.transferReason || '建议人工客服继续跟进' }}
+                  </div>
                 </div>
               </div>
               <div v-else class="reliability-block__content reliability-block__content--muted">
@@ -393,6 +410,13 @@ watch(() => props.aiResponse, (res) => {
             <div v-if="reliability.userVisibleNotice" class="reliability-block">
               <div class="reliability-block__label">用户提示</div>
               <div class="reliability-block__content">{{ reliability.userVisibleNotice }}</div>
+            </div>
+
+            <div v-if="reliability.transferRecommended" class="reliability-block reliability-block--transfer">
+              <div class="reliability-block__label">转人工建议</div>
+              <div class="reliability-block__content">
+                {{ reliability.transferPriority || 'MEDIUM' }}：{{ reliability.transferReason || '建议人工客服继续跟进' }}
+              </div>
             </div>
 
             <div class="reliability-block">
@@ -832,6 +856,11 @@ watch(() => props.aiResponse, (res) => {
   background-color: #fafafa;
   border-radius: 6px;
 
+  &--transfer {
+    border: 1px solid #faecd8;
+    background-color: #fff8ed;
+  }
+
   &__label {
     font-size: 12px;
     font-weight: 600;
@@ -1017,6 +1046,17 @@ watch(() => props.aiResponse, (res) => {
   &__reason {
     margin-top: 6px;
     color: #666;
+    font-size: 12px;
+    line-height: 18px;
+    word-break: break-word;
+  }
+
+  &__transfer {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background-color: #fff8ed;
+    color: #9a5b13;
     font-size: 12px;
     line-height: 18px;
     word-break: break-word;

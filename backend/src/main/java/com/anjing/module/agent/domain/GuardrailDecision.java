@@ -15,4 +15,7 @@ public class GuardrailDecision {
     private String userVisibleNotice;
     private List<String> policyTags;
     private List<RuleHit> ruleHits;
+    private boolean transferRecommended;
+    private String transferReason;
+    private String transferPriority;
 }

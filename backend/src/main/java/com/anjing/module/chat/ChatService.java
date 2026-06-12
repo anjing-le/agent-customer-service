@@ -328,6 +328,9 @@ public class ChatService {
                     ? agentReply.getGuardrailDecision().getFallbackReason().name()
                     : null);
             vo.setUserVisibleNotice(agentReply.getGuardrailDecision().getUserVisibleNotice());
+            vo.setTransferRecommended(agentReply.getGuardrailDecision().isTransferRecommended());
+            vo.setTransferReason(agentReply.getGuardrailDecision().getTransferReason());
+            vo.setTransferPriority(agentReply.getGuardrailDecision().getTransferPriority());
             vo.setPolicyTags(agentReply.getGuardrailDecision().getPolicyTags());
             vo.setRuleHits(toRuleHitVOs(agentReply.getGuardrailDecision().getRuleHits()));
         }
@@ -489,6 +492,9 @@ public class ChatService {
             audit.setFallbackReason(agentReply.getGuardrailDecision().getFallbackReason() != null
                     ? agentReply.getGuardrailDecision().getFallbackReason().name()
                     : null);
+            audit.setTransferRecommended(agentReply.getGuardrailDecision().isTransferRecommended());
+            audit.setTransferReason(agentReply.getGuardrailDecision().getTransferReason());
+            audit.setTransferPriority(agentReply.getGuardrailDecision().getTransferPriority());
             audit.setRuleHitCount(agentReply.getGuardrailDecision().getRuleHits() != null
                     ? agentReply.getGuardrailDecision().getRuleHits().size()
                     : 0);
@@ -496,6 +502,7 @@ public class ChatService {
         } else {
             audit.setSafe(true);
             audit.setFallbackRequired(false);
+            audit.setTransferRecommended(false);
             audit.setRuleHitCount(0);
         }
         audit.setPromptRenderCount(agentReply.getPromptRenderResults() != null
@@ -550,6 +557,9 @@ public class ChatService {
         vo.setSafe(audit.getSafe());
         vo.setFallbackRequired(audit.getFallbackRequired());
         vo.setFallbackReason(audit.getFallbackReason());
+        vo.setTransferRecommended(audit.getTransferRecommended());
+        vo.setTransferReason(audit.getTransferReason());
+        vo.setTransferPriority(audit.getTransferPriority());
         vo.setKnowledgeEvidenceCount(audit.getKnowledgeEvidenceCount());
         vo.setRuleHitCount(audit.getRuleHitCount());
         vo.setPromptRenderCount(audit.getPromptRenderCount());

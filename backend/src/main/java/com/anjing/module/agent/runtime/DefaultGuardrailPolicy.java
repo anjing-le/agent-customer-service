@@ -40,7 +40,11 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
             decision.setSafe(false);
             decision.setFallbackRequired(true);
             decision.setFallbackReason(FallbackReason.SAFETY_BLOCKED);
+            decision.setTransferRecommended(true);
+            decision.setTransferReason("命中安全拦截规则，需要人工确认风险表达。");
+            decision.setTransferPriority("HIGH");
             decision.setUserVisibleNotice("检测到高风险表达，将使用安全客服话术并建议人工跟进。");
+            tags.add("transfer-recommended");
             return decision;
         }
 
@@ -48,7 +52,23 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
         if (transferHit != null) {
             decision.setFallbackRequired(true);
             decision.setFallbackReason(FallbackReason.LOW_CONFIDENCE);
-            decision.setUserVisibleNotice("我还不太确定您的具体诉求，可以请您补充更多信息。");
+            decision.setTransferRecommended(true);
+            decision.setTransferReason(transferHit.getReason() != null ? transferHit.getReason() : "低置信度触发转人工阈值。");
+            decision.setTransferPriority(resolveTransferPriority(analysis.getConfidence()));
+            decision.setUserVisibleNotice("我还不太确定您的具体诉求，可以请您补充更多信息；必要时会建议人工客服跟进。");
+            tags.add("transfer-recommended");
+            return decision;
+        }
+
+        if (analysis.getConfidence() != null && analysis.getConfidence() < 0.45D) {
+            decision.setFallbackRequired(true);
+            decision.setFallbackReason(FallbackReason.LOW_CONFIDENCE);
+            decision.setTransferRecommended(true);
+            decision.setTransferReason("意图置信度低于 0.45，自动建议人工客服接手。");
+            decision.setTransferPriority("HIGH");
+            decision.setUserVisibleNotice("我还没有充分理解您的问题，建议由人工客服继续跟进。");
+            tags.add("transfer-recommended");
+            tags.add("low-confidence-transfer");
             return decision;
         }
 
@@ -63,6 +83,12 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
             tags.add("analysis-engine-" + analysis.getEngine().name().toLowerCase());
         }
         return decision;
+    }
+
+    private String resolveTransferPriority(Double confidence) {
+        if (confidence == null || confidence < 0.45D) return "HIGH";
+        if (confidence < 0.6D) return "MEDIUM";
+        return "LOW";
     }
 
     private RuleHit findHit(List<RuleHit> hits, String ruleCode, String action) {
