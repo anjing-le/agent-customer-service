@@ -1,5 +1,7 @@
 package com.anjing.module.scene;
 
+import com.anjing.model.errorcode.CommonErrorCode;
+import com.anjing.model.exception.BizException;
 import com.anjing.module.chat.LlmService;
 import com.anjing.module.scene.entity.Intent;
 import com.anjing.module.scene.entity.Prompt;
@@ -9,6 +11,8 @@ import com.anjing.module.scene.repository.PromptRepository;
 import com.anjing.module.scene.repository.RuleRepository;
 import com.anjing.util.JsonUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +35,7 @@ public class SceneService {
     private final PromptRepository promptRepository;
     private final RuleRepository ruleRepository;
     private final LlmService llmService;
+    private final ObjectMapper objectMapper;
 
     @PostConstruct
     public void initData() {
@@ -338,6 +343,7 @@ public class SceneService {
 
     @Transactional
     public SceneVO.RuleVO createRule(SceneDTO.CreateRuleDTO dto) {
+        validateRuleJson(dto.getConditions(), dto.getActions());
         Rule entity = new Rule();
         entity.setRuleName(dto.getRuleName());
         entity.setRuleCode(dto.getRuleCode());
@@ -359,6 +365,7 @@ public class SceneService {
     public SceneVO.RuleVO updateRule(SceneDTO.UpdateRuleDTO dto) {
         Rule rule = ruleRepository.findById(dto.getId()).orElse(null);
         if (rule != null) {
+            validateRuleJson(dto.getConditions(), dto.getActions());
             if (dto.getRuleName() != null) rule.setRuleName(dto.getRuleName());
             if (dto.getRuleCode() != null) rule.setRuleCode(dto.getRuleCode());
             if (dto.getRuleType() != null) rule.setRuleType(dto.getRuleType());
@@ -384,6 +391,29 @@ public class SceneService {
 
     public SceneVO.RuleVO getRuleDetail(Long id) {
         return ruleRepository.findById(id).map(this::ruleToVO).orElse(null);
+    }
+
+    private void validateRuleJson(String conditions, String actions) {
+        if (conditions != null && !conditions.isBlank()) {
+            JsonNode conditionNode = parseRuleJson(conditions, "规则条件");
+            if (!conditionNode.has("all") && !conditionNode.has("any") && !conditionNode.has("field")) {
+                throw new BizException("规则条件必须包含 all、any 或 field", CommonErrorCode.PARAM_INVALID);
+            }
+        }
+        if (actions != null && !actions.isBlank()) {
+            JsonNode actionNode = parseRuleJson(actions, "规则动作");
+            if (!actionNode.isObject()) {
+                throw new BizException("规则动作必须是 JSON 对象", CommonErrorCode.PARAM_INVALID);
+            }
+        }
+    }
+
+    private JsonNode parseRuleJson(String json, String label) {
+        try {
+            return objectMapper.readTree(json);
+        } catch (Exception ex) {
+            throw new BizException(label + "不是合法 JSON: " + ex.getMessage(), CommonErrorCode.PARAM_INVALID);
+        }
     }
 
     @Transactional
