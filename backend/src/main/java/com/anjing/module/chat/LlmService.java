@@ -238,6 +238,11 @@ public class LlmService {
             if (knowledge != null) {
                 sb.append("\n\n参考知识：\n").append(knowledge);
             }
+
+            Object runtimePrompt = context.get("runtimePrompt");
+            if (runtimePrompt != null) {
+                sb.append("\n\n后台启用提示词：\n").append(runtimePrompt);
+            }
         }
 
         return sb.toString();

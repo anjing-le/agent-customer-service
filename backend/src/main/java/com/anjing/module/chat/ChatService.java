@@ -237,8 +237,24 @@ public class ChatService {
         response.setEmotion(agentReply.getIntentAnalysis().getEmotion());
         response.setKnowledgeRecall(toKnowledgeRecallVO(agentReply.getKnowledgeRecall()));
         response.setReasoningProcess(toReasoningProcess(agentReply.getReasoningSteps()));
+        response.setReliability(toReliabilityVO(agentReply));
         response.setCreatedAt(aiMessage.getCreatedAt());
         return response;
+    }
+
+    private ChatVO.ReliabilityVO toReliabilityVO(AgentReply agentReply) {
+        ChatVO.ReliabilityVO vo = new ChatVO.ReliabilityVO();
+        vo.setReplyEngine(agentReply.getEngine() != null ? agentReply.getEngine().name() : null);
+        if (agentReply.getGuardrailDecision() != null) {
+            vo.setSafe(agentReply.getGuardrailDecision().isSafe());
+            vo.setFallbackRequired(agentReply.getGuardrailDecision().isFallbackRequired());
+            vo.setFallbackReason(agentReply.getGuardrailDecision().getFallbackReason() != null
+                    ? agentReply.getGuardrailDecision().getFallbackReason().name()
+                    : null);
+            vo.setUserVisibleNotice(agentReply.getGuardrailDecision().getUserVisibleNotice());
+            vo.setPolicyTags(agentReply.getGuardrailDecision().getPolicyTags());
+        }
+        return vo;
     }
 
     private ChatVO.IntentVO toIntentVO(AgentReply agentReply) {

@@ -34,6 +34,14 @@ const serviceFlow = ref([
 const knowledgeRecall = ref<any>({ products: [], faqs: [], activities: [] })
 
 const reasoningProcess = ref<any[]>([])
+const reliability = ref<any>({
+  replyEngine: '-',
+  safe: true,
+  fallbackRequired: false,
+  fallbackReason: '',
+  userVisibleNotice: '',
+  policyTags: []
+})
 
 const formatTime = (ts: string | null) => {
   if (!ts) return ''
@@ -88,6 +96,15 @@ watch(() => props.aiResponse, (res) => {
     content: r.content,
     timestamp: formatTime(r.timestamp)
   }))
+
+  reliability.value = {
+    replyEngine: res.reliability?.replyEngine || '-',
+    safe: res.reliability?.safe ?? true,
+    fallbackRequired: res.reliability?.fallbackRequired ?? false,
+    fallbackReason: res.reliability?.fallbackReason || '',
+    userVisibleNotice: res.reliability?.userVisibleNotice || '',
+    policyTags: res.reliability?.policyTags || []
+  }
 
   userProfile.value.lastActive = '刚刚'
 })
@@ -229,6 +246,63 @@ watch(() => props.aiResponse, (res) => {
                 <div class="recall-item__meta">
                   <span class="recall-item__score">{{ (item.score * 100).toFixed(0) }}%</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="可靠性" name="reliability">
+          <div v-if="!props.aiResponse" class="empty-hint">
+            发送消息后，这里将展示回复引擎、兜底原因和护栏标签
+          </div>
+          <div v-else class="reliability-panel">
+            <div class="reliability-grid">
+              <div class="reliability-metric">
+                <div class="reliability-metric__label">回复引擎</div>
+                <div class="reliability-metric__value">{{ reliability.replyEngine }}</div>
+              </div>
+              <div class="reliability-metric">
+                <div class="reliability-metric__label">安全状态</div>
+                <div class="reliability-metric__value">
+                  <el-tag :type="reliability.safe ? 'success' : 'danger'" size="small">
+                    {{ reliability.safe ? '通过' : '拦截' }}
+                  </el-tag>
+                </div>
+              </div>
+              <div class="reliability-metric">
+                <div class="reliability-metric__label">兜底状态</div>
+                <div class="reliability-metric__value">
+                  <el-tag :type="reliability.fallbackRequired ? 'warning' : 'success'" size="small">
+                    {{ reliability.fallbackRequired ? '已兜底' : '未兜底' }}
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="reliability.fallbackReason" class="reliability-block">
+              <div class="reliability-block__label">兜底原因</div>
+              <div class="reliability-block__content">{{ reliability.fallbackReason }}</div>
+            </div>
+
+            <div v-if="reliability.userVisibleNotice" class="reliability-block">
+              <div class="reliability-block__label">用户提示</div>
+              <div class="reliability-block__content">{{ reliability.userVisibleNotice }}</div>
+            </div>
+
+            <div class="reliability-block">
+              <div class="reliability-block__label">策略标签</div>
+              <div v-if="reliability.policyTags.length" class="policy-tags">
+                <el-tag
+                  v-for="tag in reliability.policyTags"
+                  :key="tag"
+                  size="small"
+                  type="info"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
+              <div v-else class="reliability-block__content reliability-block__content--muted">
+                暂无策略标签
               </div>
             </div>
           </div>
@@ -564,5 +638,66 @@ watch(() => props.aiResponse, (res) => {
     font-weight: 500;
   }
 }
-</style>
 
+.reliability-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reliability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reliability-metric {
+  padding: 10px;
+  background-color: #fafafa;
+  border-radius: 6px;
+
+  &__label {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 6px;
+  }
+
+  &__value {
+    min-height: 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    word-break: break-word;
+  }
+}
+
+.reliability-block {
+  padding: 12px;
+  background-color: #fafafa;
+  border-radius: 6px;
+
+  &__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+  }
+
+  &__content {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+    word-break: break-word;
+
+    &--muted {
+      color: #999;
+    }
+  }
+}
+
+.policy-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+</style>

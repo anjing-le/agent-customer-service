@@ -5,10 +5,14 @@ import com.anjing.module.agent.domain.AgentEngine;
 import com.anjing.module.agent.domain.ConversationTurn;
 import com.anjing.module.agent.domain.IntentAnalysis;
 import com.anjing.module.chat.LlmService;
+import com.anjing.module.scene.entity.Intent;
+import com.anjing.module.scene.repository.IntentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,6 +24,7 @@ import java.util.Map;
 public class DefaultIntentAnalyzer implements IntentAnalyzer {
 
     private final LlmService llmService;
+    private final IntentRepository intentRepository;
 
     @Override
     public IntentAnalysis analyze(ConversationTurn turn) {
@@ -37,16 +42,44 @@ public class DefaultIntentAnalyzer implements IntentAnalyzer {
             return analysis;
         }
 
-        IntentAnalysis fallback = new IntentAnalysis();
-        fallback.setSceneType(recognizeSceneFallback(turn.getUserMessage()));
-        fallback.setIntentCode(recognizeIntentCodeFallback(turn.getUserMessage()));
-        fallback.setIntentName(intentNameOf(fallback.getIntentCode()));
-        fallback.setConfidence(confidenceOf(fallback.getIntentCode()));
+        Intent configuredIntent = matchConfiguredIntent(turn.getUserMessage());
+        IntentAnalysis fallback = configuredIntent != null
+                ? fromConfiguredIntent(configuredIntent)
+                : fromBuiltinFallback(turn.getUserMessage());
         fallback.setEmotion(analyzeEmotionFallback(turn.getUserMessage()));
         fallback.setEngine(AgentEngine.RULE);
         log.info("Agent 分析完成: engine=RULE, scene={}, intent={}, confidence={}, emotion={}",
                 fallback.getSceneType(), fallback.getIntentName(), fallback.getConfidence(), fallback.getEmotion());
         return fallback;
+    }
+
+    private Intent matchConfiguredIntent(String content) {
+        List<Intent> enabledIntents = intentRepository.findByStatusOrderByPriorityAsc("启用");
+        for (Intent intent : enabledIntents) {
+            if (matchesKeywords(content, intent.getTriggerKeywords())) {
+                log.info("命中 Scene Intent 配置: code={}, name={}", intent.getIntentCode(), intent.getIntentName());
+                return intent;
+            }
+        }
+        return null;
+    }
+
+    private IntentAnalysis fromConfiguredIntent(Intent intent) {
+        IntentAnalysis analysis = new IntentAnalysis();
+        analysis.setSceneType(intent.getSceneType() != null ? intent.getSceneType() : "通用咨询");
+        analysis.setIntentCode(intent.getIntentCode() != null ? intent.getIntentCode() : "GENERAL_QUERY");
+        analysis.setIntentName(intent.getIntentName() != null ? intent.getIntentName() : intentNameOf(analysis.getIntentCode()));
+        analysis.setConfidence(intent.getConfidenceThreshold() != null ? intent.getConfidenceThreshold() : 0.8);
+        return analysis;
+    }
+
+    private IntentAnalysis fromBuiltinFallback(String content) {
+        IntentAnalysis analysis = new IntentAnalysis();
+        analysis.setSceneType(recognizeSceneFallback(content));
+        analysis.setIntentCode(recognizeIntentCodeFallback(content));
+        analysis.setIntentName(intentNameOf(analysis.getIntentCode()));
+        analysis.setConfidence(confidenceOf(analysis.getIntentCode()));
+        return analysis;
     }
 
     private Double parseConfidence(String confidence) {
@@ -110,5 +143,15 @@ public class DefaultIntentAnalyzer implements IntentAnalyzer {
             if (content.contains(keyword)) return true;
         }
         return false;
+    }
+
+    private boolean matchesKeywords(String content, String commaSeparatedKeywords) {
+        if (content == null || commaSeparatedKeywords == null || commaSeparatedKeywords.isBlank()) {
+            return false;
+        }
+        return Arrays.stream(commaSeparatedKeywords.split(","))
+                .map(String::trim)
+                .filter(keyword -> !keyword.isEmpty())
+                .anyMatch(content::contains);
     }
 }

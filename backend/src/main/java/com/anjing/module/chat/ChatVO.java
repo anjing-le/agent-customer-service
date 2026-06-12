@@ -92,8 +92,29 @@ public class ChatVO {
         private KnowledgeRecallVO knowledgeRecall;
         /** 推理过程 */
         private List<ReasoningStepVO> reasoningProcess;
+        /** 可靠性决策 */
+        private ReliabilityVO reliability;
         /** 创建时间 */
         private LocalDateTime createdAt;
+    }
+
+    /**
+     * 可靠性决策结果
+     */
+    @Data
+    public static class ReliabilityVO {
+        /** 回复引擎：LLM/RULE/HYBRID */
+        private String replyEngine;
+        /** 是否安全 */
+        private Boolean safe;
+        /** 是否触发兜底 */
+        private Boolean fallbackRequired;
+        /** 兜底原因 */
+        private String fallbackReason;
+        /** 用户可见提示 */
+        private String userVisibleNotice;
+        /** 策略标签 */
+        private List<String> policyTags;
     }
 
     /**
@@ -195,4 +216,3 @@ public class ChatVO {
         private Map<String, Object> userProfile;
     }
 }
-

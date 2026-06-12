@@ -12,6 +12,8 @@ import com.anjing.module.agent.domain.KnowledgeEvidence;
 import com.anjing.module.agent.domain.KnowledgeRecall;
 import com.anjing.module.agent.domain.KnowledgeSource;
 import com.anjing.module.chat.LlmService;
+import com.anjing.module.scene.entity.Prompt;
+import com.anjing.module.scene.repository.PromptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,7 @@ import java.util.Map;
 public class DefaultReplyGenerator implements ReplyGenerator {
 
     private final LlmService llmService;
+    private final PromptRepository promptRepository;
 
     @Override
     public AgentReply generate(
@@ -68,7 +71,25 @@ public class DefaultReplyGenerator implements ReplyGenerator {
         context.put("intentName", analysis.getIntentName());
         context.put("emotion", analysis.getEmotion());
         context.put("knowledge", buildKnowledgeText(recall));
+        context.put("runtimePrompt", buildRuntimePrompt(analysis));
         return context;
+    }
+
+    private String buildRuntimePrompt(IntentAnalysis analysis) {
+        List<Prompt> enabledSystemPrompts = promptRepository.findByStatusAndPromptType("启用", "SYSTEM");
+        StringBuilder builder = new StringBuilder();
+        for (Prompt prompt : enabledSystemPrompts) {
+            if (!matchesScene(prompt, analysis)) continue;
+            if (builder.length() > 0) builder.append("\n");
+            builder.append("- ").append(prompt.getPromptName()).append(": ").append(prompt.getPromptContent());
+        }
+        return builder.length() > 0 ? builder.toString() : null;
+    }
+
+    private boolean matchesScene(Prompt prompt, IntentAnalysis analysis) {
+        return prompt.getSceneType() == null
+                || prompt.getSceneType().isBlank()
+                || prompt.getSceneType().equals(analysis.getSceneType());
     }
 
     private List<Map<String, String>> buildChatHistory(ConversationTurn turn) {

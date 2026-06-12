@@ -12,9 +12,9 @@ const activeTab = ref('intent')
 
 // Tab配置
 const tabs = [
-  { name: 'intent', label: '意图管理（模拟）', icon: '🎯', desc: 'CRUD真实，未接入对话链路，意图识别当前由LLM/关键词完成' },
-  { name: 'prompt', label: '提示词模板（模拟）', icon: '📝', desc: 'CRUD真实，「测试」按钮真实调LLM，但对话链路使用硬编码提示词' },
-  { name: 'rule', label: '场景规则（模拟）', icon: '⚙️', desc: 'CRUD真实，启用/禁用真实，未接入对话链路，预留规则引擎扩展' }
+  { name: 'intent', label: '意图管理', icon: '🎯', desc: '启用意图会按关键词参与运行时识别，LLM失败后兜底使用' },
+  { name: 'prompt', label: '提示词模板', icon: '📝', desc: '启用的SYSTEM提示词会注入对话运行时，测试按钮可直接调LLM' },
+  { name: 'rule', label: '场景规则', icon: '⚙️', desc: '启用规则会进入护栏策略，当前支持基础敏感过滤和转人工阈值' }
 ]
 </script>
 
