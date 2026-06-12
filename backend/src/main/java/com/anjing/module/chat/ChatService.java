@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 对话中心服务。
@@ -72,6 +73,8 @@ public class ChatService {
         vo.setAverageMessagesPerSession(totalSessions == 0 ? 0D : Math.round((double) totalMessages * 100 / totalSessions) / 100D);
         vo.setRecentSessions(loadRecentSessions());
         vo.setRecentAudits(loadRecentAudits());
+        vo.setQualitySummary(buildQualitySummary());
+        vo.setDailyTrends(buildDailyTrends());
         return vo;
     }
 
@@ -484,6 +487,80 @@ public class ChatService {
         vo.setPromptRenderCount(audit.getPromptRenderCount());
         vo.setCreatedAt(audit.getCreatedAt());
         return vo;
+    }
+
+    private ChatVO.QualitySummaryVO buildQualitySummary() {
+        List<ChatAgentAudit> audits = auditRepository.findAll();
+        ChatVO.QualitySummaryVO vo = new ChatVO.QualitySummaryVO();
+        vo.setTotalAuditedReplies((long) audits.size());
+        vo.setAverageConfidence(roundAverage(audits.stream()
+                .map(ChatAgentAudit::getConfidence)
+                .filter(value -> value != null)
+                .toList()));
+        vo.setFallbackRate(roundRate(countFallback(audits), audits.size()));
+        vo.setUnsafeRate(roundRate(countUnsafe(audits), audits.size()));
+        vo.setAverageKnowledgeEvidenceCount(roundAverage(audits.stream()
+                .map(ChatAgentAudit::getKnowledgeEvidenceCount)
+                .filter(value -> value != null)
+                .map(Integer::doubleValue)
+                .toList()));
+        vo.setAverageRuleHitCount(roundAverage(audits.stream()
+                .map(ChatAgentAudit::getRuleHitCount)
+                .filter(value -> value != null)
+                .map(Integer::doubleValue)
+                .toList()));
+        vo.setAveragePromptRenderCount(roundAverage(audits.stream()
+                .map(ChatAgentAudit::getPromptRenderCount)
+                .filter(value -> value != null)
+                .map(Integer::doubleValue)
+                .toList()));
+        return vo;
+    }
+
+    private List<ChatVO.RuntimeTrendVO> buildDailyTrends() {
+        LocalDate startDate = LocalDate.now().minusDays(6);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = LocalDate.now().plusDays(1).atStartOfDay();
+        List<ChatAgentAudit> audits = auditRepository.findByCreatedAtBetweenOrderByCreatedAtAsc(start, end);
+        Map<LocalDate, List<ChatAgentAudit>> auditsByDate = audits.stream()
+                .filter(audit -> audit.getCreatedAt() != null)
+                .collect(Collectors.groupingBy(audit -> audit.getCreatedAt().toLocalDate()));
+
+        List<ChatVO.RuntimeTrendVO> trends = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate date = startDate.plusDays(i);
+            List<ChatAgentAudit> dayAudits = auditsByDate.getOrDefault(date, List.of());
+            ChatVO.RuntimeTrendVO trend = new ChatVO.RuntimeTrendVO();
+            trend.setDate(date.toString());
+            trend.setReplies((long) dayAudits.size());
+            trend.setFallbackReplies(countFallback(dayAudits));
+            trend.setUnsafeReplies(countUnsafe(dayAudits));
+            trend.setAverageConfidence(roundAverage(dayAudits.stream()
+                    .map(ChatAgentAudit::getConfidence)
+                    .filter(value -> value != null)
+                    .toList()));
+            trends.add(trend);
+        }
+        return trends;
+    }
+
+    private long countFallback(List<ChatAgentAudit> audits) {
+        return audits.stream().filter(audit -> Boolean.TRUE.equals(audit.getFallbackRequired())).count();
+    }
+
+    private long countUnsafe(List<ChatAgentAudit> audits) {
+        return audits.stream().filter(audit -> Boolean.FALSE.equals(audit.getSafe())).count();
+    }
+
+    private double roundRate(long numerator, long denominator) {
+        if (denominator == 0) return 0D;
+        return Math.round((double) numerator * 10000 / denominator) / 100D;
+    }
+
+    private double roundAverage(List<Double> values) {
+        if (values.isEmpty()) return 0D;
+        double total = values.stream().mapToDouble(Double::doubleValue).sum();
+        return Math.round(total * 100 / values.size()) / 100D;
     }
 
     private ConversationMessage toConversationMessage(ChatMessage message) {

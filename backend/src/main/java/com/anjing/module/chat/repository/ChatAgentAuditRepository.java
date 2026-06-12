@@ -16,5 +16,7 @@ public interface ChatAgentAuditRepository extends JpaRepository<ChatAgentAudit, 
 
     long countByFallbackRequiredAndCreatedAtBetween(Boolean fallbackRequired, LocalDateTime start, LocalDateTime end);
 
+    List<ChatAgentAudit> findByCreatedAtBetweenOrderByCreatedAtAsc(LocalDateTime start, LocalDateTime end);
+
     List<ChatAgentAudit> findTop5ByOrderByCreatedAtDesc();
 }

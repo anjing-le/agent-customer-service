@@ -53,6 +53,17 @@ Chat 运行审计：
 | `ruleHitCount` | 本轮命中规则数量 |
 | `promptRenderCount` | 本轮渲染 Prompt 数量 |
 
+Chat 运行趋势：
+
+| 指标 | 说明 |
+|---|---|
+| `qualitySummary.averageConfidence` | 已审计回复的平均意图置信度 |
+| `qualitySummary.fallbackRate` | 已审计回复中的兜底比例 |
+| `qualitySummary.unsafeRate` | 已审计回复中的不安全比例 |
+| `dailyTrends.replies` | 近 7 日每日 Agent 回复数 |
+| `dailyTrends.fallbackReplies` | 近 7 日每日兜底回复数 |
+| `dailyTrends.unsafeReplies` | 近 7 日每日不安全回复数 |
+
 Scene 配置接入点：
 
 | 配置 | Runtime 影响 |
@@ -133,5 +144,6 @@ flowchart LR
 10. 已完成：Scene Runtime Overview，展示启用配置、规则命中、Prompt 使用和 Top 项。
 11. 已完成：Chat Runtime Overview，展示会话、消息、活跃状态、今日消息和最近会话。
 12. 已完成：Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
-13. 下一步：将关键词检索升级为向量检索 + rerank。
-14. 下一步：增加运行历史快照，沉淀规则命中率、Prompt 使用量和兜底趋势。
+13. 已完成：Chat Runtime Trend，基于审计事实展示平均置信度、兜底率、不安全率和 7 日趋势。
+14. 下一步：将关键词检索升级为向量检索 + rerank。
+15. 下一步：增加定时运行历史快照，沉淀长期规则命中率、Prompt 使用量和兜底趋势。

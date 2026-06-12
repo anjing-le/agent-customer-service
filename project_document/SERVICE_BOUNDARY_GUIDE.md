@@ -22,7 +22,7 @@
 ## Runtime Truth
 
 - 当前真实链路：用户消息 -> `AgentRuntime` -> 意图分析 -> Product/Activity/FAQ 检索 -> 护栏决策 -> LLM/规则回复 -> 推理和可靠性结果返回。
-- Chat 当前接入：会话和消息持久化、最近历史加载、会话运行概览、Agent 单轮回复审计。
+- Chat 当前接入：会话和消息持久化、最近历史加载、会话运行概览、Agent 单轮回复审计、7 日运行趋势。
 - Scene 当前接入：启用 Intent 参与关键词兜底识别；启用 SYSTEM Prompt 由 PromptRuntime 渲染后注入 LLM 上下文，支持变量 schema 和编辑态校验；启用 Rule 由 RuleEngine 产生命中原因和动作，支持内置规则码、轻量 JSON 条件表达式、表达式测试和编辑态校验；Scene Runtime Overview 展示轻量运行统计。
 - 当前预留链路：Industry/Solution 向量化、运行历史快照、向量检索和 rerank。
 

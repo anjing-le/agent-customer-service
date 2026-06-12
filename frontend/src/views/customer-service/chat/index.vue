@@ -38,7 +38,17 @@ const overview = ref({
   todayFallbackReplies: 0,
   averageMessagesPerSession: 0,
   recentSessions: [] as any[],
-  recentAudits: [] as any[]
+  recentAudits: [] as any[],
+  qualitySummary: {
+    totalAuditedReplies: 0,
+    averageConfidence: 0,
+    fallbackRate: 0,
+    unsafeRate: 0,
+    averageKnowledgeEvidenceCount: 0,
+    averageRuleHitCount: 0,
+    averagePromptRenderCount: 0
+  },
+  dailyTrends: [] as any[]
 })
 
 const loadOverview = async () => {
@@ -107,6 +117,31 @@ onMounted(() => {
           {{ overview.recentAudits?.[0]?.intentName || overview.recentSessions?.[0]?.lastMessage || '暂无记录' }}
         </strong>
       </div>
+      <div class="runtime-quality">
+        <div>
+          <span>平均置信度</span>
+          <strong>{{ overview.qualitySummary?.averageConfidence }}</strong>
+        </div>
+        <div>
+          <span>兜底率</span>
+          <strong>{{ overview.qualitySummary?.fallbackRate }}%</strong>
+        </div>
+        <div>
+          <span>不安全率</span>
+          <strong>{{ overview.qualitySummary?.unsafeRate }}%</strong>
+        </div>
+      </div>
+      <div class="runtime-trend">
+        <div
+          v-for="item in overview.dailyTrends"
+          :key="item.date"
+          class="trend-item"
+        >
+          <span>{{ item.date.slice(5) }}</span>
+          <strong>{{ item.replies }}</strong>
+          <em>{{ item.fallbackReplies }}</em>
+        </div>
+      </div>
     </div>
 
     <div class="chat-center">
@@ -160,7 +195,9 @@ onMounted(() => {
 }
 
 .runtime-metric,
-.runtime-recent {
+.runtime-recent,
+.runtime-quality,
+.runtime-trend {
   min-height: 58px;
   padding: 10px 12px;
   border: 1px solid #dedbd1;
@@ -190,6 +227,57 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
+}
+
+.runtime-quality {
+  grid-column: span 3;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+
+  span {
+    display: block;
+    color: #7b7567;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  strong {
+    color: #2d2a24;
+    font-size: 18px;
+    line-height: 24px;
+  }
+}
+
+.runtime-trend {
+  grid-column: span 4;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(46px, 1fr));
+  gap: 6px;
+}
+
+.trend-item {
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #f3f0e7;
+  text-align: center;
+
+  span,
+  em {
+    display: block;
+    color: #7b7567;
+    font-size: 11px;
+    line-height: 15px;
+    font-style: normal;
+  }
+
+  strong {
+    display: block;
+    color: #2d2a24;
+    font-size: 16px;
+    line-height: 20px;
+  }
 }
 
 .chat-center {
@@ -237,6 +325,11 @@ onMounted(() => {
     grid-template-columns: repeat(3, minmax(140px, 1fr));
   }
 
+  .runtime-quality,
+  .runtime-trend {
+    grid-column: span 3;
+  }
+
   .chat-center {
     &__sidebar {
       width: 16%;
@@ -261,6 +354,11 @@ onMounted(() => {
 
   .runtime-overview {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .runtime-quality,
+  .runtime-trend {
+    grid-column: span 2;
   }
 
   .chat-center {

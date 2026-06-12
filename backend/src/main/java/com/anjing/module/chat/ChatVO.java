@@ -41,6 +41,10 @@ public class ChatVO {
         private List<RecentSessionVO> recentSessions;
         /** 最近 Agent 审计 */
         private List<AgentAuditVO> recentAudits;
+        /** 质检摘要 */
+        private QualitySummaryVO qualitySummary;
+        /** 近 7 日趋势 */
+        private List<RuntimeTrendVO> dailyTrends;
     }
 
     /**
@@ -75,6 +79,32 @@ public class ChatVO {
         private Integer ruleHitCount;
         private Integer promptRenderCount;
         private LocalDateTime createdAt;
+    }
+
+    /**
+     * Agent 回复质检摘要。
+     */
+    @Data
+    public static class QualitySummaryVO {
+        private Long totalAuditedReplies;
+        private Double averageConfidence;
+        private Double fallbackRate;
+        private Double unsafeRate;
+        private Double averageKnowledgeEvidenceCount;
+        private Double averageRuleHitCount;
+        private Double averagePromptRenderCount;
+    }
+
+    /**
+     * Agent 运行趋势。
+     */
+    @Data
+    public static class RuntimeTrendVO {
+        private String date;
+        private Long replies;
+        private Long fallbackReplies;
+        private Long unsafeReplies;
+        private Double averageConfidence;
     }
 
 
