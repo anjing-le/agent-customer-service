@@ -43,6 +43,7 @@ export const ApiPaths = {
     gapSummary: '/api/knowledge/gap/summary',
     gapList: '/api/knowledge/gap/list',
     gapResolve: '/api/knowledge/gap/resolve',
+    gapVerify: '/api/knowledge/gap/verify',
     industryList: '/api/knowledge/industry/list',
     industryCreate: '/api/knowledge/industry/create',
     industryUpdate: '/api/knowledge/industry/update',

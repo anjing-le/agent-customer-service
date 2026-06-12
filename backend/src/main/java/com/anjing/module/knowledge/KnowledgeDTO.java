@@ -120,6 +120,12 @@ public class KnowledgeDTO {
         private String resolutionNote;
     }
 
+    @Data
+    public static class VerifyGapDTO {
+        private Long id;
+        private String question;
+    }
+
     // ==================== 行业知识 ====================
     
     @Data

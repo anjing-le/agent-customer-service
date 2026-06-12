@@ -180,6 +180,14 @@ public class KnowledgeController {
         return APIResponse.success(knowledgeService.resolveKnowledgeGap(dto));
     }
 
+    /**
+     * 验证知识缺口补全后是否可被 FAQ 召回
+     */
+    @PostMapping(ApiConstants.Knowledge.GAP_VERIFY)
+    public APIResponse<KnowledgeVO.KnowledgeGapVerifyVO> verifyKnowledgeGap(@RequestBody KnowledgeDTO.VerifyGapDTO dto) {
+        return APIResponse.success(knowledgeService.verifyKnowledgeGap(dto));
+    }
+
     // ==================== 行业知识 ====================
 
     /**

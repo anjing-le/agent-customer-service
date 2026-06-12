@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KnowledgeService {
 
+    private static final double FAQ_VERIFY_THRESHOLD = 0.3D;
+
     private final ProductRepository productRepository;
     private final ActivityRepository activityRepository;
     private final FaqRepository faqRepository;
@@ -697,12 +699,86 @@ public class KnowledgeService {
         return toKnowledgeGapVO(knowledgeGapRepository.save(gap));
     }
 
+    public KnowledgeVO.KnowledgeGapVerifyVO verifyKnowledgeGap(KnowledgeDTO.VerifyGapDTO dto) {
+        KnowledgeGap gap = dto.getId() != null ? knowledgeGapRepository.findById(dto.getId()).orElse(null) : null;
+        String question = normalizeQuestion(dto.getQuestion() != null ? dto.getQuestion() : gap != null ? gap.getUserQuestion() : null);
+
+        KnowledgeVO.KnowledgeGapVerifyVO vo = new KnowledgeVO.KnowledgeGapVerifyVO();
+        vo.setGapId(gap != null ? gap.getId() : dto.getId());
+        vo.setQuestion(question);
+
+        Faq bestFaq = null;
+        double bestScore = 0D;
+        for (Faq faq : faqRepository.findAll()) {
+            double score = calculateMatchScore(question, faq.getQuestion(), faq.getAnswer(), faq.getRelatedQuestions(), faq.getTags());
+            if (score > bestScore) {
+                bestScore = score;
+                bestFaq = faq;
+            }
+        }
+
+        String trustLevel = resolveTrustLevel(bestScore);
+        boolean quotable = !"LOW".equals(trustLevel);
+        boolean answerable = bestFaq != null && bestScore > FAQ_VERIFY_THRESHOLD && quotable;
+        vo.setAnswerable(answerable);
+        vo.setBestScore(roundScore(bestScore));
+        vo.setTrustLevel(trustLevel);
+        vo.setQuotable(quotable);
+        vo.setVerdict(answerable ? "PASS" : "FAIL");
+        vo.setSuggestion(answerable
+                ? "已命中可引用 FAQ，可回到对话链路复测。"
+                : "仍未命中足够可靠的 FAQ，建议继续补充问题别名、标签或更明确答案。");
+
+        if (bestFaq != null) {
+            vo.setMatchedFaqId(bestFaq.getId());
+            vo.setMatchedQuestion(bestFaq.getQuestion());
+            vo.setMatchedAnswer(bestFaq.getAnswer());
+            vo.setMatchReason("FAQ 回归验证匹配，可信度为 " + trustLevel + "，匹配分 "
+                    + Math.round(bestScore * 100) + "%。");
+        } else {
+            vo.setMatchReason("当前 FAQ 库没有可比较的候选答案。");
+        }
+        return vo;
+    }
+
     private String normalizeQuestion(String question) {
         return question == null ? "" : question.trim().replaceAll("\\s+", " ");
     }
 
     private String safeLower(String text) {
         return text == null ? "" : text.toLowerCase();
+    }
+
+    private double calculateMatchScore(String query, String... fields) {
+        if (query == null || query.isEmpty()) return 0D;
+        String q = query.toLowerCase();
+        int totalHits = 0;
+        int totalChars = 0;
+        for (String field : fields) {
+            if (field == null || field.isEmpty()) continue;
+            String f = field.toLowerCase();
+            totalChars += f.length();
+            for (int i = 0; i < q.length(); i++) {
+                if (f.indexOf(q.charAt(i)) >= 0) totalHits++;
+            }
+            for (int len = 2; len <= Math.min(q.length(), 6); len++) {
+                for (int i = 0; i <= q.length() - len; i++) {
+                    if (f.contains(q.substring(i, i + len))) totalHits += len;
+                }
+            }
+        }
+        if (totalChars == 0) return 0D;
+        return Math.min(1.0, totalHits / (double) (q.length() * 3 + totalChars * 0.5));
+    }
+
+    private String resolveTrustLevel(double score) {
+        if (score >= 0.85D) return "HIGH";
+        if (score >= 0.55D) return "MEDIUM";
+        return "LOW";
+    }
+
+    private double roundScore(double score) {
+        return Math.round(score * 10000D) / 10000D;
     }
 
     private String resolveGapPriority(String noAnswerReason, AgentReply agentReply) {

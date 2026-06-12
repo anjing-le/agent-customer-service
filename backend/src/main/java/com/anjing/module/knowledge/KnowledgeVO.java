@@ -148,6 +148,22 @@ public class KnowledgeVO {
         private String status;
     }
 
+    @Data
+    public static class KnowledgeGapVerifyVO {
+        private Long gapId;
+        private String question;
+        private Boolean answerable;
+        private String verdict;
+        private Double bestScore;
+        private String trustLevel;
+        private Boolean quotable;
+        private Long matchedFaqId;
+        private String matchedQuestion;
+        private String matchedAnswer;
+        private String matchReason;
+        private String suggestion;
+    }
+
     // ==================== 行业知识 ====================
     
     @Data

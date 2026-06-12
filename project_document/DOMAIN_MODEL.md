@@ -138,6 +138,15 @@ Chat 运行趋势：
 | `reasonStats` | 按无答案原因聚合的缺口分布 |
 | `topQuestions` | 按出现次数排序的高频知识缺口 |
 
+知识缺口回归验证：
+
+| 字段 | 说明 |
+|---|---|
+| `answerable` | 原问题是否已能命中可引用 FAQ |
+| `bestScore` / `trustLevel` | 最佳 FAQ 匹配分和可信度 |
+| `matchedFaqId` | 回归验证命中的 FAQ |
+| `suggestion` | 验证后的下一步建议 |
+
 Chat 运行快照：
 
 | 字段 | 说明 |
@@ -263,4 +272,5 @@ flowchart LR
 24. 已完成：Knowledge No-answer Boundary，无可靠证据时返回无答案原因并阻止自由生成。
 25. 已完成：Knowledge Gap Queue，无可靠证据问题自动沉淀为知识缺口，支持补 FAQ 或人工关闭。
 26. 已完成：Knowledge Gap Analytics，展示待处理、高优先级、解决率、Top 无答案原因和重复问题。
-27. 下一步：补知识补全后的回归验证样例。
+27. 已完成：Knowledge Gap Regression，补知识后可用原问题验证 FAQ 召回、可信度和可引用状态。
+28. 下一步：补对话回归用例集和一键批量验证。

@@ -167,6 +167,16 @@ export function fetchResolveKnowledgeGap(data: {
   })
 }
 
+export function fetchVerifyKnowledgeGap(data: {
+  id?: number
+  question?: string
+}) {
+  return request.post<any>({
+    url: ApiPaths.knowledge.gapVerify,
+    data
+  })
+}
+
 // ==================== 行业知识 ====================
 
 export function fetchListIndustries(data?: { keyword?: string; industryType?: string; status?: string; page?: number; size?: number }) {

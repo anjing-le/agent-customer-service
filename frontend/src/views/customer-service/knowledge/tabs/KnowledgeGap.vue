@@ -5,7 +5,8 @@
 import {
   fetchKnowledgeGapSummary,
   fetchListKnowledgeGaps,
-  fetchResolveKnowledgeGap
+  fetchResolveKnowledgeGap,
+  fetchVerifyKnowledgeGap
 } from '@/api/customer-service/knowledge'
 
 interface KnowledgeGap {
@@ -39,8 +40,11 @@ const summary = ref<any>({
 })
 const loading = ref(false)
 const dialogVisible = ref(false)
+const verifyDialogVisible = ref(false)
 const submitting = ref(false)
+const verifying = ref(false)
 const currentGap = ref<KnowledgeGap | null>(null)
+const verifyResult = ref<any>(null)
 const formRef = ref()
 
 const formData = reactive({
@@ -148,6 +152,22 @@ const handleManualClose = (row: KnowledgeGap) => {
   }).catch(() => {})
 }
 
+const handleVerify = async (row: KnowledgeGap) => {
+  verifying.value = true
+  verifyResult.value = null
+  try {
+    verifyResult.value = await fetchVerifyKnowledgeGap({
+      id: row.id,
+      question: row.userQuestion
+    })
+    verifyDialogVisible.value = true
+  } catch {
+    ElMessage.error('验证失败')
+  } finally {
+    verifying.value = false
+  }
+}
+
 onMounted(() => { refreshAll() })
 </script>
 
@@ -244,9 +264,10 @@ onMounted(() => { refreshAll() })
         </template>
       </el-table-column>
       <el-table-column prop="noAnswerDetail" label="边界说明" min-width="260" show-overflow-tooltip />
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status !== 'RESOLVED'" type="primary" link size="small" @click="handleOpenResolve(row)">补 FAQ</el-button>
+          <el-button type="success" link size="small" :loading="verifying" @click="handleVerify(row)">验证</el-button>
           <el-button v-if="row.status !== 'RESOLVED'" type="info" link size="small" @click="handleManualClose(row)">关闭</el-button>
           <span v-else class="resolved-text">{{ row.resolvedKnowledgeType || '已处理' }}</span>
         </template>
@@ -286,6 +307,45 @@ onMounted(() => { refreshAll() })
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="handleCreateFaq">创建 FAQ 并关闭缺口</el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog v-model="verifyDialogVisible" title="回归验证" width="680px" destroy-on-close>
+      <div v-if="verifyResult" class="verify-result">
+        <div class="verify-result__header">
+          <div>
+            <div class="verify-result__title">{{ verifyResult.question }}</div>
+            <div class="verify-result__desc">{{ verifyResult.suggestion }}</div>
+          </div>
+          <el-tag :type="verifyResult.answerable ? 'success' : 'danger'" size="small">
+            {{ verifyResult.verdict }}
+          </el-tag>
+        </div>
+        <div class="verify-result__metrics">
+          <div>
+            <span>匹配分</span>
+            <strong>{{ ((verifyResult.bestScore || 0) * 100).toFixed(0) }}%</strong>
+          </div>
+          <div>
+            <span>可信度</span>
+            <strong>{{ verifyResult.trustLevel || 'LOW' }}</strong>
+          </div>
+          <div>
+            <span>引用状态</span>
+            <strong>{{ verifyResult.quotable ? '可引用' : '不可引用' }}</strong>
+          </div>
+        </div>
+        <div class="verify-result__block">
+          <div class="verify-result__label">匹配说明</div>
+          <div class="verify-result__content">{{ verifyResult.matchReason }}</div>
+        </div>
+        <div v-if="verifyResult.matchedFaqId" class="verify-result__block">
+          <div class="verify-result__label">命中 FAQ</div>
+          <div class="verify-result__content">
+            <strong>{{ verifyResult.matchedQuestion }}</strong>
+            <p>{{ verifyResult.matchedAnswer }}</p>
+          </div>
+        </div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -400,5 +460,81 @@ onMounted(() => { refreshAll() })
 .resolved-text {
   color: #67c23a;
   font-size: 12px;
+}
+
+.verify-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__title {
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  &__desc {
+    color: #8a94a6;
+    font-size: 12px;
+    line-height: 18px;
+    margin-top: 4px;
+  }
+
+  &__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+
+    div {
+      padding: 10px;
+      border-radius: 6px;
+      background-color: #f8fbff;
+    }
+
+    span {
+      display: block;
+      color: #8a94a6;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    strong {
+      color: #1f5fbf;
+      font-size: 14px;
+    }
+  }
+
+  &__block {
+    padding: 12px;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    background-color: #fff;
+  }
+
+  &__label {
+    color: #333;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  &__content {
+    color: #606a7a;
+    font-size: 12px;
+    line-height: 18px;
+    word-break: break-word;
+
+    p {
+      margin: 6px 0 0;
+    }
+  }
 }
 </style>

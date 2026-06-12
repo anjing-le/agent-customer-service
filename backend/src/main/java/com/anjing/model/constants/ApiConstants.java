@@ -75,6 +75,7 @@ public class ApiConstants {
         public static final String GAP_SUMMARY = "/api/knowledge/gap/summary";
         public static final String GAP_LIST = "/api/knowledge/gap/list";
         public static final String GAP_RESOLVE = "/api/knowledge/gap/resolve";
+        public static final String GAP_VERIFY = "/api/knowledge/gap/verify";
         
         // 行业知识
         public static final String INDUSTRY_LIST = "/api/knowledge/industry/list";
