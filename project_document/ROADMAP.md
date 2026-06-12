@@ -15,9 +15,9 @@
 
 ## V2: 可靠 Agent Runtime
 
-- 拆分 `ChatService`：会话、分析、检索、生成、兜底、防幻觉、审计。
+- 已开始拆分 `ChatService`：会话/消息保留在 `ChatService`，分析、检索、生成、兜底、防幻觉、审计由 `AgentRuntime` 编排。
 - Scene 配置接入运行时：动态 Intent、PromptRuntime、RuleEngine。
-- 将 `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 接入真实 runtime。
+- 已将 `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 接入真实 runtime。
 - 增加会话历史、可靠性看板和兜底原因追踪。
 - 支持 SSE 流式回复和低置信度转人工策略。
 

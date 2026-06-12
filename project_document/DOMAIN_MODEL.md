@@ -1,6 +1,6 @@
 # Domain Model
 
-本文档描述 `agent-customer-service` 的可靠客服 Agent 领域模型。当前运行链路仍由 `ChatService` 承载，新模型先作为拆分边界和后续实现端口。
+本文档描述 `agent-customer-service` 的可靠客服 Agent 领域模型。当前运行链路已经引入 `AgentRuntime`，`ChatService` 只保留会话/消息持久化和前端 VO 映射。
 
 ## Core Concepts
 
@@ -17,7 +17,7 @@
 
 ## Application Ports
 
-后端新增 `com.anjing.module.agent.application` 端口，后续按端口拆出实现：
+后端 `com.anjing.module.agent.application` 定义端口，`com.anjing.module.agent.runtime` 提供当前 JPA/LLM/规则实现：
 
 | 端口 | 职责 | 不应该做 |
 |---|---|---|
@@ -28,30 +28,40 @@
 | `ReplyGenerator` | 基于证据生成 LLM 或规则回复 | 不保存会话 |
 | `AgentRuntime` | 编排一轮 Agent 处理 | 不承载具体仓储细节 |
 
+当前实现：
+
+| 实现 | 职责 |
+|---|---|
+| `DefaultAgentRuntime` | 主编排：分析 -> 检索 -> 护栏 -> 回复 -> 推理步骤 |
+| `DefaultIntentAnalyzer` | LLM 分析优先，失败后关键词兜底 |
+| `JpaKnowledgeRetriever` | Product/Activity/FAQ 的 JPA 关键词检索和人工选择召回 |
+| `DefaultGuardrailPolicy` | 低置信度、无可靠知识等兜底决策 |
+| `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
+
 ## Runtime Boundary
 
 当前真实链路：
 
 ```mermaid
 flowchart LR
-    A["User Message"] --> B["ChatService"]
-    B --> C["IntentAnalysis: LLM or keyword"]
-    C --> D["KnowledgeRecall: Product, Activity, FAQ"]
-    D --> E["ReplyGenerator: LLM or rule fallback"]
-    E --> F["ReasoningStep audit"]
-    F --> G["ChatVO.SendMessageVO"]
+    A["ChatController"] --> B["ChatService"]
+    B --> C["AgentRuntime"]
+    C --> D["IntentAnalyzer"]
+    D --> E["KnowledgeRetriever"]
+    E --> F["GuardrailPolicy"]
+    F --> G["ReplyGenerator"]
+    G --> H["ChatVO.SendMessageVO"]
 ```
 
-目标链路：
+目标链路仍需继续补齐：
 
 ```mermaid
 flowchart LR
-    A["ConversationTurn"] --> B["ConversationMemory"]
-    A --> C["IntentAnalyzer"]
-    C --> D["KnowledgeRetriever"]
-    D --> E["GuardrailPolicy"]
-    E --> F["ReplyGenerator"]
-    F --> G["AgentReply"]
+    A["Scene Config"] --> B["IntentAnalyzer"]
+    A --> C["PromptRuntime"]
+    A --> D["RuleEngine"]
+    E["Vector Store"] --> F["KnowledgeRetriever"]
+    G["Reliability Dashboard"] --> H["AgentReply Audit"]
 ```
 
 ## Reliability Rules
@@ -64,8 +74,8 @@ flowchart LR
 
 ## Migration Plan
 
-1. 保持 `ChatService` 现有行为不变，将内部中间结果映射到领域对象。
-2. 抽出 `IntentAnalyzer` 实现，复用当前 LLM 分析和关键词兜底。
-3. 抽出 `KnowledgeRetriever` 实现，先保留关键词检索，后续替换为向量检索和 rerank。
-4. 增加 `GuardrailPolicy`，将低置信度、无知识、敏感场景和转人工策略集中治理。
-5. 最后引入 `AgentRuntime` 编排，Controller 只调用 runtime 并返回 `AgentReply` 映射后的 VO。
+1. 已完成：`ChatService` 调用 `AgentRuntime`，现有 API 和前端 VO 不变。
+2. 已完成：抽出 `IntentAnalyzer`、`KnowledgeRetriever`、`GuardrailPolicy`、`ReplyGenerator`。
+3. 下一步：Scene 配置接入 `IntentAnalyzer`、`PromptRuntime` 和 `RuleEngine`。
+4. 下一步：将关键词检索升级为向量检索 + rerank。
+5. 下一步：增加可靠性看板，展示兜底原因、知识证据和回复引擎。
