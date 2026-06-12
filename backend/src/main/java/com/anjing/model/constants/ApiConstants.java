@@ -72,6 +72,7 @@ public class ApiConstants {
         public static final String FAQ_IMPORT = "/api/knowledge/faq/import";
 
         // 知识缺口
+        public static final String GAP_SUMMARY = "/api/knowledge/gap/summary";
         public static final String GAP_LIST = "/api/knowledge/gap/list";
         public static final String GAP_RESOLVE = "/api/knowledge/gap/resolve";
         

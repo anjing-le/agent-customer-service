@@ -2,7 +2,11 @@
 /**
  * 知识缺口池 - 由对话运行时自动沉淀无答案问题。
  */
-import { fetchListKnowledgeGaps, fetchResolveKnowledgeGap } from '@/api/customer-service/knowledge'
+import {
+  fetchKnowledgeGapSummary,
+  fetchListKnowledgeGaps,
+  fetchResolveKnowledgeGap
+} from '@/api/customer-service/knowledge'
 
 interface KnowledgeGap {
   id: number
@@ -24,6 +28,15 @@ const searchKeyword = ref('')
 const statusFilter = ref('OPEN')
 const reasonFilter = ref('')
 const tableData = ref<KnowledgeGap[]>([])
+const summary = ref<any>({
+  totalGaps: 0,
+  openGaps: 0,
+  resolvedGaps: 0,
+  highPriorityOpenGaps: 0,
+  resolutionRate: 0,
+  reasonStats: [],
+  topQuestions: []
+})
 const loading = ref(false)
 const dialogVisible = ref(false)
 const submitting = ref(false)
@@ -50,6 +63,22 @@ const priorityTagType = (priority?: string) => {
 
 const statusTagType = (status?: string) => status === 'RESOLVED' ? 'success' : 'warning'
 
+const loadSummary = async () => {
+  try {
+    summary.value = await fetchKnowledgeGapSummary()
+  } catch {
+    summary.value = {
+      totalGaps: 0,
+      openGaps: 0,
+      resolvedGaps: 0,
+      highPriorityOpenGaps: 0,
+      resolutionRate: 0,
+      reasonStats: [],
+      topQuestions: []
+    }
+  }
+}
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -66,6 +95,11 @@ const loadData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const refreshAll = () => {
+  loadSummary()
+  loadData()
 }
 
 const handleOpenResolve = (row: KnowledgeGap) => {
@@ -94,7 +128,7 @@ const handleCreateFaq = async () => {
     })
     ElMessage.success('已补充为 FAQ')
     dialogVisible.value = false
-    loadData()
+    refreshAll()
   } catch {
     ElMessage.error('处理失败')
   } finally {
@@ -110,15 +144,57 @@ const handleManualClose = (row: KnowledgeGap) => {
       resolutionNote: '人工确认无需新增知识'
     })
     ElMessage.success('已标记处理')
-    loadData()
+    refreshAll()
   }).catch(() => {})
 }
 
-onMounted(() => { loadData() })
+onMounted(() => { refreshAll() })
 </script>
 
 <template>
   <div class="knowledge-gap">
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span>待处理</span>
+        <strong>{{ summary.openGaps || 0 }}</strong>
+      </div>
+      <div class="summary-card summary-card--danger">
+        <span>高优先级</span>
+        <strong>{{ summary.highPriorityOpenGaps || 0 }}</strong>
+      </div>
+      <div class="summary-card">
+        <span>已处理</span>
+        <strong>{{ summary.resolvedGaps || 0 }}</strong>
+      </div>
+      <div class="summary-card">
+        <span>解决率</span>
+        <strong>{{ summary.resolutionRate || 0 }}%</strong>
+      </div>
+    </div>
+
+    <div class="analysis-row">
+      <div class="analysis-panel">
+        <div class="analysis-panel__title">Top 无答案原因</div>
+        <div v-if="summary.reasonStats?.length" class="reason-list">
+          <div v-for="item in summary.reasonStats" :key="item.noAnswerReason" class="reason-item">
+            <span>{{ item.noAnswerReason }}</span>
+            <strong>{{ item.openCount }} / {{ item.totalCount }}</strong>
+          </div>
+        </div>
+        <div v-else class="analysis-empty">暂无原因统计</div>
+      </div>
+      <div class="analysis-panel">
+        <div class="analysis-panel__title">重复最多的问题</div>
+        <div v-if="summary.topQuestions?.length" class="top-question-list">
+          <div v-for="item in summary.topQuestions" :key="item.id" class="top-question-item">
+            <span>{{ item.userQuestion }}</span>
+            <el-tag :type="priorityTagType(item.priority)" size="small">{{ item.occurrenceCount || 1 }} 次</el-tag>
+          </div>
+        </div>
+        <div v-else class="analysis-empty">暂无重复问题</div>
+      </div>
+    </div>
+
     <div class="action-bar">
       <el-input
         v-model="searchKeyword"
@@ -142,7 +218,7 @@ onMounted(() => { loadData() })
         <el-option label="低可信证据" value="LOW_TRUST_EVIDENCE" />
         <el-option label="未覆盖意图" value="UNSUPPORTED_INTENT" />
       </el-select>
-      <el-button @click="loadData">
+      <el-button @click="refreshAll">
         <el-icon><Refresh /></el-icon>
         刷新
       </el-button>
@@ -217,6 +293,93 @@ onMounted(() => { loadData() })
 <style lang="scss" scoped>
 .knowledge-gap {
   height: 100%;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.summary-card {
+  padding: 12px;
+  border: 1px solid #e8eef7;
+  border-radius: 6px;
+  background-color: #f8fbff;
+
+  span {
+    display: block;
+    color: #8a94a6;
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+
+  strong {
+    color: #1f5fbf;
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  &--danger {
+    border-color: #f8d7da;
+    background-color: #fff7f7;
+
+    strong {
+      color: #d93026;
+    }
+  }
+}
+
+.analysis-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.analysis-panel {
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background-color: #fff;
+
+  &__title {
+    color: #333;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+}
+
+.reason-list,
+.top-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reason-item,
+.top-question-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #606a7a;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.top-question-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-empty {
+  color: #999;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .action-bar {

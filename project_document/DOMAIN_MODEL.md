@@ -129,6 +129,15 @@ Chat 运行趋势：
 | `RESOLVED` | 已补充 FAQ 或人工关闭 |
 | `resolvedKnowledgeType` / `resolvedKnowledgeId` | 缺口处理后关联的知识类型和知识 ID |
 
+知识缺口分析：
+
+| 指标 | 说明 |
+|---|---|
+| `openGaps` / `highPriorityOpenGaps` | 当前待补知识数量和高优先级缺口数量 |
+| `resolutionRate` | 已处理缺口占全部缺口的比例 |
+| `reasonStats` | 按无答案原因聚合的缺口分布 |
+| `topQuestions` | 按出现次数排序的高频知识缺口 |
+
 Chat 运行快照：
 
 | 字段 | 说明 |
@@ -253,4 +262,5 @@ flowchart LR
 23. 已完成：Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用。
 24. 已完成：Knowledge No-answer Boundary，无可靠证据时返回无答案原因并阻止自由生成。
 25. 已完成：Knowledge Gap Queue，无可靠证据问题自动沉淀为知识缺口，支持补 FAQ 或人工关闭。
-26. 下一步：补知识缺口运营统计和 Top 缺口分析。
+26. 已完成：Knowledge Gap Analytics，展示待处理、高优先级、解决率、Top 无答案原因和重复问题。
+27. 下一步：补知识补全后的回归验证样例。

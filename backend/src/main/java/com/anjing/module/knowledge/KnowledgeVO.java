@@ -120,6 +120,34 @@ public class KnowledgeVO {
         private LocalDateTime updatedAt;
     }
 
+    @Data
+    public static class KnowledgeGapSummaryVO {
+        private Long totalGaps;
+        private Long openGaps;
+        private Long resolvedGaps;
+        private Long highPriorityOpenGaps;
+        private Double resolutionRate;
+        private List<KnowledgeGapReasonStatVO> reasonStats;
+        private List<KnowledgeGapTopQuestionVO> topQuestions;
+    }
+
+    @Data
+    public static class KnowledgeGapReasonStatVO {
+        private String noAnswerReason;
+        private Long totalCount;
+        private Long openCount;
+    }
+
+    @Data
+    public static class KnowledgeGapTopQuestionVO {
+        private Long id;
+        private String userQuestion;
+        private String noAnswerReason;
+        private String priority;
+        private Integer occurrenceCount;
+        private String status;
+    }
+
     // ==================== 行业知识 ====================
     
     @Data

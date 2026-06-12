@@ -131,6 +131,13 @@ export function fetchGetFaqDetail(id: number) {
 
 // ==================== 知识缺口 ====================
 
+export function fetchKnowledgeGapSummary() {
+  return request.post<any>({
+    url: ApiPaths.knowledge.gapSummary,
+    data: {}
+  })
+}
+
 export function fetchListKnowledgeGaps(data?: {
   keyword?: string
   status?: string

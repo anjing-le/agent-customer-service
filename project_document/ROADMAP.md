@@ -39,8 +39,9 @@
 - 已补 Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用，支撑防幻觉展示。
 - 已补 Knowledge No-answer Boundary，无可靠证据时返回无答案原因，并由护栏阻止自由生成。
 - 已补 Knowledge Gap Queue，无可靠证据问题自动沉淀为知识缺口，支持补 FAQ 或人工关闭。
+- 已补 Knowledge Gap Analytics，展示待处理、高优先级、解决率、Top 无答案原因和重复问题。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补知识缺口运营统计和 Top 缺口分析。
+- 下一步补知识补全后的回归验证样例。
 - 支持 SSE 流式回复和人工接管状态同步。
 
 ## V3: 生产化扩展

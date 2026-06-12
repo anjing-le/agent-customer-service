@@ -647,6 +647,27 @@ public class KnowledgeService {
         return buildPage(list, dto.getPage(), dto.getSize());
     }
 
+    public KnowledgeVO.KnowledgeGapSummaryVO getKnowledgeGapSummary() {
+        List<KnowledgeGap> gaps = knowledgeGapRepository.findAll();
+        long total = gaps.size();
+        long open = gaps.stream().filter(g -> "OPEN".equals(g.getStatus())).count();
+        long resolved = gaps.stream().filter(g -> "RESOLVED".equals(g.getStatus())).count();
+        long highPriorityOpen = gaps.stream()
+                .filter(g -> "OPEN".equals(g.getStatus()))
+                .filter(g -> "HIGH".equals(g.getPriority()))
+                .count();
+
+        KnowledgeVO.KnowledgeGapSummaryVO vo = new KnowledgeVO.KnowledgeGapSummaryVO();
+        vo.setTotalGaps(total);
+        vo.setOpenGaps(open);
+        vo.setResolvedGaps(resolved);
+        vo.setHighPriorityOpenGaps(highPriorityOpen);
+        vo.setResolutionRate(total == 0 ? 0D : Math.round(resolved * 10000D / total) / 100D);
+        vo.setReasonStats(buildGapReasonStats(gaps));
+        vo.setTopQuestions(buildTopGapQuestions(gaps));
+        return vo;
+    }
+
     @Transactional
     public KnowledgeVO.KnowledgeGapVO resolveKnowledgeGap(KnowledgeDTO.ResolveGapDTO dto) {
         KnowledgeGap gap = knowledgeGapRepository.findById(dto.getId()).orElse(null);
@@ -691,6 +712,43 @@ public class KnowledgeService {
         }
         if ("LOW_TRUST_EVIDENCE".equals(noAnswerReason)) return "MEDIUM";
         return "LOW";
+    }
+
+    private List<KnowledgeVO.KnowledgeGapReasonStatVO> buildGapReasonStats(List<KnowledgeGap> gaps) {
+        return gaps.stream()
+                .collect(Collectors.groupingBy(g -> g.getNoAnswerReason() != null ? g.getNoAnswerReason() : "UNKNOWN"))
+                .entrySet()
+                .stream()
+                .map(entry -> {
+                    KnowledgeVO.KnowledgeGapReasonStatVO vo = new KnowledgeVO.KnowledgeGapReasonStatVO();
+                    vo.setNoAnswerReason(entry.getKey());
+                    vo.setTotalCount((long) entry.getValue().size());
+                    vo.setOpenCount(entry.getValue().stream().filter(g -> "OPEN".equals(g.getStatus())).count());
+                    return vo;
+                })
+                .sorted(Comparator.comparing(KnowledgeVO.KnowledgeGapReasonStatVO::getOpenCount).reversed())
+                .limit(5)
+                .collect(Collectors.toList());
+    }
+
+    private List<KnowledgeVO.KnowledgeGapTopQuestionVO> buildTopGapQuestions(List<KnowledgeGap> gaps) {
+        return gaps.stream()
+                .sorted(Comparator
+                        .comparing((KnowledgeGap gap) -> gap.getOccurrenceCount() == null ? 0 : gap.getOccurrenceCount())
+                        .reversed()
+                        .thenComparing(KnowledgeGap::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(5)
+                .map(gap -> {
+                    KnowledgeVO.KnowledgeGapTopQuestionVO vo = new KnowledgeVO.KnowledgeGapTopQuestionVO();
+                    vo.setId(gap.getId());
+                    vo.setUserQuestion(gap.getUserQuestion());
+                    vo.setNoAnswerReason(gap.getNoAnswerReason());
+                    vo.setPriority(gap.getPriority());
+                    vo.setOccurrenceCount(gap.getOccurrenceCount());
+                    vo.setStatus(gap.getStatus());
+                    return vo;
+                })
+                .collect(Collectors.toList());
     }
 
     // ==================== 行业知识 ====================

@@ -9,7 +9,7 @@
 | 脚手架继承 | Ready | 技术栈、结构、契约、脚本、质量门禁沿用 `infra-dev-scaffolding`，业务只扩展客服 Agent |
 | 对话中心 | Runtime observable | 会话/消息持久化仍在 `ChatService`，分析、检索、护栏、回复生成已由 `AgentRuntime` 编排；已补会话运行概览和单轮回复审计 |
 | 知识中心 | In progress | Product/Activity/FAQ 参与当前对话检索；Industry/Solution 为预留 |
-| 知识缺口池 | Runtime observable | 无可靠证据触发防幻觉边界时自动沉淀缺口，支持补充 FAQ 或标记已处理 |
+| 知识缺口池 | Runtime observable | 无可靠证据触发防幻觉边界时自动沉淀缺口，支持补充 FAQ、标记已处理、运营统计和 Top 缺口分析 |
 | 场景配置 | Runtime connected | 启用 Intent 参与关键词识别；启用 SYSTEM Prompt 由 PromptRuntime 渲染后注入 LLM 上下文；启用 Rule 由 RuleEngine 执行 |
 | 工程契约 | Ready for V1 | 已接入 contracts、scripts、project_document；前端 API 路径已集中到 `ApiPaths` |
 | 响应 envelope | Ready for V1 | Chat/Knowledge/Scene Controller 已迁移到 `APIResponse<T>`；前端 HTTP 层兼容字符串成功码 `"0"` |

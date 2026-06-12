@@ -157,6 +157,14 @@ public class KnowledgeController {
     // ==================== 知识缺口 ====================
 
     /**
+     * 获取知识缺口运营统计
+     */
+    @PostMapping(ApiConstants.Knowledge.GAP_SUMMARY)
+    public APIResponse<KnowledgeVO.KnowledgeGapSummaryVO> getKnowledgeGapSummary() {
+        return APIResponse.success(knowledgeService.getKnowledgeGapSummary());
+    }
+
+    /**
      * 获取运行时知识缺口列表
      */
     @PostMapping(ApiConstants.Knowledge.GAP_LIST)
