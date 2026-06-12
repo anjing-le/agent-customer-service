@@ -33,7 +33,15 @@ const serviceFlow = ref([
   { step: 5, name: '生成回复', status: 'pending', result: '等待输入' }
 ])
 
-const knowledgeRecall = ref<any>({ products: [], faqs: [], activities: [] })
+const knowledgeRecall = ref<any>({
+  products: [],
+  faqs: [],
+  activities: [],
+  answerable: true,
+  noAnswerReason: '',
+  noAnswerDetail: '',
+  hallucinationBlocked: false
+})
 
 const reasoningProcess = ref<any[]>([])
 const reliability = ref<any>({
@@ -77,6 +85,10 @@ const trustTagType = (trustLevel?: string) => {
   return 'info'
 }
 
+const hasKnowledgeEvidence = computed(() => knowledgeRecall.value.products.length > 0
+  || knowledgeRecall.value.faqs.length > 0
+  || knowledgeRecall.value.activities.length > 0)
+
 const formatTime = (ts: string | null) => {
   if (!ts) return ''
   try {
@@ -95,16 +107,25 @@ watch(() => props.aiResponse, (res) => {
   const totalKnowledge = (res.knowledgeRecall?.products?.length || 0)
     + (res.knowledgeRecall?.faqs?.length || 0)
     + (res.knowledgeRecall?.activities?.length || 0)
+  const retrievalResult = totalKnowledge > 0
+    ? `检索到${totalKnowledge}条相关知识`
+    : res.knowledgeRecall?.hallucinationBlocked
+      ? '无可靠知识，已兜底'
+      : '未召回知识'
 
   serviceFlow.value = [
     { step: 1, name: '场景识别', status: 'completed', result: res.sceneType || '通用咨询' },
     { step: 2, name: '意图分析', status: 'completed', result: res.intent?.intentName || '通用咨询' },
     { step: 3, name: '情绪判断', status: 'completed', result: res.emotion || '中性' },
-    { step: 4, name: '知识检索', status: 'completed', result: `检索到${totalKnowledge}条相关知识` },
+    { step: 4, name: '知识检索', status: 'completed', result: retrievalResult },
     { step: 5, name: '生成回复', status: 'completed', result: '已完成' }
   ]
 
   knowledgeRecall.value = {
+    answerable: res.knowledgeRecall?.answerable ?? true,
+    noAnswerReason: res.knowledgeRecall?.noAnswerReason || '',
+    noAnswerDetail: res.knowledgeRecall?.noAnswerDetail || '',
+    hallucinationBlocked: res.knowledgeRecall?.hallucinationBlocked ?? false,
     products: (res.knowledgeRecall?.products || []).map((p: any) => ({
       id: p.productId,
       name: p.productName,
@@ -276,8 +297,28 @@ const handleResolveTransfer = async () => {
         </el-tab-pane>
 
         <el-tab-pane label="知识召回" name="knowledge">
-          <div v-if="knowledgeRecall.products.length === 0 && knowledgeRecall.faqs.length === 0 && knowledgeRecall.activities.length === 0" class="empty-hint">
+          <div v-if="!props.aiResponse" class="empty-hint">
             💡 发送消息后，这里将展示知识召回结果
+          </div>
+          <div
+            v-else-if="!hasKnowledgeEvidence"
+            class="no-answer-panel"
+            :class="{ 'no-answer-panel--blocked': knowledgeRecall.hallucinationBlocked }"
+          >
+            <div class="no-answer-panel__header">
+              <div>
+                <div class="no-answer-panel__title">无可靠知识</div>
+                <div class="no-answer-panel__reason">
+                  {{ knowledgeRecall.noAnswerReason || 'NO_EVIDENCE' }}
+                </div>
+              </div>
+              <el-tag :type="knowledgeRecall.hallucinationBlocked ? 'danger' : 'info'" size="small">
+                {{ knowledgeRecall.hallucinationBlocked ? '已阻止自由生成' : '可继续澄清' }}
+              </el-tag>
+            </div>
+            <div class="no-answer-panel__detail">
+              {{ knowledgeRecall.noAnswerDetail || '当前问题没有可引用证据，需要补充信息或转人工确认。' }}
+            </div>
           </div>
           <div v-else class="knowledge-recall">
             <!-- 商品召回 -->
@@ -419,6 +460,16 @@ const handleResolveTransfer = async () => {
               <div class="session-quality__reasons">
                 <span>主要兜底原因</span>
                 <strong>{{ sessionQuality.primaryFallbackReason || '暂无' }}</strong>
+              </div>
+            </div>
+
+            <div
+              v-if="knowledgeRecall.hallucinationBlocked || knowledgeRecall.noAnswerDetail"
+              class="reliability-block reliability-block--blocked"
+            >
+              <div class="reliability-block__label">防幻觉边界</div>
+              <div class="reliability-block__content">
+                {{ knowledgeRecall.noAnswerDetail || '当前回复缺少可引用知识依据，已进入兜底链路。' }}
               </div>
             </div>
 
@@ -869,6 +920,46 @@ const handleResolveTransfer = async () => {
   gap: 16px;
 }
 
+.no-answer-panel {
+  padding: 14px;
+  border: 1px solid #e8eef7;
+  border-radius: 6px;
+  background-color: #f8fbff;
+
+  &--blocked {
+    border-color: #f8d7da;
+    background-color: #fff7f7;
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  &__title {
+    color: #333;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  &__reason {
+    color: #8a94a6;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  &__detail {
+    color: #606a7a;
+    font-size: 12px;
+    line-height: 18px;
+    word-break: break-word;
+  }
+}
+
 .recall-group {
   &__title {
     font-size: 13px;
@@ -969,6 +1060,11 @@ const handleResolveTransfer = async () => {
   &--transfer {
     border: 1px solid #faecd8;
     background-color: #fff8ed;
+  }
+
+  &--blocked {
+    border: 1px solid #f8d7da;
+    background-color: #fff7f7;
   }
 
   &__label {

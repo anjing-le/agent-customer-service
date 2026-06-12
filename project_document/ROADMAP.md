@@ -37,8 +37,9 @@
 - 已补 Transfer Queue Simulation，自动生成转人工工单，支持 `PENDING` 到 `RESOLVED` 的模拟人工接管回写。
 - 已补 Transfer Runtime Metrics，展示待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
 - 已补 Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用，支撑防幻觉展示。
+- 已补 Knowledge No-answer Boundary，无可靠证据时返回无答案原因，并由护栏阻止自由生成。
 - 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补知识检索负样本兜底和无答案原因展示。
+- 下一步沉淀知识缺口池和补知识任务。
 - 支持 SSE 流式回复和人工接管状态同步。
 
 ## V3: 生产化扩展

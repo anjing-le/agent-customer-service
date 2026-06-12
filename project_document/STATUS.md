@@ -26,6 +26,7 @@
 | 转人工流程 | Runtime observable | 低置信度、安全拦截或转人工规则命中时自动入队，支持模拟人工接管和结果回写 |
 | 转人工统计 | Runtime observable | 展示待处理、今日新增、今日解决、高优先级待处理和平均解决耗时 |
 | 知识证据解释 | Runtime observable | 召回证据返回命中原因、可信度等级和是否可引用，前端知识召回区可见 |
+| 知识负样本兜底 | Runtime observable | 无可靠证据时返回无答案原因，护栏阻止自由生成并进入规则兜底 |
 | 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
 | OpenAPI typed client | Pending | 后续接入 `/v3/api-docs` 和前端 operation 类型 |
 | 测试与质量门禁 | Ready for V1 | `./scripts/quality-gate.sh` 已通过；后续补单元测试和运行探针 |
@@ -36,7 +37,7 @@
 - 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
 - V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
 - 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已补运行洞察和近 7 日趋势；Chat 已沉淀 Agent 单轮审计事实、知识证据解释、会话质检摘要、质检明细、转人工队列、人工回写、转人工统计、7 日趋势和运行快照。
+- Scene 已补运行洞察和近 7 日趋势；Chat 已沉淀 Agent 单轮审计事实、知识证据解释、知识负样本兜底、会话质检摘要、质检明细、转人工队列、人工回写、转人工统计、7 日趋势和运行快照。
 
 ## 验证入口
 

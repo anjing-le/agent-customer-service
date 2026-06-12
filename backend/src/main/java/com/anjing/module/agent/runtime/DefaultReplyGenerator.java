@@ -61,7 +61,7 @@ public class DefaultReplyGenerator implements ReplyGenerator {
             reply.setContent(llmReply);
             reply.setEngine(AgentEngine.LLM);
         } else {
-            reply.setContent(generateRuleReply(analysis, recall));
+            reply.setContent(generateRuleReply(analysis, recall, guardrailDecision));
             reply.setEngine(AgentEngine.RULE);
         }
 
@@ -120,7 +120,13 @@ public class DefaultReplyGenerator implements ReplyGenerator {
         }
     }
 
-    private String generateRuleReply(IntentAnalysis analysis, KnowledgeRecall recall) {
+    private String generateRuleReply(IntentAnalysis analysis, KnowledgeRecall recall, GuardrailDecision guardrailDecision) {
+        if (Boolean.TRUE.equals(recall.getHallucinationBlocked()) && guardrailDecision.isFallbackRequired()) {
+            return "当前没有检索到足够可靠的知识依据，我不能直接给出确定结论。"
+                    + "\n\n原因：" + (recall.getNoAnswerDetail() != null ? recall.getNoAnswerDetail() : "缺少可引用证据。")
+                    + "\n\n建议您补充更多信息，或由人工客服继续确认。";
+        }
+
         StringBuilder reply = new StringBuilder();
 
         firstEvidence(recall, KnowledgeSource.FAQ).ifPresent(evidence -> reply.append(evidence.getContent()));

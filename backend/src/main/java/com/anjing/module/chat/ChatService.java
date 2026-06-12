@@ -424,6 +424,10 @@ public class ChatService {
         vo.setProducts(new ArrayList<>());
         vo.setFaqs(new ArrayList<>());
         vo.setActivities(new ArrayList<>());
+        vo.setAnswerable(recall.getAnswerable());
+        vo.setNoAnswerReason(recall.getNoAnswerReason());
+        vo.setNoAnswerDetail(recall.getNoAnswerDetail());
+        vo.setHallucinationBlocked(recall.getHallucinationBlocked());
 
         for (KnowledgeEvidence evidence : recall.getEvidences()) {
             if (KnowledgeSource.PRODUCT == evidence.getSource()) {

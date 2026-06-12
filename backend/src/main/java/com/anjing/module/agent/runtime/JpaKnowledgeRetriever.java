@@ -56,10 +56,34 @@ public class JpaKnowledgeRetriever implements KnowledgeRetriever {
             recall.getEvidences().addAll(retrieveActivitiesByTrigger());
         }
         recall.getEvidences().addAll(retrieveFaqsByKeyword(turn.getUserMessage()));
+        explainRecallBoundary(recall, analysis);
 
         log.info("Agent 知识检索完成: evidenceCount={}, reliable={}",
                 recall.getEvidences().size(), recall.hasReliableEvidence());
         return recall;
+    }
+
+    private void explainRecallBoundary(KnowledgeRecall recall, IntentAnalysis analysis) {
+        if (recall.hasReliableEvidence()) {
+            recall.setAnswerable(true);
+            recall.setHallucinationBlocked(false);
+            return;
+        }
+
+        recall.setAnswerable(false);
+        recall.setHallucinationBlocked(true);
+        if (recall.getEvidences().isEmpty()) {
+            recall.setNoAnswerReason("NO_EVIDENCE");
+            recall.setNoAnswerDetail("知识库没有召回可用于回答当前问题的证据，禁止凭空生成具体结论。");
+        } else {
+            recall.setNoAnswerReason("LOW_TRUST_EVIDENCE");
+            recall.setNoAnswerDetail("已召回部分知识，但可信度不足或不可直接引用，需要规则兜底或转人工确认。");
+        }
+
+        if (analysis.getIntentCode() == null || "GENERAL_CONSULT".equals(analysis.getIntentCode())) {
+            recall.setNoAnswerReason("UNSUPPORTED_INTENT");
+            recall.setNoAnswerDetail("当前意图没有明确知识库覆盖，建议澄清问题或转人工。");
+        }
     }
 
     private List<KnowledgeEvidence> retrieveSelectedProducts(List<Long> ids) {

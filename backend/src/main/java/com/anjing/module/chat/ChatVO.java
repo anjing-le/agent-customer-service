@@ -369,6 +369,14 @@ public class ChatVO {
         private List<FaqRecallVO> faqs;
         /** 召回的活动 */
         private List<ActivityRecallVO> activities;
+        /** 是否可基于召回知识回答 */
+        private Boolean answerable;
+        /** 无答案原因 */
+        private String noAnswerReason;
+        /** 无答案详情 */
+        private String noAnswerDetail;
+        /** 是否阻止幻觉生成 */
+        private Boolean hallucinationBlocked;
     }
 
     /**

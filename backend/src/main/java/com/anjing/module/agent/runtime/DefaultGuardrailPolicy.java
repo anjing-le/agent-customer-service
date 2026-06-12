@@ -72,11 +72,15 @@ public class DefaultGuardrailPolicy implements GuardrailPolicy {
             return decision;
         }
 
-        if (!recall.hasReliableEvidence() && requiresEvidence(analysis.getIntentCode())) {
+        if (Boolean.TRUE.equals(recall.getHallucinationBlocked())
+                || (!recall.hasReliableEvidence() && requiresEvidence(analysis.getIntentCode()))) {
             decision.setFallbackRequired(true);
             decision.setFallbackReason(FallbackReason.NO_RELIABLE_KNOWLEDGE);
-            decision.setUserVisibleNotice("当前没有检索到足够可靠的知识，将使用标准客服规则回答。");
+            decision.setUserVisibleNotice(recall.getNoAnswerDetail() != null
+                    ? recall.getNoAnswerDetail()
+                    : "当前没有检索到足够可靠的知识，将使用标准客服规则回答。");
             tags.add("no-reliable-knowledge");
+            tags.add("hallucination-blocked");
         }
 
         if (analysis.getEngine() != null) {
