@@ -23,6 +23,7 @@
 | 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看、筛选、处理工单，并展示 SLA、升级状态和事件时间线 |
 | 渠道策略 | Runtime connected | `ChannelPolicy` 定义 Web/WeChat/App/Marketplace 的语气、风险加权和 SLA，转人工工单按渠道计算升级 |
 | 渠道接入 | Runtime connected | `/api/channels/inbound` 支持 env 配置密钥、HMAC-SHA256 签名、timestamp 时间窗和 replay 防重复提交 |
+| 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示渠道 secret ref、签名窗口、replay 开关和轮换提示，不返回密钥值 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
 | 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
@@ -41,5 +42,5 @@
 
 ## 下一步
 
-1. 将渠道密钥从 env 扩展到数据库配置，并补真实渠道 message id、回调协议差异和密钥轮换。
+1. 让签名校验优先读取数据库渠道密钥配置，并补真实渠道 message id、回调协议差异和密钥轮换。
 2. 增加质检任务分配和规则版本灰度。

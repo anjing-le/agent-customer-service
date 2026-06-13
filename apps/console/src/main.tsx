@@ -157,6 +157,17 @@ type ChannelPolicy = {
   escalationNote: string;
   enabled: boolean;
 };
+type ChannelIntegration = {
+  channel: string;
+  displayName: string;
+  enabled: boolean;
+  secretSource: string;
+  secretRef: string;
+  signatureWindowSeconds: number;
+  replayProtection: boolean;
+  rotationHint: string;
+  updatedAt: string;
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
@@ -164,6 +175,7 @@ type Dashboard = {
   rules: Rule[] | null;
   transfers: TransferTicket[] | null;
   channelPolicies: ChannelPolicy[] | null;
+  integrations: ChannelIntegration[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
 };
@@ -291,6 +303,7 @@ function App() {
   const transfers = dashboard?.transfers ?? [];
   const annotations = dashboard?.annotations ?? [];
   const channelPolicies = dashboard?.channelPolicies ?? [];
+  const integrations = dashboard?.integrations ?? [];
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
     if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
@@ -744,6 +757,32 @@ function App() {
                   {item.content && <p>{item.content}</p>}
                 </article>
               ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">渠道接入</p>
+                <h2>密钥与防重放</h2>
+              </div>
+              <span className="status">{integrations.length}</span>
+            </div>
+            <div className="tableList">
+              {integrations.map((item) => (
+                <article className="tableRow" key={item.channel}>
+                  <div>
+                    <strong>{item.displayName}</strong>
+                    <span>{item.secretSource} · {item.secretRef}</span>
+                    <span>{item.rotationHint}</span>
+                  </div>
+                  <div>
+                    <em>{item.signatureWindowSeconds}s</em>
+                    <b className={statusClass(item.replayProtection ? 'PASS' : 'FAIL')}>{item.replayProtection ? 'REPLAY' : 'OFF'}</b>
+                  </div>
+                </article>
+              ))}
+              {integrations.length === 0 && <p className="empty">暂无渠道接入配置</p>}
             </div>
           </section>
 

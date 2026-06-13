@@ -60,6 +60,7 @@ type Store struct {
 	rules           []Rule
 	tickets         []TransferTicket
 	channelPolicies []ChannelPolicy
+	integrations    []ChannelIntegration
 	annotations     []Annotation
 	inboundReplay   map[string]ChannelInboundReceipt
 	generator       ReplyGenerator
@@ -169,6 +170,18 @@ type ChannelPolicy struct {
 	Enabled        bool   `json:"enabled"`
 }
 
+type ChannelIntegration struct {
+	Channel                string `json:"channel"`
+	DisplayName            string `json:"displayName"`
+	Enabled                bool   `json:"enabled"`
+	SecretSource           string `json:"secretSource"`
+	SecretRef              string `json:"secretRef"`
+	SignatureWindowSeconds int    `json:"signatureWindowSeconds"`
+	ReplayProtection       bool   `json:"replayProtection"`
+	RotationHint           string `json:"rotationHint"`
+	UpdatedAt              string `json:"updatedAt"`
+}
+
 type TransferEvent struct {
 	Type      string `json:"type"`
 	Actor     string `json:"actor"`
@@ -213,14 +226,15 @@ type TrainingSample struct {
 }
 
 type Dashboard struct {
-	Metrics         []Metric         `json:"metrics"`
-	Conversations   []Conversation   `json:"conversations"`
-	KnowledgeGaps   []KnowledgeGap   `json:"knowledgeGaps"`
-	Rules           []Rule           `json:"rules"`
-	Transfers       []TransferTicket `json:"transfers"`
-	ChannelPolicies []ChannelPolicy  `json:"channelPolicies"`
-	Quality         QualitySummary   `json:"quality"`
-	Annotations     []Annotation     `json:"annotations"`
+	Metrics         []Metric             `json:"metrics"`
+	Conversations   []Conversation       `json:"conversations"`
+	KnowledgeGaps   []KnowledgeGap       `json:"knowledgeGaps"`
+	Rules           []Rule               `json:"rules"`
+	Transfers       []TransferTicket     `json:"transfers"`
+	ChannelPolicies []ChannelPolicy      `json:"channelPolicies"`
+	Integrations    []ChannelIntegration `json:"integrations"`
+	Quality         QualitySummary       `json:"quality"`
+	Annotations     []Annotation         `json:"annotations"`
 }
 
 type Metric struct {
@@ -290,6 +304,7 @@ func NewSeedStore(options ...Option) *Store {
 			{ID: "rule_human_transfer", Code: "TRANSFER_THRESHOLD", Name: "转人工阈值", Trigger: "投诉/催办/法律风险", Action: "recommend_human_transfer", Enabled: true},
 		},
 		channelPolicies: defaultChannelPolicies(),
+		integrations:    defaultChannelIntegrations(now),
 	}
 	st.messages = []Message{
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
@@ -527,6 +542,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Rules:           append([]Rule(nil), s.rules...),
 		Transfers:       transfers,
 		ChannelPolicies: append([]ChannelPolicy(nil), s.channelPolicies...),
+		Integrations:    append([]ChannelIntegration(nil), s.integrations...),
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
 	}, nil
@@ -886,6 +902,15 @@ func defaultChannelPolicies() []ChannelPolicy {
 		{Channel: "WeChat", DisplayName: "微信客服", Tone: "简洁、安抚、快速接管", SLAMinutes: 15, RiskBoost: "HIGH", EscalationNote: "微信投诉和催办要更快进入人工队列。", Enabled: true},
 		{Channel: "App", DisplayName: "App 客服", Tone: "直接、产品化、引导自助", SLAMinutes: 20, RiskBoost: "NORMAL", EscalationNote: "App 内问题优先引导订单和售后入口。", Enabled: true},
 		{Channel: "Marketplace", DisplayName: "平台店铺客服", Tone: "谨慎、合规、避免承诺", SLAMinutes: 10, RiskBoost: "HIGH", EscalationNote: "平台投诉可能影响店铺指标，优先升级。", Enabled: true},
+	}
+}
+
+func defaultChannelIntegrations(now string) []ChannelIntegration {
+	return []ChannelIntegration{
+		{Channel: "Web", DisplayName: "Web 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WEB_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "按演示环境手动轮换 env secret", UpdatedAt: now},
+		{Channel: "WeChat", DisplayName: "微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECHAT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "生产接入时对齐微信回调 message id", UpdatedAt: now},
+		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
+		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
 	}
 }
 

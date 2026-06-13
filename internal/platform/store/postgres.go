@@ -487,6 +487,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	integrations, err := s.listChannelIntegrations()
+	if err != nil {
+		return Dashboard{}, err
+	}
 	messages, err := s.listRecentMessages()
 	if err != nil {
 		return Dashboard{}, err
@@ -525,6 +529,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		Rules:           rules,
 		Transfers:       transfers,
 		ChannelPolicies: channelPolicies,
+		Integrations:    integrations,
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
 	}, nil
@@ -659,6 +664,46 @@ func (s *PostgresStore) listChannelPolicies() ([]ChannelPolicy, error) {
 	}
 	if len(items) == 0 {
 		return defaultChannelPolicies(), nil
+	}
+	return items, nil
+}
+
+func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select channel, display_name, enabled, secret_source, secret_ref, signature_window_seconds, replay_protection, rotation_hint, updated_at
+		from channel_integrations
+		order by channel asc
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel integrations: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]ChannelIntegration, 0)
+	for rows.Next() {
+		var item ChannelIntegration
+		var updatedAt time.Time
+		if err := rows.Scan(
+			&item.Channel,
+			&item.DisplayName,
+			&item.Enabled,
+			&item.SecretSource,
+			&item.SecretRef,
+			&item.SignatureWindowSeconds,
+			&item.ReplayProtection,
+			&item.RotationHint,
+			&updatedAt,
+		); err != nil {
+			return nil, err
+		}
+		item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return defaultChannelIntegrations(time.Now().UTC().Format(time.RFC3339)), nil
 	}
 	return items, nil
 }

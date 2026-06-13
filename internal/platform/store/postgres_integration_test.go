@@ -95,4 +95,7 @@ func TestPostgresStoreRuntime(t *testing.T) {
 	if len(dashboard.ChannelPolicies) == 0 {
 		t.Fatalf("expected channel policies, got %#v", dashboard)
 	}
+	if len(dashboard.Integrations) == 0 {
+		t.Fatalf("expected channel integrations, got %#v", dashboard)
+	}
 }

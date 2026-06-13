@@ -230,6 +230,9 @@ func TestChannelPolicyControlsTransferSLA(t *testing.T) {
 	if len(dashboard.ChannelPolicies) < 4 {
 		t.Fatalf("expected seeded channel policies, got %#v", dashboard.ChannelPolicies)
 	}
+	if len(dashboard.Integrations) < 4 {
+		t.Fatalf("expected seeded channel integrations, got %#v", dashboard.Integrations)
+	}
 	if len(dashboard.Transfers) == 0 || dashboard.Transfers[0].Channel != "Marketplace" {
 		t.Fatalf("expected marketplace transfer ticket, got %#v", dashboard.Transfers)
 	}

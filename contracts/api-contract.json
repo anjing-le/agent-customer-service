@@ -399,7 +399,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "quality", "annotations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "quality", "annotations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -407,6 +407,7 @@
         "rules": "Rule[]",
         "transfers": "TransferTicket[]",
         "channelPolicies": "ChannelPolicy[]",
+        "integrations": "ChannelIntegration[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]"
       }
@@ -421,6 +422,20 @@
         "riskBoost": "NORMAL|HIGH",
         "escalationNote": "string",
         "enabled": "boolean"
+      }
+    },
+    "ChannelIntegration": {
+      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "signatureWindowSeconds", "replayProtection", "rotationHint", "updatedAt"],
+      "fields": {
+        "channel": "string",
+        "displayName": "string",
+        "enabled": "boolean",
+        "secretSource": "env|database",
+        "secretRef": "string",
+        "signatureWindowSeconds": "number",
+        "replayProtection": "boolean",
+        "rotationHint": "string",
+        "updatedAt": "RFC3339 string"
       }
     },
     "QualitySummary": {

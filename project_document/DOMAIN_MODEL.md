@@ -17,6 +17,7 @@
 | `RuleTestResult` | 对单句用户输入的规则测试结果 | `/api/ops/rules/test` |
 | `TransferTicket` | 转人工工单，包含 SLA、升级状态、创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
 | `ChannelPolicy` | 渠道级客服策略，定义语气、风险加权、转人工 SLA 和升级说明 | seed store 或 PostgreSQL |
+| `ChannelIntegration` | 渠道接入配置的非敏感视图，记录密钥来源、secret ref、签名窗口和 replay 开关 | seed store 或 PostgreSQL |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
 | `AnnotationDimensions` | 人工质检评分维度：证据贴合、安全性、帮助性 | `Annotation.dimensions` |
@@ -44,7 +45,7 @@ user message
 | 无可信知识 | 返回安全兜底，不自由生成；创建 `KnowledgeGap` |
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
-| 渠道接入 | 对 inbound 请求做 HMAC-SHA256 签名、时间窗和 replay 校验，再映射到稳定内部会话 ID |
+| 渠道接入 | 对 inbound 请求做 HMAC-SHA256 签名、时间窗和 replay 校验，并通过 `ChannelIntegration` 展示非敏感接入配置 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
@@ -81,7 +82,7 @@ user message
 | `internal/customer` | conversation、message |
 | `internal/channels` | inbound webhook、signature verification、replay protection、channel conversation mapping |
 | `internal/knowledge` | knowledge article、knowledge gap |
-| `internal/ops` | dashboard、rule test、transfer ticket、channel policy、annotation |
+| `internal/ops` | dashboard、rule test、transfer ticket、channel policy、channel integration、annotation |
 | `internal/platform/store` | runtime interface、seed store、Postgres store |
 
 ## Current Limits
@@ -90,4 +91,4 @@ user message
 - 规则引擎是确定性轻量规则，尚未接完整表达式 DSL。
 - 当前没有鉴权、多租户和限流。
 - 模型客户端默认关闭，开启后只在有知识证据的路径参与生成；失败会自动回退到 `rag+rule`。
-- 渠道 replay 保护已覆盖重复签名载荷；下一步可以对接真实渠道 message id 和密钥轮换策略。
+- 渠道 replay 保护已覆盖重复签名载荷；`ChannelIntegration` 先暴露非敏感治理信息，下一步可让签名校验优先读取数据库密钥并接入真实渠道 message id。
