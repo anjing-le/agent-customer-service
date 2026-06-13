@@ -178,7 +178,7 @@ func NewSeedStore(options ...Option) *Store {
 	}
 	st.messages = []Message{
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
-		{ID: "msg_demo_2", ConversationID: "conv_demo_refund", Role: "assistant", Content: "根据售后知识库，签收 7 天内可申请无理由退货；非质量问题寄回运费通常由用户承担，质量问题由商家承担。", Engine: "rule+rAG", Safe: true, EvidenceIDs: []string{"kb_refund_7d"}, CreatedAt: now},
+		{ID: "msg_demo_2", ConversationID: "conv_demo_refund", Role: "assistant", Content: "根据售后知识库，签收 7 天内可申请无理由退货；非质量问题寄回运费通常由用户承担，质量问题由商家承担。", Engine: "rag+rule", Safe: true, EvidenceIDs: []string{"kb_refund_7d"}, CreatedAt: now},
 	}
 	st.tickets = []TransferTicket{
 		{ID: "ticket_demo_transfer", ConversationID: "conv_demo_transfer", Question: "我已经催了三次，必须马上找人工处理。", Reason: "TRANSFER_THRESHOLD", Priority: "HIGH", Status: "OPEN", CreatedAt: now},

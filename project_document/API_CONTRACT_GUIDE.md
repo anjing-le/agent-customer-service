@@ -1,6 +1,10 @@
 # API Contract Guide
 
-机器可读版本见 `contracts/platform-contract.json` 和 `contracts/service-boundaries.json`。
+机器可读版本见：
+
+- `contracts/platform-contract.json`
+- `contracts/service-boundaries.json`
+- `contracts/api-contract.json`
 
 ## Response Envelope
 
@@ -37,6 +41,22 @@ Go API 当前响应格式：
 - `/api/ops/dashboard`: 运行看板。
 - `/api/ops/rules/test`: 规则测试。
 - `/api/ops/transfers/resolve`: 处理人工 ticket。
+
+## Endpoint Contract
+
+`contracts/api-contract.json` 是当前接口的机器可读草案，覆盖：
+
+- endpoint id、业务边界、method、path
+- query/body request schema
+- response status 和 data schema
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`
+
+新增或修改接口时，需要同时更新：
+
+1. Go handler
+2. React console 调用点
+3. `contracts/service-boundaries.json`
+4. `contracts/api-contract.json`
 
 ## Pagination
 

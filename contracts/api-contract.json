@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "agent-customer-service",
+  "apiPrefix": "/api",
+  "responseEnvelope": "platform-contract.json#/responseEnvelope",
+  "endpoints": [
+    {
+      "id": "listConversations",
+      "boundary": "customer-service",
+      "method": "GET",
+      "path": "/api/customer-service/conversations",
+      "response": { "status": 200, "schema": "Conversation[]" }
+    },
+    {
+      "id": "createConversation",
+      "boundary": "customer-service",
+      "method": "POST",
+      "path": "/api/customer-service/conversations",
+      "request": { "body": "CreateConversationRequest" },
+      "response": { "status": 201, "schema": "Conversation" }
+    },
+    {
+      "id": "listMessages",
+      "boundary": "customer-service",
+      "method": "GET",
+      "path": "/api/customer-service/messages",
+      "request": { "query": "ListMessagesQuery" },
+      "response": { "status": 200, "schema": "Message[]" }
+    },
+    {
+      "id": "sendMessage",
+      "boundary": "customer-service",
+      "method": "POST",
+      "path": "/api/customer-service/messages",
+      "request": { "body": "SendMessageRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
+      "id": "listArticles",
+      "boundary": "knowledge",
+      "method": "GET",
+      "path": "/api/knowledge/articles",
+      "response": { "status": 200, "schema": "KnowledgeArticle[]" }
+    },
+    {
+      "id": "searchKnowledge",
+      "boundary": "knowledge",
+      "method": "POST",
+      "path": "/api/knowledge/search",
+      "request": { "body": "SearchKnowledgeRequest" },
+      "response": { "status": 200, "schema": "KnowledgeArticle[]" }
+    },
+    {
+      "id": "resolveGap",
+      "boundary": "knowledge",
+      "method": "POST",
+      "path": "/api/knowledge/gaps/resolve",
+      "request": { "body": "ResolveByIdRequest" },
+      "response": { "status": 200, "schema": "KnowledgeGap" }
+    },
+    {
+      "id": "createArticleFromGap",
+      "boundary": "knowledge",
+      "method": "POST",
+      "path": "/api/knowledge/gaps/create-article",
+      "request": { "body": "CreateArticleFromGapRequest" },
+      "response": { "status": 201, "schema": "KnowledgeArticle" }
+    },
+    {
+      "id": "dashboard",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/dashboard",
+      "response": { "status": 200, "schema": "Dashboard" }
+    },
+    {
+      "id": "testRule",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/rules/test",
+      "request": { "body": "TestRuleRequest" },
+      "response": { "status": 200, "schema": "RuleTestResult" }
+    },
+    {
+      "id": "resolveTransfer",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/transfers/resolve",
+      "request": { "body": "ResolveTransferRequest" },
+      "response": { "status": 200, "schema": "TransferTicket" }
+    }
+  ],
+  "schemas": {
+    "CreateConversationRequest": {
+      "fields": {
+        "customer": "string",
+        "channel": "string"
+      }
+    },
+    "ListMessagesQuery": {
+      "required": ["conversationId"],
+      "fields": {
+        "conversationId": "string"
+      }
+    },
+    "SendMessageRequest": {
+      "required": ["content"],
+      "fields": {
+        "conversationId": "string",
+        "content": "string"
+      }
+    },
+    "SearchKnowledgeRequest": {
+      "fields": {
+        "query": "string"
+      }
+    },
+    "ResolveByIdRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string"
+      }
+    },
+    "CreateArticleFromGapRequest": {
+      "required": ["gapId"],
+      "fields": {
+        "gapId": "string",
+        "title": "string",
+        "category": "string",
+        "content": "string",
+        "tags": "string[]"
+      }
+    },
+    "TestRuleRequest": {
+      "fields": {
+        "content": "string"
+      }
+    },
+    "ResolveTransferRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string",
+        "assignee": "string",
+        "note": "string"
+      }
+    },
+    "Conversation": {
+      "required": ["id", "customer", "channel", "intent", "status", "riskLevel", "startedAt"],
+      "fields": {
+        "id": "string",
+        "customer": "string",
+        "channel": "string",
+        "intent": "string",
+        "status": "Active|KnowledgeGap|NeedsHuman",
+        "riskLevel": "LOW|MEDIUM|HIGH",
+        "startedAt": "RFC3339 string",
+        "lastMessage": "string"
+      }
+    },
+    "Message": {
+      "required": ["id", "conversationId", "role", "content", "engine", "safe", "createdAt"],
+      "fields": {
+        "id": "string",
+        "conversationId": "string",
+        "role": "user|assistant",
+        "content": "string",
+        "engine": "customer|rule|rag+rule|llm+rag",
+        "safe": "boolean",
+        "fallbackReason": "NO_EVIDENCE|TRANSFER_THRESHOLD",
+        "evidenceIds": "string[]",
+        "createdAt": "RFC3339 string"
+      }
+    },
+    "KnowledgeArticle": {
+      "required": ["id", "title", "category", "content", "tags", "trustLevel", "updatedAt"],
+      "fields": {
+        "id": "string",
+        "title": "string",
+        "category": "string",
+        "content": "string",
+        "tags": "string[]",
+        "trustLevel": "LOW|MEDIUM|HIGH",
+        "updatedAt": "RFC3339 string"
+      }
+    },
+    "KnowledgeGap": {
+      "required": ["id", "conversationId", "question", "reason", "status", "priority", "createdAt"],
+      "fields": {
+        "id": "string",
+        "conversationId": "string",
+        "question": "string",
+        "reason": "NO_EVIDENCE",
+        "status": "OPEN|RESOLVED",
+        "priority": "LOW|MEDIUM|HIGH",
+        "createdAt": "RFC3339 string"
+      }
+    },
+    "Rule": {
+      "required": ["id", "code", "name", "trigger", "action", "enabled"],
+      "fields": {
+        "id": "string",
+        "code": "NO_EVIDENCE_FALLBACK|TRANSFER_THRESHOLD",
+        "name": "string",
+        "trigger": "string",
+        "action": "string",
+        "enabled": "boolean"
+      }
+    },
+    "RuleTestResult": {
+      "required": ["input", "matched", "action", "riskLevel", "fallback", "reason", "recommended"],
+      "fields": {
+        "input": "string",
+        "matched": "boolean",
+        "ruleCode": "string",
+        "action": "string",
+        "riskLevel": "LOW|MEDIUM|HIGH",
+        "fallback": "boolean",
+        "reason": "string",
+        "recommended": "string"
+      }
+    },
+    "TransferTicket": {
+      "required": ["id", "conversationId", "question", "reason", "priority", "status", "createdAt"],
+      "fields": {
+        "id": "string",
+        "conversationId": "string",
+        "question": "string",
+        "reason": "TRANSFER_THRESHOLD",
+        "priority": "LOW|MEDIUM|HIGH",
+        "status": "OPEN|RESOLVED",
+        "assignee": "string",
+        "resolutionNote": "string",
+        "createdAt": "RFC3339 string",
+        "resolvedAt": "RFC3339 string"
+      }
+    },
+    "Metric": {
+      "required": ["label", "value", "note"],
+      "fields": {
+        "label": "string",
+        "value": "string",
+        "note": "string"
+      }
+    },
+    "Dashboard": {
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers"],
+      "fields": {
+        "metrics": "Metric[]",
+        "conversations": "Conversation[]",
+        "knowledgeGaps": "KnowledgeGap[]",
+        "rules": "Rule[]",
+        "transfers": "TransferTicket[]"
+      }
+    },
+    "SendMessageResult": {
+      "required": ["conversation", "userMessage", "agentMessage", "evidence"],
+      "fields": {
+        "conversation": "Conversation",
+        "userMessage": "Message",
+        "agentMessage": "Message",
+        "evidence": "KnowledgeArticle[]",
+        "gap": "KnowledgeGap"
+      }
+    }
+  }
+}

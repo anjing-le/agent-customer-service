@@ -4,6 +4,7 @@
 
 - `platform-contract.json`: 平台级 API、响应、分页、请求上下文、时间、语言和错误码契约。
 - `service-boundaries.json`: 当前 Go runtime 的服务/模块边界。
+- `api-contract.json`: 当前 HTTP endpoint、request、response 和领域对象字段契约。
 
 当前真实运行路径以 `service-boundaries.json` 为准：
 
