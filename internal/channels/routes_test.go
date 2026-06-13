@@ -96,6 +96,27 @@ func TestInboundRouteRejectsDuplicateReplay(t *testing.T) {
 	}
 }
 
+func TestInboundRouteSkipsReplayWhenIntegrationDisablesIt(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{
+		testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 300, false),
+	})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("WeChat", "wx-open-no-replay", timestamp, content)
+	body := `{"channel":"WeChat","externalConversationId":"wx-open-no-replay","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`
+
+	for idx := 0; idx < 2; idx++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected request %d to bypass replay protection, got %d: %s", idx+1, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestInboundRouteAcceptsConfiguredChannelSecret(t *testing.T) {
 	mux := http.NewServeMux()
 	cfg := testConfig()
@@ -115,6 +136,70 @@ func TestInboundRouteAcceptsConfiguredChannelSecret(t *testing.T) {
 	}
 }
 
+func TestInboundRouteUsesIntegrationSecretRef(t *testing.T) {
+	t.Setenv("ANJING_TEST_WECHAT_SECRET", "runtime-wechat-secret")
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{
+		testIntegration("WeChat", true, "ANJING_TEST_WECHAT_SECRET", 300, true),
+	})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignatureWithSecret("runtime-wechat-secret", "WeChat", "wx-open-runtime-secret", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-runtime-secret","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestInboundRouteRejectsDisabledIntegration(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{
+		testIntegration("WeChat", false, "ANJING_CHANNEL_WECHAT_SECRET", 300, true),
+	})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "你好"
+	signature := ChannelSignature("WeChat", "wx-open-disabled", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-disabled","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"channel_disabled"`) {
+		t.Fatalf("expected disabled channel error, got %s", rec.Body.String())
+	}
+}
+
+func TestInboundRouteUsesIntegrationSignatureWindow(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{
+		testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 20, true),
+	})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "你好"
+	signature := ChannelSignature("WeChat", "wx-open-window", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-window","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"stale_signature"`) {
+		t.Fatalf("expected stale signature error, got %s", rec.Body.String())
+	}
+}
+
 func testConfig() Config {
 	return Config{
 		Secrets:         defaultChannelSecrets,
@@ -122,5 +207,17 @@ func testConfig() Config {
 		Now: func() time.Time {
 			return time.Date(2026, 6, 14, 2, 10, 30, 0, time.UTC)
 		},
+	}
+}
+
+func testIntegration(channel string, enabled bool, secretRef string, windowSeconds int, replayProtection bool) store.ChannelIntegration {
+	return store.ChannelIntegration{
+		Channel:                channel,
+		DisplayName:            channel,
+		Enabled:                enabled,
+		SecretSource:           "env",
+		SecretRef:              secretRef,
+		SignatureWindowSeconds: windowSeconds,
+		ReplayProtection:       replayProtection,
 	}
 }

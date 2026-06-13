@@ -32,11 +32,18 @@ func WithReplyGenerator(generator ReplyGenerator) Option {
 	}
 }
 
+func WithChannelIntegrations(integrations []ChannelIntegration) Option {
+	return func(s *Store) {
+		s.integrations = append([]ChannelIntegration(nil), integrations...)
+	}
+}
+
 type Runtime interface {
 	ListConversations() ([]Conversation, error)
 	CreateConversation(customer, channel string) (Conversation, error)
 	ListMessages(conversationID string) ([]Message, error)
 	SendMessage(conversationID, content string) (SendMessageResult, error)
+	ChannelIntegration(channel string) (ChannelIntegration, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
@@ -396,6 +403,12 @@ func (s *Store) RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error
 	}
 	s.inboundReplay[receipt.ReplayKey] = receipt
 	return true, nil
+}
+
+func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return channelIntegrationFor(s.integrations, channel), nil
 }
 
 func (s *Store) ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error) {
@@ -912,6 +925,21 @@ func defaultChannelIntegrations(now string) []ChannelIntegration {
 		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
 		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
 	}
+}
+
+func channelIntegrationFor(integrations []ChannelIntegration, channel string) ChannelIntegration {
+	normalized := strings.ToLower(strings.TrimSpace(channel))
+	for _, integration := range integrations {
+		if strings.ToLower(integration.Channel) == normalized {
+			return integration
+		}
+	}
+	for _, integration := range defaultChannelIntegrations(time.Now().UTC().Format(time.RFC3339)) {
+		if strings.ToLower(integration.Channel) == normalized {
+			return integration
+		}
+	}
+	return defaultChannelIntegrations(time.Now().UTC().Format(time.RFC3339))[0]
 }
 
 func channelPolicyFor(policies []ChannelPolicy, channel string) ChannelPolicy {

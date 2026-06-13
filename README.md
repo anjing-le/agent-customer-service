@@ -61,7 +61,7 @@ go run ./cmd/platform-all
 
 模型客户端默认关闭；开启后也只在命中知识证据时参与回复生成。无证据、高风险或模型不可用时仍走规则兜底。
 
-渠道 webhook 会做签名、时间窗和重复提交校验。控制台只展示 secret ref，不返回密钥值。签名密钥默认使用 demo 值；演示真实渠道时可通过 env 覆盖：
+渠道 webhook 会读取 `ChannelIntegration`，执行签名、时间窗、启用状态和重复提交校验。控制台只展示 secret ref，不返回密钥值。签名密钥默认使用 demo 值；演示真实渠道时可通过 env 覆盖：
 
 ```bash
 export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'

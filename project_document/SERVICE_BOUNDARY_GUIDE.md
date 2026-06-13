@@ -24,7 +24,7 @@
 ## Runtime Truth
 
 - 用户消息进入 `/api/customer-service/messages`。
-- 外部渠道消息进入 `/api/channels/inbound`，通过 env 密钥、HMAC-SHA256 签名、timestamp 时间窗和 replay 记录校验后映射为内部会话。
+- 外部渠道消息进入 `/api/channels/inbound`，读取 `ChannelIntegration` 后再做 HMAC-SHA256 签名、timestamp 时间窗和 replay 记录校验，并映射为内部会话。
 - 控制台可以使用 `/api/customer-service/messages/stream` 获取 SSE 流式输出。
 - 有可信知识时返回 RAG 证据回复；配置模型客户端后可生成 `llm+rag`。
 - 无可信知识时返回安全兜底，并创建知识缺口。
@@ -32,7 +32,7 @@
 - 人工 ticket 返回创建和解决事件，便于复盘接管链路。
 - 人工 ticket 会返回 SLA 状态、等待分钟数和升级标记，控制台可筛选升级工单。
 - 渠道策略会影响转人工 SLA，控制台可按 Web、WeChat、App、Marketplace 筛选会话和工单。
-- 渠道集成配置只暴露 secret ref、签名窗口和 replay 开关，不把密钥值返回给控制台。
+- 渠道集成配置只暴露 secret ref、签名窗口和 replay 开关，不把密钥值返回给控制台；运行时用 secret ref 解析 env secret。
 - 人工质检可对助手消息提交标注，按证据贴合、安全性和帮助性回写质量摘要。
 - 低分或待复核标注可导出为复盘样本，保留 prompt、answer、证据、评分和备注。
 - 每条助手消息通过 `trace` 暴露策略、证据、历史和模型回退观测。

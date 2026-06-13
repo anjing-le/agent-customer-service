@@ -219,6 +219,34 @@ func (s *PostgresStore) RecordChannelInbound(receipt ChannelInboundReceipt) (boo
 	return tag.RowsAffected() == 1, nil
 }
 
+func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, error) {
+	var item ChannelIntegration
+	var updatedAt time.Time
+	err := s.pool.QueryRow(context.Background(), `
+		select channel, display_name, enabled, secret_source, secret_ref, signature_window_seconds, replay_protection, rotation_hint, updated_at
+		from channel_integrations
+		where lower(channel) = lower($1)
+	`, channel).Scan(
+		&item.Channel,
+		&item.DisplayName,
+		&item.Enabled,
+		&item.SecretSource,
+		&item.SecretRef,
+		&item.SignatureWindowSeconds,
+		&item.ReplayProtection,
+		&item.RotationHint,
+		&updatedAt,
+	)
+	if err == nil {
+		item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+		return item, nil
+	}
+	if err == pgx.ErrNoRows {
+		return channelIntegrationFor(defaultChannelIntegrations(time.Now().UTC().Format(time.RFC3339)), channel), nil
+	}
+	return ChannelIntegration{}, fmt.Errorf("load channel integration: %w", err)
+}
+
 func (s *PostgresStore) ListKnowledge() ([]KnowledgeArticle, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, title, category, content, tags, trust_level, updated_at

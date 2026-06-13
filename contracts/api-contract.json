@@ -52,6 +52,7 @@
       "response": { "status": 200, "schema": "SendMessageResult" },
       "errorResponses": [
         { "status": 401, "code": "invalid_signature|invalid_timestamp|stale_signature" },
+        { "status": 403, "code": "channel_disabled" },
         { "status": 409, "code": "duplicate_inbound" }
       ]
     },
@@ -154,7 +155,7 @@
         "customer": "string",
         "content": "string",
         "timestamp": "RFC3339 string within ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS",
-        "signature": "HMAC-SHA256 hex using channel env secret; duplicate signed payload returns duplicate_inbound"
+        "signature": "HMAC-SHA256 hex using ChannelIntegration secretRef/env fallback; duplicate signed payload returns duplicate_inbound when replayProtection is enabled"
       }
     },
     "MessageStreamEvent": {

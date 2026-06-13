@@ -28,6 +28,10 @@ func (f failingRuntime) SendMessage(string, string) (store.SendMessageResult, er
 	return store.SendMessageResult{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ChannelIntegration(string) (store.ChannelIntegration, error) {
+	return store.ChannelIntegration{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) RecordChannelInbound(store.ChannelInboundReceipt) (bool, error) {
 	return false, errors.New("database unavailable")
 }

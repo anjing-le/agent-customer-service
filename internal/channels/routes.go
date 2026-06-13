@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -70,19 +71,30 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.BadRequest(w, "signature is required")
 			return
 		}
-		ok, code, message := cfg.validSignature(req)
-		if !ok {
-			httpjson.Fail(w, http.StatusUnauthorized, code, message)
-			return
-		}
-		accepted, err := st.RecordChannelInbound(channelInboundReceipt(req))
+		integration, err := st.ChannelIntegration(req.Channel)
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return
 		}
-		if !accepted {
-			httpjson.Fail(w, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted")
+		if !integration.Enabled {
+			httpjson.Fail(w, http.StatusForbidden, "channel_disabled", "channel integration is disabled")
 			return
+		}
+		ok, code, message := cfg.validSignature(req, integration)
+		if !ok {
+			httpjson.Fail(w, http.StatusUnauthorized, code, message)
+			return
+		}
+		if integration.ReplayProtection {
+			accepted, err := st.RecordChannelInbound(channelInboundReceipt(req))
+			if err != nil {
+				httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+				return
+			}
+			if !accepted {
+				httpjson.Fail(w, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted")
+				return
+			}
 		}
 		result, err := st.ReceiveChannelMessage(store.ChannelInboundMessage{
 			Channel:                req.Channel,
@@ -119,7 +131,7 @@ func (cfg Config) withDefaults() Config {
 	return cfg
 }
 
-func (cfg Config) validSignature(req inboundRequest) (bool, string, string) {
+func (cfg Config) validSignature(req inboundRequest, integration store.ChannelIntegration) (bool, string, string) {
 	timestamp, err := time.Parse(time.RFC3339, strings.TrimSpace(req.Timestamp))
 	if err != nil {
 		return false, "invalid_timestamp", "timestamp must be RFC3339"
@@ -128,10 +140,10 @@ func (cfg Config) validSignature(req inboundRequest) (bool, string, string) {
 	if delta < 0 {
 		delta = -delta
 	}
-	if delta > cfg.SignatureWindow {
+	if delta > cfg.signatureWindow(integration) {
 		return false, "stale_signature", "channel signature timestamp is outside allowed window"
 	}
-	expected := ChannelSignatureWithSecret(cfg.channelSecret(req.Channel), req.Channel, req.ExternalConversationID, req.Timestamp, req.Content)
+	expected := ChannelSignatureWithSecret(cfg.channelSecret(req.Channel, integration), req.Channel, req.ExternalConversationID, req.Timestamp, req.Content)
 	if !hmac.Equal([]byte(expected), []byte(strings.TrimSpace(req.Signature))) {
 		return false, "invalid_signature", "channel signature verification failed"
 	}
@@ -150,7 +162,7 @@ func channelInboundReceipt(req inboundRequest) store.ChannelInboundReceipt {
 }
 
 func ChannelSignature(channel, externalConversationID, timestamp, content string) string {
-	secret := DefaultConfig().channelSecret(channel)
+	secret := DefaultConfig().channelSecret(channel, store.ChannelIntegration{})
 	return ChannelSignatureWithSecret(secret, channel, externalConversationID, timestamp, content)
 }
 
@@ -180,13 +192,25 @@ func contentHash(content string) string {
 }
 
 func channelSecret(channel string) string {
-	return DefaultConfig().channelSecret(channel)
+	return DefaultConfig().channelSecret(channel, store.ChannelIntegration{})
 }
 
-func (cfg Config) channelSecret(channel string) string {
+func (cfg Config) channelSecret(channel string, integration store.ChannelIntegration) string {
+	if secretRef := strings.TrimSpace(integration.SecretRef); secretRef != "" {
+		if value := os.Getenv(secretRef); strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
 	secret, ok := cfg.Secrets[strings.ToLower(strings.TrimSpace(channel))]
 	if !ok {
 		return "web-demo-secret"
 	}
 	return secret
+}
+
+func (cfg Config) signatureWindow(integration store.ChannelIntegration) time.Duration {
+	if integration.SignatureWindowSeconds > 0 {
+		return time.Duration(integration.SignatureWindowSeconds) * time.Second
+	}
+	return cfg.SignatureWindow
 }
