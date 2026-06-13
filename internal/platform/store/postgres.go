@@ -190,6 +190,21 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
 }
 
+func (s *PostgresStore) ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error) {
+	now := time.Now().UTC()
+	channel := fallback(message.Channel, "Web")
+	externalID := fallback(message.ExternalConversationID, fmt.Sprintf("anon_%d", now.UnixNano()))
+	conversationID := inboundConversationID(channel, externalID)
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into conversations (id, customer, channel, intent, status, risk_level, started_at, last_message)
+		values ($1, $2, $3, '待识别', 'Active', 'LOW', $4, '')
+		on conflict (id) do nothing
+	`, conversationID, fallback(message.Customer, "访客"), channel, now); err != nil {
+		return SendMessageResult{}, fmt.Errorf("ensure inbound conversation: %w", err)
+	}
+	return s.SendMessage(conversationID, message.Content)
+}
+
 func (s *PostgresStore) ListKnowledge() ([]KnowledgeArticle, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, title, category, content, tags, trust_level, updated_at

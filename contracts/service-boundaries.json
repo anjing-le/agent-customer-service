@@ -24,6 +24,17 @@
       ]
     },
     {
+      "id": "channels",
+      "name": "Channel Inbound Runtime",
+      "kind": "runtime",
+      "owner": "agent-customer-service",
+      "basePath": "/api/channels",
+      "goPackage": "internal/channels",
+      "routes": [
+        { "name": "receiveInboundMessage", "path": "/api/channels/inbound", "methods": ["POST"], "console": false }
+      ]
+    },
+    {
       "id": "knowledge",
       "name": "Knowledge Operations",
       "kind": "runtime",

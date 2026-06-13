@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/anjing-le/agent-customer-service/internal/channels"
 	"github.com/anjing-le/agent-customer-service/internal/customer"
 	"github.com/anjing-le/agent-customer-service/internal/knowledge"
 	"github.com/anjing-le/agent-customer-service/internal/platform/config"
@@ -30,7 +31,7 @@ func main() {
 		defer pool.Close()
 		st = store.NewPostgresStore(pool, postgresOptions...)
 	}
-	mux := service.NewMux(cfg.ServiceName, st, customer.Register, knowledge.Register)
+	mux := service.NewMux(cfg.ServiceName, st, customer.Register, channels.Register, knowledge.Register)
 	if err := service.Listen(cfg.Addr, cfg.ServiceName, mux); err != nil {
 		panic(err)
 	}

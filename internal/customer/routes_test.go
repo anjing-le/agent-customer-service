@@ -28,6 +28,10 @@ func (f failingRuntime) SendMessage(string, string) (store.SendMessageResult, er
 	return store.SendMessageResult{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ReceiveChannelMessage(store.ChannelInboundMessage) (store.SendMessageResult, error) {
+	return store.SendMessageResult{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) ListKnowledge() ([]store.KnowledgeArticle, error) {
 	return nil, errors.New("database unavailable")
 }

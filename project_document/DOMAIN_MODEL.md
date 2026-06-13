@@ -7,6 +7,7 @@
 | 模型 | 说明 | 当前来源 |
 |---|---|---|
 | `Conversation` | 一条客服会话，记录客户、渠道、意图、风险和最后一句话 | `internal/platform/store` |
+| `ChannelInboundMessage` | 外部渠道进入系统的标准化消息，包含渠道、外部会话 ID、客户和内容 | `/api/channels/inbound` |
 | `Message` | 用户或助手的一条消息，包含回复引擎、证据、兜底原因和 trace | `SendMessage` runtime |
 | `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
 | `KnowledgeArticle` | 可引用的可信知识 | seed store 或 PostgreSQL |
@@ -42,6 +43,7 @@ user message
 | 无可信知识 | 返回安全兜底，不自由生成；创建 `KnowledgeGap` |
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
+| 渠道接入 | 对 inbound 请求做 HMAC-SHA256 签名校验，再映射到稳定内部会话 ID |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
@@ -55,6 +57,7 @@ user message
 |---|---|
 | `ListConversations` / `CreateConversation` | 会话管理 |
 | `SendMessage` | 一轮用户输入的核心处理 |
+| `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
 | `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |
 | `ResolveKnowledgeGap` | 关闭知识缺口 |
 | `CreateArticleFromGap` | 由缺口生成可信知识 |
@@ -74,6 +77,7 @@ user message
 | 模块 | 主要数据 |
 |---|---|
 | `internal/customer` | conversation、message |
+| `internal/channels` | inbound webhook、signature verification、channel conversation mapping |
 | `internal/knowledge` | knowledge article、knowledge gap |
 | `internal/ops` | dashboard、rule test、transfer ticket、channel policy、annotation |
 | `internal/platform/store` | runtime interface、seed store、Postgres store |

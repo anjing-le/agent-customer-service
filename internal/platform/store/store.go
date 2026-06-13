@@ -37,6 +37,7 @@ type Runtime interface {
 	CreateConversation(customer, channel string) (Conversation, error)
 	ListMessages(conversationID string) ([]Message, error)
 	SendMessage(conversationID, content string) (SendMessageResult, error)
+	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
 	ResolveKnowledgeGap(id string) (KnowledgeGap, error)
@@ -245,6 +246,13 @@ type SendMessageResult struct {
 	Gap          *KnowledgeGap      `json:"gap,omitempty"`
 }
 
+type ChannelInboundMessage struct {
+	Channel                string `json:"channel"`
+	ExternalConversationID string `json:"externalConversationId"`
+	Customer               string `json:"customer"`
+	Content                string `json:"content"`
+}
+
 func NewSeedStore(options ...Option) *Store {
 	now := time.Now().UTC().Format(time.RFC3339)
 	st := &Store{
@@ -348,6 +356,27 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
 	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
+}
+
+func (s *Store) ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error) {
+	channel := fallback(message.Channel, "Web")
+	externalID := fallback(message.ExternalConversationID, fmt.Sprintf("anon_%d", time.Now().UnixNano()))
+	conversationID := inboundConversationID(channel, externalID)
+	s.mu.Lock()
+	if !s.conversationExistsLocked(conversationID) {
+		now := time.Now().UTC().Format(time.RFC3339)
+		s.conversations = append([]Conversation{{
+			ID:        conversationID,
+			Customer:  fallback(message.Customer, "访客"),
+			Channel:   channel,
+			Intent:    "待识别",
+			Status:    "Active",
+			RiskLevel: "LOW",
+			StartedAt: now,
+		}}, s.conversations...)
+	}
+	s.mu.Unlock()
+	return s.SendMessage(conversationID, message.Content)
 }
 
 func (s *Store) ListKnowledge() ([]KnowledgeArticle, error) {
@@ -595,6 +624,15 @@ func (s *Store) messageExistsLocked(messageID string) bool {
 	return false
 }
 
+func (s *Store) conversationExistsLocked(conversationID string) bool {
+	for _, conversation := range s.conversations {
+		if conversation.ID == conversationID {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Store) conversationChannelLocked(conversationID string) string {
 	for _, item := range s.conversations {
 		if item.ID == conversationID {
@@ -602,6 +640,30 @@ func (s *Store) conversationChannelLocked(conversationID string) string {
 		}
 	}
 	return "Web"
+}
+
+func inboundConversationID(channel, externalID string) string {
+	return fmt.Sprintf("conv_%s_%s", normalizeIDPart(channel), normalizeIDPart(externalID))
+}
+
+func normalizeIDPart(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "unknown"
+	}
+	var builder strings.Builder
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') {
+			builder.WriteRune(char)
+			continue
+		}
+		builder.WriteRune('_')
+	}
+	normalized := strings.Trim(builder.String(), "_")
+	if normalized == "" {
+		return "unknown"
+	}
+	return normalized
 }
 
 func (s *Store) touchConversationLocked(conversationID, content string, evidence []KnowledgeArticle, gap *KnowledgeGap) Conversation {

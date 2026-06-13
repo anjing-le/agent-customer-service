@@ -7,6 +7,7 @@
 | boundary | kind | basePath | 说明 |
 |---|---|---|---|
 | customer-service | runtime | `/api/customer-service` | 会话、消息、RAG 回复、无证据兜底、转人工触发 |
+| channels | runtime | `/api/channels` | 外部渠道 inbound 消息、签名校验、会话映射 |
 | knowledge | runtime | `/api/knowledge` | 知识列表、检索、知识缺口关闭、缺口生成知识 |
 | ops | runtime | `/api/ops` | 运行看板、规则测试、人工 ticket 处理、质检标注 |
 
@@ -23,6 +24,7 @@
 ## Runtime Truth
 
 - 用户消息进入 `/api/customer-service/messages`。
+- 外部渠道消息进入 `/api/channels/inbound`，通过 HMAC-SHA256 签名校验后映射为内部会话。
 - 控制台可以使用 `/api/customer-service/messages/stream` 获取 SSE 流式输出。
 - 有可信知识时返回 RAG 证据回复；配置模型客户端后可生成 `llm+rag`。
 - 无可信知识时返回安全兜底，并创建知识缺口。

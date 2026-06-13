@@ -44,6 +44,14 @@
       "response": { "status": 200, "contentType": "text/event-stream", "schema": "MessageStreamEvent" }
     },
     {
+      "id": "receiveInboundMessage",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/inbound",
+      "request": { "body": "ChannelInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
       "id": "listArticles",
       "boundary": "knowledge",
       "method": "GET",
@@ -132,6 +140,17 @@
       "fields": {
         "conversationId": "string",
         "content": "string"
+      }
+    },
+    "ChannelInboundRequest": {
+      "required": ["channel", "externalConversationId", "content", "timestamp", "signature"],
+      "fields": {
+        "channel": "Web|WeChat|App|Marketplace",
+        "externalConversationId": "string",
+        "customer": "string",
+        "content": "string",
+        "timestamp": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex"
       }
     },
     "MessageStreamEvent": {

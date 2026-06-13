@@ -35,6 +35,7 @@ Go API 当前响应格式：
 - `GET /api/customer-service/messages?conversationId=...`: 读取指定会话历史消息。
 - `POST /api/customer-service/messages`: 发送用户消息，触发 RAG、兜底、缺口和人工 ticket。
 - `POST /api/customer-service/messages/stream`: 发送用户消息并以 SSE 返回 `meta`、`delta`、`done` 事件。
+- `POST /api/channels/inbound`: 外部渠道消息入口，要求 `channel`、`externalConversationId`、`timestamp` 和 HMAC-SHA256 `signature`。
 - `/api/knowledge/articles`: 可信知识列表。
 - `/api/knowledge/search`: 知识检索。
 - `/api/knowledge/gaps/resolve`: 关闭知识缺口。
@@ -52,7 +53,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`Annotation`、`TrainingSample`、`QualitySummary`
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`Annotation`、`TrainingSample`、`QualitySummary`
 
 新增或修改接口时，需要同时更新：
 

@@ -31,6 +31,7 @@ if (platform.responseEnvelope.successField !== 'success') {
 }
 
 const goFiles = [
+  'internal/channels/routes.go',
   'internal/customer/routes.go',
   'internal/knowledge/routes.go',
   'internal/ops/routes.go'
