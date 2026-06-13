@@ -224,7 +224,7 @@ func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, 
 	var updatedAt time.Time
 	var rotatesAt *time.Time
 	err := s.pool.QueryRow(context.Background(), `
-		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, rotation_hint, rotates_at, updated_at
+		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, allowed_origins, rotation_hint, rotates_at, updated_at
 		from channel_integrations
 		where lower(channel) = lower($1)
 	`, channel).Scan(
@@ -236,6 +236,7 @@ func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, 
 		&item.NextSecretRef,
 		&item.SignatureWindowSeconds,
 		&item.ReplayProtection,
+		&item.AllowedOrigins,
 		&item.RotationHint,
 		&rotatesAt,
 		&updatedAt,
@@ -704,7 +705,7 @@ func (s *PostgresStore) listChannelPolicies() ([]ChannelPolicy, error) {
 
 func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, rotation_hint, rotates_at, updated_at
+		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, allowed_origins, rotation_hint, rotates_at, updated_at
 		from channel_integrations
 		order by channel asc
 	`)
@@ -727,6 +728,7 @@ func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) 
 			&item.NextSecretRef,
 			&item.SignatureWindowSeconds,
 			&item.ReplayProtection,
+			&item.AllowedOrigins,
 			&item.RotationHint,
 			&rotatesAt,
 			&updatedAt,

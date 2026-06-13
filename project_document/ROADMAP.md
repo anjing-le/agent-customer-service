@@ -40,12 +40,13 @@
 - 已支持 `externalMessageId` 对账，真实渠道可用官方消息 ID 做幂等，缺省时退回签名载荷 replay key。
 - 已支持 WeChat/App/Marketplace adapter，将真实渠道字段归一到标准 inbound 链路。
 - 已支持 active/next secret ref 双密钥轮换窗口，控制台不暴露密钥值。
-- 下一步补更细的真实平台回调协议差异和渠道权限。
+- 已支持渠道来源白名单，声明 `Origin` 或 `X-Channel-Origin` 时必须命中 `allowedOrigins`。
+- 下一步补渠道频率限制和更细的真实平台回调协议差异。
 
 ## V3: 生产化扩展
 
 - 接入向量数据库和 rerank，替换 V1 关键词检索。
-- 真实渠道接入生产化：Web、App、微信、抖音等渠道权限、回调协议差异和官方 message id 对账。
+- 真实渠道接入生产化：Web、App、微信、抖音等渠道频率限制、回调协议差异和官方 message id 对账。
 - 更完整的质检任务分配、规则版本灰度和复盘样本流转。
 - 多租户、权限、限流、成本统计和治理面板。
 - 继续扩展 DVSkyFolding 口径下的生产化运维、审计和治理能力。

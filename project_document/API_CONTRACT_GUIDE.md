@@ -56,7 +56,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`Annotation`、`TrainingSample`、`QualitySummary`；`ChannelIntegration` 只暴露 active/next secret ref，不暴露密钥值。
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`Annotation`、`TrainingSample`、`QualitySummary`；`ChannelIntegration` 只暴露 active/next secret ref 和 allowed origins，不暴露密钥值。
 
 新增或修改接口时，需要同时更新：
 

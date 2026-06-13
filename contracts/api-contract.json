@@ -52,7 +52,7 @@
       "response": { "status": 200, "schema": "SendMessageResult" },
       "errorResponses": [
         { "status": 401, "code": "invalid_signature|invalid_timestamp|stale_signature" },
-        { "status": 403, "code": "channel_disabled" },
+        { "status": 403, "code": "channel_disabled|channel_origin_denied" },
         { "status": 409, "code": "duplicate_inbound" }
       ]
     },
@@ -484,7 +484,7 @@
       }
     },
     "ChannelIntegration": {
-      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "nextSecretRef", "signatureWindowSeconds", "replayProtection", "rotationHint", "updatedAt"],
+      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "nextSecretRef", "signatureWindowSeconds", "replayProtection", "allowedOrigins", "rotationHint", "updatedAt"],
       "fields": {
         "channel": "string",
         "displayName": "string",
@@ -494,6 +494,7 @@
         "nextSecretRef": "string",
         "signatureWindowSeconds": "number",
         "replayProtection": "boolean",
+        "allowedOrigins": "string[]",
         "rotationHint": "string",
         "rotatesAt": "RFC3339 string",
         "updatedAt": "RFC3339 string"

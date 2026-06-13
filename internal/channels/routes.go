@@ -79,7 +79,7 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.BadRequest(w, err.Error())
 			return
 		}
-		handleInbound(w, st, cfg, req)
+		handleInbound(w, r, st, cfg, req)
 	})
 	mux.HandleFunc("/api/channels/wechat/inbound", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
@@ -90,7 +90,7 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.BadRequest(w, err.Error())
 			return
 		}
-		handleInbound(w, st, cfg, req.toInbound())
+		handleInbound(w, r, st, cfg, req.toInbound())
 	})
 	mux.HandleFunc("/api/channels/app/inbound", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
@@ -101,7 +101,7 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.BadRequest(w, err.Error())
 			return
 		}
-		handleInbound(w, st, cfg, req.toInbound())
+		handleInbound(w, r, st, cfg, req.toInbound())
 	})
 	mux.HandleFunc("/api/channels/marketplace/inbound", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
@@ -112,11 +112,11 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.BadRequest(w, err.Error())
 			return
 		}
-		handleInbound(w, st, cfg, req.toInbound())
+		handleInbound(w, r, st, cfg, req.toInbound())
 	})
 }
 
-func handleInbound(w http.ResponseWriter, st store.Runtime, cfg Config, req inboundRequest) {
+func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg Config, req inboundRequest) {
 	if strings.TrimSpace(req.Channel) == "" {
 		httpjson.BadRequest(w, "channel is required")
 		return
@@ -146,6 +146,10 @@ func handleInbound(w http.ResponseWriter, st store.Runtime, cfg Config, req inbo
 		httpjson.Fail(w, http.StatusForbidden, "channel_disabled", "channel integration is disabled")
 		return
 	}
+	if !originAllowed(r, integration) {
+		httpjson.Fail(w, http.StatusForbidden, "channel_origin_denied", "channel origin is not allowed")
+		return
+	}
 	ok, code, message := cfg.validSignature(req, integration)
 	if !ok {
 		httpjson.Fail(w, http.StatusUnauthorized, code, message)
@@ -173,6 +177,25 @@ func handleInbound(w http.ResponseWriter, st store.Runtime, cfg Config, req inbo
 		return
 	}
 	httpjson.OK(w, result)
+}
+
+func originAllowed(r *http.Request, integration store.ChannelIntegration) bool {
+	if len(integration.AllowedOrigins) == 0 {
+		return true
+	}
+	origin := strings.TrimSpace(r.Header.Get("X-Channel-Origin"))
+	if origin == "" {
+		origin = strings.TrimSpace(r.Header.Get("Origin"))
+	}
+	if origin == "" {
+		return true
+	}
+	for _, allowed := range integration.AllowedOrigins {
+		if strings.EqualFold(strings.TrimSpace(allowed), origin) {
+			return true
+		}
+	}
+	return false
 }
 
 func (req wechatInboundRequest) toInbound() inboundRequest {

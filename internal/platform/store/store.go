@@ -178,17 +178,18 @@ type ChannelPolicy struct {
 }
 
 type ChannelIntegration struct {
-	Channel                string `json:"channel"`
-	DisplayName            string `json:"displayName"`
-	Enabled                bool   `json:"enabled"`
-	SecretSource           string `json:"secretSource"`
-	SecretRef              string `json:"secretRef"`
-	NextSecretRef          string `json:"nextSecretRef"`
-	SignatureWindowSeconds int    `json:"signatureWindowSeconds"`
-	ReplayProtection       bool   `json:"replayProtection"`
-	RotationHint           string `json:"rotationHint"`
-	RotatesAt              string `json:"rotatesAt,omitempty"`
-	UpdatedAt              string `json:"updatedAt"`
+	Channel                string   `json:"channel"`
+	DisplayName            string   `json:"displayName"`
+	Enabled                bool     `json:"enabled"`
+	SecretSource           string   `json:"secretSource"`
+	SecretRef              string   `json:"secretRef"`
+	NextSecretRef          string   `json:"nextSecretRef"`
+	SignatureWindowSeconds int      `json:"signatureWindowSeconds"`
+	ReplayProtection       bool     `json:"replayProtection"`
+	AllowedOrigins         []string `json:"allowedOrigins"`
+	RotationHint           string   `json:"rotationHint"`
+	RotatesAt              string   `json:"rotatesAt,omitempty"`
+	UpdatedAt              string   `json:"updatedAt"`
 }
 
 type TransferEvent struct {
@@ -923,10 +924,10 @@ func defaultChannelPolicies() []ChannelPolicy {
 
 func defaultChannelIntegrations(now string) []ChannelIntegration {
 	return []ChannelIntegration{
-		{Channel: "Web", DisplayName: "Web 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WEB_SECRET", NextSecretRef: "ANJING_CHANNEL_WEB_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "按演示环境手动轮换 env secret", UpdatedAt: now},
-		{Channel: "WeChat", DisplayName: "微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECHAT_SECRET", NextSecretRef: "ANJING_CHANNEL_WECHAT_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "生产接入时对齐微信回调 message id", UpdatedAt: now},
-		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", NextSecretRef: "ANJING_CHANNEL_APP_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
-		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", NextSecretRef: "ANJING_CHANNEL_MARKETPLACE_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
+		{Channel: "Web", DisplayName: "Web 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WEB_SECRET", NextSecretRef: "ANJING_CHANNEL_WEB_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://console.example.com"}, RotationHint: "按演示环境手动轮换 env secret", UpdatedAt: now},
+		{Channel: "WeChat", DisplayName: "微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECHAT_SECRET", NextSecretRef: "ANJING_CHANNEL_WECHAT_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://wechat.example.com"}, RotationHint: "生产接入时对齐微信回调 message id", UpdatedAt: now},
+		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", NextSecretRef: "ANJING_CHANNEL_APP_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"app://agent-customer-service"}, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
+		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", NextSecretRef: "ANJING_CHANNEL_MARKETPLACE_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://marketplace.example.com"}, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
 	}
 }
 

@@ -295,6 +295,49 @@ func TestInboundRouteAcceptsNextSecretRefDuringRotation(t *testing.T) {
 	}
 }
 
+func TestInboundRouteAcceptsAllowedOrigin(t *testing.T) {
+	mux := http.NewServeMux()
+	integration := testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 300, true)
+	integration.AllowedOrigins = []string{"https://wechat.example.com"}
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("WeChat", "wx-open-origin-ok", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-origin-ok","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	req.Header.Set("X-Channel-Origin", "https://wechat.example.com")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected allowed origin 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestInboundRouteRejectsDeniedOrigin(t *testing.T) {
+	mux := http.NewServeMux()
+	integration := testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 300, true)
+	integration.AllowedOrigins = []string{"https://wechat.example.com"}
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("WeChat", "wx-open-origin-denied", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-origin-denied","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	req.Header.Set("X-Channel-Origin", "https://evil.example.com")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected denied origin 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"channel_origin_denied"`) {
+		t.Fatalf("expected origin denied error, got %s", rec.Body.String())
+	}
+}
+
 func TestInboundRouteRejectsDisabledIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{

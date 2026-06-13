@@ -24,7 +24,7 @@
 | 渠道策略 | Runtime connected | `ChannelPolicy` 定义 Web/WeChat/App/Marketplace 的语气、风险加权和 SLA，转人工工单按渠道计算升级 |
 | 渠道接入 | Runtime connected | `/api/channels/inbound` 读取 `ChannelIntegration` 后执行 HMAC-SHA256 签名、timestamp 时间窗、enabled、external message id 和 replay 校验 |
 | 渠道协议适配 | Runtime connected | `/api/channels/wechat|app|marketplace/inbound` 将真实渠道字段归一到标准 inbound 链路 |
-| 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示 active/next secret ref、签名窗口、replay 开关和轮换提示，不返回密钥值，运行时允许双密钥过渡验签 |
+| 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示 active/next secret ref、allowed origins、签名窗口、replay 开关和轮换提示，不返回密钥值 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
 | 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
@@ -43,5 +43,5 @@
 
 ## 下一步
 
-1. 补更细的真实平台回调协议差异和渠道权限。
+1. 补渠道频率限制和更细的真实平台回调协议差异。
 2. 增加质检任务分配和规则版本灰度。

@@ -166,6 +166,7 @@ type ChannelIntegration = {
   nextSecretRef: string;
   signatureWindowSeconds: number;
   replayProtection: boolean;
+  allowedOrigins: string[];
   rotationHint: string;
   rotatesAt?: string;
   updatedAt: string;
@@ -777,6 +778,7 @@ function App() {
                     <strong>{item.displayName}</strong>
                     <span>{item.secretSource} · {item.secretRef}</span>
                     {item.nextSecretRef && <span>next · {item.nextSecretRef}</span>}
+                    {item.allowedOrigins.length > 0 && <span>origins · {item.allowedOrigins.length}</span>}
                     <span>{item.rotationHint}</span>
                   </div>
                   <div>
