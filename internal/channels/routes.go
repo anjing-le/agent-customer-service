@@ -24,6 +24,33 @@ type inboundRequest struct {
 	Signature              string `json:"signature"`
 }
 
+type wechatInboundRequest struct {
+	OpenID    string `json:"openId"`
+	MessageID string `json:"msgId"`
+	Nickname  string `json:"nickname"`
+	Text      string `json:"text"`
+	Timestamp string `json:"timestamp"`
+	Signature string `json:"signature"`
+}
+
+type appInboundRequest struct {
+	DeviceID  string `json:"deviceId"`
+	MessageID string `json:"messageId"`
+	UserName  string `json:"userName"`
+	Body      string `json:"body"`
+	SentAt    string `json:"sentAt"`
+	Signature string `json:"signature"`
+}
+
+type marketplaceInboundRequest struct {
+	BuyerID    string `json:"buyerId"`
+	EventID    string `json:"eventId"`
+	BuyerName  string `json:"buyerName"`
+	Message    string `json:"message"`
+	OccurredAt string `json:"occurredAt"`
+	Signature  string `json:"signature"`
+}
+
 type Config struct {
 	Secrets         map[string]string
 	SignatureWindow time.Duration
@@ -52,63 +79,136 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.BadRequest(w, err.Error())
 			return
 		}
-		if strings.TrimSpace(req.Channel) == "" {
-			httpjson.BadRequest(w, "channel is required")
-			return
-		}
-		if strings.TrimSpace(req.ExternalConversationID) == "" {
-			httpjson.BadRequest(w, "externalConversationId is required")
-			return
-		}
-		if strings.TrimSpace(req.Content) == "" {
-			httpjson.BadRequest(w, "content is required")
-			return
-		}
-		if strings.TrimSpace(req.Timestamp) == "" {
-			httpjson.BadRequest(w, "timestamp is required")
-			return
-		}
-		if strings.TrimSpace(req.Signature) == "" {
-			httpjson.BadRequest(w, "signature is required")
-			return
-		}
-		integration, err := st.ChannelIntegration(req.Channel)
-		if err != nil {
-			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
-			return
-		}
-		if !integration.Enabled {
-			httpjson.Fail(w, http.StatusForbidden, "channel_disabled", "channel integration is disabled")
-			return
-		}
-		ok, code, message := cfg.validSignature(req, integration)
-		if !ok {
-			httpjson.Fail(w, http.StatusUnauthorized, code, message)
-			return
-		}
-		if integration.ReplayProtection {
-			accepted, err := st.RecordChannelInbound(channelInboundReceipt(req))
-			if err != nil {
-				httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
-				return
-			}
-			if !accepted {
-				httpjson.Fail(w, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted")
-				return
-			}
-		}
-		result, err := st.ReceiveChannelMessage(store.ChannelInboundMessage{
-			Channel:                req.Channel,
-			ExternalConversationID: req.ExternalConversationID,
-			Customer:               req.Customer,
-			Content:                req.Content,
-		})
-		if err != nil {
-			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
-			return
-		}
-		httpjson.OK(w, result)
+		handleInbound(w, st, cfg, req)
 	})
+	mux.HandleFunc("/api/channels/wechat/inbound", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req wechatInboundRequest
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		handleInbound(w, st, cfg, req.toInbound())
+	})
+	mux.HandleFunc("/api/channels/app/inbound", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req appInboundRequest
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		handleInbound(w, st, cfg, req.toInbound())
+	})
+	mux.HandleFunc("/api/channels/marketplace/inbound", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req marketplaceInboundRequest
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		handleInbound(w, st, cfg, req.toInbound())
+	})
+}
+
+func handleInbound(w http.ResponseWriter, st store.Runtime, cfg Config, req inboundRequest) {
+	if strings.TrimSpace(req.Channel) == "" {
+		httpjson.BadRequest(w, "channel is required")
+		return
+	}
+	if strings.TrimSpace(req.ExternalConversationID) == "" {
+		httpjson.BadRequest(w, "externalConversationId is required")
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		httpjson.BadRequest(w, "content is required")
+		return
+	}
+	if strings.TrimSpace(req.Timestamp) == "" {
+		httpjson.BadRequest(w, "timestamp is required")
+		return
+	}
+	if strings.TrimSpace(req.Signature) == "" {
+		httpjson.BadRequest(w, "signature is required")
+		return
+	}
+	integration, err := st.ChannelIntegration(req.Channel)
+	if err != nil {
+		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	if !integration.Enabled {
+		httpjson.Fail(w, http.StatusForbidden, "channel_disabled", "channel integration is disabled")
+		return
+	}
+	ok, code, message := cfg.validSignature(req, integration)
+	if !ok {
+		httpjson.Fail(w, http.StatusUnauthorized, code, message)
+		return
+	}
+	if integration.ReplayProtection {
+		accepted, err := st.RecordChannelInbound(channelInboundReceipt(req))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		if !accepted {
+			httpjson.Fail(w, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted")
+			return
+		}
+	}
+	result, err := st.ReceiveChannelMessage(store.ChannelInboundMessage{
+		Channel:                req.Channel,
+		ExternalConversationID: req.ExternalConversationID,
+		Customer:               req.Customer,
+		Content:                req.Content,
+	})
+	if err != nil {
+		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	httpjson.OK(w, result)
+}
+
+func (req wechatInboundRequest) toInbound() inboundRequest {
+	return inboundRequest{
+		Channel:                "WeChat",
+		ExternalConversationID: req.OpenID,
+		ExternalMessageID:      req.MessageID,
+		Customer:               req.Nickname,
+		Content:                req.Text,
+		Timestamp:              req.Timestamp,
+		Signature:              req.Signature,
+	}
+}
+
+func (req appInboundRequest) toInbound() inboundRequest {
+	return inboundRequest{
+		Channel:                "App",
+		ExternalConversationID: req.DeviceID,
+		ExternalMessageID:      req.MessageID,
+		Customer:               req.UserName,
+		Content:                req.Body,
+		Timestamp:              req.SentAt,
+		Signature:              req.Signature,
+	}
+}
+
+func (req marketplaceInboundRequest) toInbound() inboundRequest {
+	return inboundRequest{
+		Channel:                "Marketplace",
+		ExternalConversationID: req.BuyerID,
+		ExternalMessageID:      req.EventID,
+		Customer:               req.BuyerName,
+		Content:                req.Message,
+		Timestamp:              req.OccurredAt,
+		Signature:              req.Signature,
+	}
 }
 
 func DefaultConfig() Config {

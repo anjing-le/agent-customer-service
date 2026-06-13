@@ -55,6 +55,14 @@ export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
 go run ./cmd/platform-all
 ```
 
+真实渠道 adapter 入口：
+
+- `/api/channels/wechat/inbound`
+- `/api/channels/app/inbound`
+- `/api/channels/marketplace/inbound`
+
+adapter 只做字段归一，验签、时间窗、replay 和会话映射仍复用标准 inbound 链路。
+
 ## Smoke Checks
 
 ```bash

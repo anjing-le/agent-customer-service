@@ -68,6 +68,12 @@ export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
 export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
 ```
 
+真实渠道 adapter 入口会先归一字段，再复用标准 inbound 链路：
+
+- `/api/channels/wechat/inbound`
+- `/api/channels/app/inbound`
+- `/api/channels/marketplace/inbound`
+
 流式回复：
 
 ```bash

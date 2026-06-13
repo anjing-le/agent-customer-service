@@ -24,7 +24,7 @@
 
 ### Q6: 消息发送到回复的链路是什么？
 
-**A:** 用户消息可以来自控制台，也可以从 `/api/channels/inbound` 这类渠道入口进入。渠道入口会先读取 `ChannelIntegration`，再用 secret ref 对应的 env 密钥做 HMAC-SHA256 签名校验，检查 timestamp 时间窗和渠道启用状态，并按 replay 开关记录 replay key。真实渠道传入 `externalMessageId` 时，系统优先用它做重复回调对账；没有时退回签名载荷幂等。通过后，系统会把外部会话 ID 映射成内部会话。进入 `SendMessage` 后，系统会读取当前会话历史，再检索知识证据。如果命中证据，默认生成 `rag+rule` 回复；配置模型客户端后，会在证据约束下生成 `llm+rag` 回复并记录 `evidence_ids`。如果没有证据，就返回兜底话术并创建 `KnowledgeGap`；如果命中转人工关键词，就创建 `TransferTicket`。最后更新会话状态，并通过统一 JSON envelope 返回给调用方。
+**A:** 用户消息可以来自控制台，也可以从 `/api/channels/inbound` 这类标准渠道入口进入；微信、App、平台店铺也各有 adapter 入口，把 `openId/msgId/text`、`deviceId/messageId/body`、`buyerId/eventId/message` 归一成标准 inbound。渠道入口会读取 `ChannelIntegration`，再用 secret ref 对应的 env 密钥做 HMAC-SHA256 签名校验，检查 timestamp 时间窗和渠道启用状态，并按 replay 开关记录 replay key。真实渠道传入 `externalMessageId` 时，系统优先用它做重复回调对账；没有时退回签名载荷幂等。通过后，系统会把外部会话 ID 映射成内部会话。进入 `SendMessage` 后，系统会读取当前会话历史，再检索知识证据。如果命中证据，默认生成 `rag+rule` 回复；配置模型客户端后，会在证据约束下生成 `llm+rag` 回复并记录 `evidence_ids`。如果没有证据，就返回兜底话术并创建 `KnowledgeGap`；如果命中转人工关键词，就创建 `TransferTicket`。最后更新会话状态，并通过统一 JSON envelope 返回给调用方。
 
 ### Q7: RAG 检索是怎么实现的？
 
@@ -72,7 +72,7 @@
 
 ### Q18: 项目目前还有哪些不足？
 
-**A:** 当前已经接入可选模型生成、SSE 流式输出、`Message.trace`、渠道 inbound 入口、`ChannelIntegration` 运行时校验、签名时间窗、`externalMessageId` 对账、replay 防重复提交、渠道集成治理视图、渠道策略、人工工单 SLA、人工质检标注和低分复盘样本导出。但还没有向量检索、更完整的上下文压缩、渠道协议字段适配、密钥自动轮换和权限体系。规则表达也比较简单，后续可以做规则版本、审核流、质检任务分配和灰度。当前阶段的价值是先把可靠客服 Agent 的领域边界、工程结构和运营闭环打稳。
+**A:** 当前已经接入可选模型生成、SSE 流式输出、`Message.trace`、渠道 inbound 入口、WeChat/App/Marketplace adapter、`ChannelIntegration` 运行时校验、签名时间窗、`externalMessageId` 对账、replay 防重复提交、渠道集成治理视图、渠道策略、人工工单 SLA、人工质检标注和低分复盘样本导出。但还没有向量检索、更完整的上下文压缩、更细的真实平台协议差异、密钥自动轮换和权限体系。规则表达也比较简单，后续可以做规则版本、审核流、质检任务分配和灰度。当前阶段的价值是先把可靠客服 Agent 的领域边界、工程结构和运营闭环打稳。
 
 ## 二、AI 应用层面
 

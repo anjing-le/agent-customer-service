@@ -164,6 +164,77 @@ func TestInboundRouteScopesExternalMessageIDByChannel(t *testing.T) {
 	}
 }
 
+func TestWeChatAdapterNormalizesInboundMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("WeChat", "wx-open-adapter", timestamp, content)
+	body := strings.NewReader(`{"openId":"wx-open-adapter","msgId":"wechat-adapter-msg-1","nickname":"微信客户","text":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/wechat/inbound", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"WeChat"`, `"conversationId":"conv_wechat_wx_open_adapter"`, `"agentMessage"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
+func TestAppAdapterNormalizesInboundMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("App", "device-1", timestamp, content)
+	body := strings.NewReader(`{"deviceId":"device-1","messageId":"app-msg-1","userName":"App 客户","body":"` + content + `","sentAt":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/app/inbound", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"conversationId":"conv_app_device_1"`) {
+		t.Fatalf("expected app conversation id, got %s", rec.Body.String())
+	}
+}
+
+func TestMarketplaceAdapterUsesEventIDForReplay(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	content := "这个商品能不能开发票？"
+	firstTimestamp := "2026-06-14T02:10:00Z"
+	firstSignature := ChannelSignature("Marketplace", "buyer-1", firstTimestamp, content)
+	firstBody := `{"buyerId":"buyer-1","eventId":"market-event-1","buyerName":"平台买家","message":"` + content + `","occurredAt":"` + firstTimestamp + `","signature":"` + firstSignature + `"}`
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/channels/marketplace/inbound", strings.NewReader(firstBody))
+	firstRec := httptest.NewRecorder()
+	mux.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first marketplace event 200, got %d: %s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondTimestamp := "2026-06-14T02:10:10Z"
+	secondSignature := ChannelSignature("Marketplace", "buyer-1", secondTimestamp, content)
+	secondBody := `{"buyerId":"buyer-1","eventId":"market-event-1","buyerName":"平台买家","message":"` + content + `","occurredAt":"` + secondTimestamp + `","signature":"` + secondSignature + `"}`
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/channels/marketplace/inbound", strings.NewReader(secondBody))
+	secondRec := httptest.NewRecorder()
+	mux.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusConflict {
+		t.Fatalf("expected duplicate marketplace event 409, got %d: %s", secondRec.Code, secondRec.Body.String())
+	}
+	if !strings.Contains(secondRec.Body.String(), `"code":"duplicate_inbound"`) {
+		t.Fatalf("expected duplicate inbound error, got %s", secondRec.Body.String())
+	}
+}
+
 func TestInboundRouteAcceptsConfiguredChannelSecret(t *testing.T) {
 	mux := http.NewServeMux()
 	cfg := testConfig()

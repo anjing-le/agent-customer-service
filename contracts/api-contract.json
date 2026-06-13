@@ -57,6 +57,30 @@
       ]
     },
     {
+      "id": "receiveWeChatInbound",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/wechat/inbound",
+      "request": { "body": "WeChatInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
+      "id": "receiveAppInbound",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/app/inbound",
+      "request": { "body": "AppInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
+      "id": "receiveMarketplaceInbound",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/marketplace/inbound",
+      "request": { "body": "MarketplaceInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
       "id": "listArticles",
       "boundary": "knowledge",
       "method": "GET",
@@ -157,6 +181,39 @@
         "content": "string",
         "timestamp": "RFC3339 string within ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS",
         "signature": "HMAC-SHA256 hex using ChannelIntegration secretRef/env fallback; duplicate externalMessageId or signed payload returns duplicate_inbound when replayProtection is enabled"
+      }
+    },
+    "WeChatInboundRequest": {
+      "required": ["openId", "text", "timestamp", "signature"],
+      "fields": {
+        "openId": "string",
+        "msgId": "string",
+        "nickname": "string",
+        "text": "string",
+        "timestamp": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex over normalized WeChat inbound payload"
+      }
+    },
+    "AppInboundRequest": {
+      "required": ["deviceId", "body", "sentAt", "signature"],
+      "fields": {
+        "deviceId": "string",
+        "messageId": "string",
+        "userName": "string",
+        "body": "string",
+        "sentAt": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex over normalized App inbound payload"
+      }
+    },
+    "MarketplaceInboundRequest": {
+      "required": ["buyerId", "message", "occurredAt", "signature"],
+      "fields": {
+        "buyerId": "string",
+        "eventId": "string",
+        "buyerName": "string",
+        "message": "string",
+        "occurredAt": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex over normalized Marketplace inbound payload"
       }
     },
     "MessageStreamEvent": {

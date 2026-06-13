@@ -36,6 +36,9 @@ Go API 当前响应格式：
 - `POST /api/customer-service/messages`: 发送用户消息，触发 RAG、兜底、缺口和人工 ticket。
 - `POST /api/customer-service/messages/stream`: 发送用户消息并以 SSE 返回 `meta`、`delta`、`done` 事件。
 - `POST /api/channels/inbound`: 外部渠道消息入口，要求 `channel`、`externalConversationId`、RFC3339 `timestamp` 和 HMAC-SHA256 `signature`；可选 `externalMessageId` 用于真实渠道消息对账。校验会读取 `ChannelIntegration` 的 enabled、secretRef、签名时间窗和 replay 开关，重复 `externalMessageId` 或签名载荷返回 `409 duplicate_inbound`。
+- `POST /api/channels/wechat/inbound`: 微信协议 adapter，将 `openId`、`msgId`、`text` 归一为标准 inbound 请求。
+- `POST /api/channels/app/inbound`: App 协议 adapter，将 `deviceId`、`messageId`、`body` 归一为标准 inbound 请求。
+- `POST /api/channels/marketplace/inbound`: 平台店铺协议 adapter，将 `buyerId`、`eventId`、`message` 归一为标准 inbound 请求。
 - `/api/knowledge/articles`: 可信知识列表。
 - `/api/knowledge/search`: 知识检索。
 - `/api/knowledge/gaps/resolve`: 关闭知识缺口。
@@ -53,7 +56,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`Annotation`、`TrainingSample`、`QualitySummary`
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`Annotation`、`TrainingSample`、`QualitySummary`
 
 新增或修改接口时，需要同时更新：
 

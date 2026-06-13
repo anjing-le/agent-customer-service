@@ -38,7 +38,8 @@
 - 已支持渠道集成治理视图，展示 secret ref、签名窗口、replay 开关和轮换提示，但不暴露密钥值。
 - 已支持 webhook 校验读取 `ChannelIntegration`，将 enabled、secret ref、签名窗口和 replay 开关接入运行时。
 - 已支持 `externalMessageId` 对账，真实渠道可用官方消息 ID 做幂等，缺省时退回签名载荷 replay key。
-- 下一步补真实渠道回调协议差异和密钥轮换。
+- 已支持 WeChat/App/Marketplace adapter，将真实渠道字段归一到标准 inbound 链路。
+- 下一步补更细的真实平台回调协议差异和密钥轮换。
 
 ## V3: 生产化扩展
 
