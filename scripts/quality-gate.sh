@@ -9,15 +9,9 @@ echo "quality-gate: template and contract checks"
 ./scripts/check-contracts.sh
 
 echo "quality-gate: backend package"
-(
-  cd backend
-  mvn -q -DskipTests package
-)
+go test ./...
 
 echo "quality-gate: frontend build"
-(
-  cd frontend
-  pnpm build
-)
+pnpm build:console
 
 echo "quality-gate: ok"

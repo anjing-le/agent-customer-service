@@ -2,53 +2,33 @@
 
 ## 定位
 
-`agent-customer-service` 是可靠 Agent 客服项目，核心关注多轮对话、RAG 检索增强、规则兜底、防幻觉、会话管理和历史记录。
+`agent-customer-service` 是可靠 Agent 客服项目，核心关注多轮对话、RAG 检索增强、规则兜底、防幻觉、会话管理、知识运营、人工接管和历史记录。
 
-它也是 `infra-dev-scaffolding` 的业务生长样例：脚手架负责通用工程能力，项目本身只讲客服 Agent 的领域设计。
+它是安静 DVSkyFolding 的业务生长样例：脚手架负责 Go/React/PostgreSQL/交付习惯，项目本身只讲客服 Agent 的领域设计。
 
-## V1: 工程对齐与可靠 Demo
+## V1: DVSkyFolding 基线与可靠 Demo
 
-- 补齐脚手架工程骨架：contracts、scripts、project_document、质量门禁入口。
-- 明确脚手架继承关系：技术栈、工程习惯、API 契约和质量门禁都来自 `infra-dev-scaffolding`。
-- 保留现有对话中心、知识中心、场景配置三大页面。
-- 将当前真实/模拟边界写入 README、文档和 service boundary。
-- 统一项目身份、端口、环境说明和生产 API 地址。
-- 逐步将旧 `R<T>`、手写 URL、漂移 TS 类型迁移到脚手架契约。
-- 落地 Agent 领域模型和 application ports，先固定拆分边界，不破坏现有 Demo。
+- 已落地 Go module、React/Vite console、PostgreSQL migrations。
+- 已落地多 command：`platform-all`、`customer-service-api`、`ops-api`、`console-web`、`migrate-db`。
+- 已落地 seed runtime 和 PostgreSQL runtime。
+- 已落地对话中心、知识中心、场景配置、人工队列的 React 控制台。
+- 已落地统一 JSON envelope、结构化日志、env 配置。
+- 已落地本地 PostgreSQL compose 和可选集成测试。
 
 ## V2: 可靠 Agent Runtime
 
-- 已开始拆分 `ChatService`：会话/消息保留在 `ChatService`，分析、检索、生成、兜底、防幻觉、审计由 `AgentRuntime` 编排。
-- 已轻量接入 Scene 配置：动态 Intent、SYSTEM Prompt、基础 Rule 护栏。
-- 已将 `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 接入真实 runtime。
-- 已补 RuleEngine 命中结果、轻量 JSON 条件表达式和 PromptRuntime 基础变量渲染。
-- 已补 Rule 条件/动作编辑器、JSON 格式化、表达式测试和前后端校验。
-- 已补 Prompt 变量 schema、运行时变量快捷填充、编辑态校验和测试入口。
-- 已补 Scene Runtime Overview，展示启用配置、规则命中、Prompt 使用和 Top 项。
-- 已补 Chat Runtime Overview，展示会话、消息、活跃状态和最近会话。
-- 已补 Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
-- 已补 Chat Runtime Trend，展示平均置信度、兜底率、不安全率和 7 日回复趋势。
-- 已补 Chat Runtime Snapshot，支持手动采样和可配置定时采样。
-- 已补 Scene Runtime Insight，展示规则/Prompt 平均使用和集中度。
-- 已补 Session Quality Summary，基于会话审计事实展示可靠性评分、风险等级和主要兜底原因。
-- 已补 Session Audit Drilldown，在可靠性面板展示每轮审计明细，支持查看意图、置信度、引擎、召回、规则和 Prompt 消费。
-- 已补 Scene Runtime Trend，基于近 7 日 Agent 审计聚合场景、规则命中和 Prompt 消费趋势。
-- 已补 Transfer Recommendation，低置信度、安全拦截或转人工规则命中时输出转人工建议、原因和优先级。
-- 已补 Transfer Queue Simulation，自动生成转人工工单，支持 `PENDING` 到 `RESOLVED` 的模拟人工接管回写。
-- 已补 Transfer Runtime Metrics，展示待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
-- 已补 Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用，支撑防幻觉展示。
-- 已补 Knowledge No-answer Boundary，无可靠证据时返回无答案原因，并由护栏阻止自由生成。
-- 已补 Knowledge Gap Queue，无可靠证据问题自动沉淀为知识缺口，支持补 FAQ 或人工关闭。
-- 已补 Knowledge Gap Analytics，展示待处理、高优先级、解决率、Top 无答案原因和重复问题。
-- 已补 Knowledge Gap Regression，补知识后可用原问题验证 FAQ 召回、可信度和可引用状态。
-- 增加会话历史、可靠性看板、渲染提示词和兜底原因追踪。
-- 下一步补对话回归用例集和一键批量验证。
-- 支持 SSE 流式回复和人工接管状态同步。
+- 已支持知识证据命中后回答。
+- 已支持无证据时拒绝自由生成并创建知识缺口。
+- 已支持知识缺口关闭和由缺口生成可信知识。
+- 已支持规则测试：转人工、无证据兜底、可回答边界。
+- 已支持转人工自动生成 ticket，并由控制台处理。
+- 下一步补批量回归验证、会话历史详情和更完整的人工接管记录。
 
 ## V3: 生产化扩展
 
 - 接入向量数据库和 rerank，替换 V1 关键词检索。
+- 支持 SSE 流式回复。
 - 多渠道适配：Web、App、微信、抖音等。
 - 对话质量评估集、回归测试和人工标注反馈。
-- 接入未来 `infra-llm-gateway`、`infra-auth`、`infra-api-gateway`。
 - 多租户、权限、限流、成本统计和治理面板。
+- 删除旧运行入口和旧教学叙事，完成 DVSkyFolding 口径收敛。

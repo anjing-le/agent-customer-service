@@ -6,6 +6,14 @@ cd "$ROOT"
 
 required_files=(
   "README.md"
+  "go.mod"
+  "package.json"
+  "pnpm-workspace.yaml"
+  "apps/console/package.json"
+  "cmd/platform-all/main.go"
+  "internal/platform/store/store.go"
+  "infra/postgres/migrations/001_agent_customer_service.sql"
+  "infra/local/docker-compose.yml"
   "contracts/platform-contract.json"
   "contracts/service-boundaries.json"
   "project_document/README.md"
@@ -25,12 +33,12 @@ for file in "${required_files[@]}"; do
   fi
 done
 
-if grep -R "agent-dev-scaffolding" backend/pom.xml frontend/package.json backend/src/main/resources/application.yml backend/src/main/java/com/anjing/config/properties/FeatureProperties.java >/dev/null; then
-  echo "check-template: old agent-dev-scaffolding identity remains in active project metadata" >&2
+if grep -R "Spring Boot\\|Vue 3\\|Element Plus\\|JPA\\|MySQL" README.md project_document contracts >/dev/null; then
+  echo "check-template: old Java/Vue runtime wording remains in core docs" >&2
   exit 1
 fi
 
-if grep -R "m1.apifoxmock.com" frontend/.env.production frontend/src/api >/dev/null; then
+if grep -R "m1.apifoxmock.com" apps/console/src contracts project_document README.md >/dev/null; then
   echo "check-template: production/runtime API must not point to Apifox mock" >&2
   exit 1
 fi

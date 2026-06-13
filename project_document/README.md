@@ -7,7 +7,7 @@
 - [PROJECT_CONSTRAINTS.md](./PROJECT_CONSTRAINTS.md)：长期工程约束和防破窗规则。
 - [API_CONTRACT_GUIDE.md](./API_CONTRACT_GUIDE.md)：API 响应、分页和迁移规则。
 - [SERVICE_BOUNDARY_GUIDE.md](./SERVICE_BOUNDARY_GUIDE.md)：服务/模块边界和未来拆分方向。
-- [SCAFFOLD_INHERITANCE.md](./SCAFFOLD_INHERITANCE.md)：本项目如何从 `infra-dev-scaffolding` 生长出来。
+- [SCAFFOLD_INHERITANCE.md](./SCAFFOLD_INHERITANCE.md)：本项目如何从 DVSkyFolding 技术基线生长出来。
 - [DOMAIN_MODEL.md](./DOMAIN_MODEL.md)：可靠客服 Agent 的领域模型和应用端口。
 - [ROADMAP.md](./ROADMAP.md)：V1/V2/V3 路线图。
 - [STATUS.md](./STATUS.md)：当前阶段状态和验证入口。

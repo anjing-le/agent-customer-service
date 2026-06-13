@@ -1,47 +1,60 @@
 # Local Startup Guide
 
-## Frontend
+## Seed Runtime
+
+不依赖数据库，适合课堂演示：
 
 ```bash
-cd frontend
 pnpm install
-pnpm dev
+pnpm build:console
+go run ./cmd/platform-all
 ```
 
-开发端口来自 `frontend/.env` 的 `VITE_PORT`，当前为 `20002`。开发环境通过 Vite proxy 转发 `/api` 到 `http://localhost:10002`。
+默认端口是 `10002`。打开 `http://localhost:10002` 可访问 React 控制台。
 
-## Backend
+## PostgreSQL Runtime
 
 ```bash
-cd backend
-mvn spring-boot:run
+pnpm db:up
+pnpm db:migrate
+export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable'
+go run ./cmd/platform-all
 ```
 
-后端当前端口为 `10002`。
+常用脚本：
 
-本地敏感配置放在：
-
-```text
-backend/src/main/resources/application-local.yml
+```bash
+pnpm db:logs
+pnpm db:psql
+pnpm db:down
 ```
-
-该文件被 ignore，不应提交。
 
 ## Smoke Checks
 
 ```bash
-curl http://localhost:10002/api/knowledge/overview
+curl http://localhost:10002/healthz
+curl http://localhost:10002/api/ops/dashboard
 ```
 
+发送消息：
+
 ```bash
-curl -X POST http://localhost:10002/api/chat/session/create \
+curl -X POST http://localhost:10002/api/customer-service/messages \
   -H "Content-Type: application/json" \
-  -d '{"userId":"demo","userName":"演示用户","channel":"web"}'
+  -d '{"conversationId":"conv_demo_refund","content":"这个商品能不能开发票？"}'
+```
+
+规则测试：
+
+```bash
+curl -X POST http://localhost:10002/api/ops/rules/test \
+  -H "Content-Type: application/json" \
+  -d '{"content":"我已经投诉很多次了，现在必须转人工"}'
 ```
 
 ## Quality Checks
 
 ```bash
-./scripts/check-template.sh
-./scripts/check-contracts.sh
+go test ./...
+pnpm build:console
 ```

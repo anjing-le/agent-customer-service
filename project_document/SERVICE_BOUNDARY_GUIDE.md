@@ -6,28 +6,31 @@
 
 | boundary | kind | basePath | 说明 |
 |---|---|---|---|
-| chat | runtime | `/api/chat` | 会话、消息、多轮对话核心链路和运行概览 |
-| knowledge | runtime | `/api/knowledge` | 知识管理；Product/Activity/FAQ 参与当前对话检索 |
-| scene | runtime | `/api/scene` | Intent/Prompt/Rule CRUD 和测试能力；已轻量接入 Agent Runtime |
+| customer-service | runtime | `/api/customer-service` | 会话、消息、RAG 回复、无证据兜底、转人工触发 |
+| knowledge | runtime | `/api/knowledge` | 知识列表、检索、知识缺口关闭、缺口生成知识 |
+| ops | runtime | `/api/ops` | 运行看板、规则测试、人工 ticket 处理 |
 
-## Target Boundaries
+## Go Commands
 
-后续统一迁移到 `/api/customer-service/**`：
-
-- `/api/customer-service/chat/**`
-- `/api/customer-service/knowledge/**`
-- `/api/customer-service/scene/**`
-- `/api/customer-service/ops/**`
+| command | 说明 |
+|---|---|
+| `cmd/platform-all` | 本地一体化运行 API 和 console web |
+| `cmd/customer-service-api` | 会话与知识运行面 |
+| `cmd/ops-api` | 运营看板、规则测试、人工队列 |
+| `cmd/console-web` | 静态控制台服务 |
+| `cmd/migrate-db` | PostgreSQL migration |
 
 ## Runtime Truth
 
-- 当前真实链路：用户消息 -> `AgentRuntime` -> 意图分析 -> Product/Activity/FAQ 检索 -> 护栏决策 -> LLM/规则回复 -> 推理和可靠性结果返回。
-- Chat 当前接入：会话和消息持久化、最近历史加载、会话运行概览、Agent 单轮回复审计、7 日运行趋势、运行快照采样。
-- Scene 当前接入：启用 Intent 参与关键词兜底识别；启用 SYSTEM Prompt 由 PromptRuntime 渲染后注入 LLM 上下文，支持变量 schema 和编辑态校验；启用 Rule 由 RuleEngine 产生命中原因和动作，支持内置规则码、轻量 JSON 条件表达式、表达式测试和编辑态校验；Scene Runtime Overview 展示轻量运行统计和配置运营洞察。
-- 当前预留链路：Industry/Solution 向量化、运行历史快照、向量检索和 rerank。
+- 用户消息进入 `/api/customer-service/messages`。
+- 有可信知识时返回 RAG 证据回复。
+- 无可信知识时返回安全兜底，并创建知识缺口。
+- 命中投诉、催办、法律风险或人工诉求时创建人工 ticket。
+- 知识缺口可以关闭，也可以生成知识后回归到可检索状态。
+- 规则测试可以在不发送真实消息的情况下验证兜底边界。
 
 ## Update Rules
 
 - 新增运行接口先更新 `contracts/service-boundaries.json`。
-- 同步后端 `ApiConstants` 和前端 API 层。
-- 运行 `./scripts/check-contracts.sh`。
+- 同步 React 控制台调用点。
+- 运行 `go test ./...` 和 `pnpm build:console`。

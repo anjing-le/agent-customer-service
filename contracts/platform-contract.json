@@ -2,8 +2,10 @@
   "schemaVersion": 1,
   "apiPrefix": "/api",
   "responseEnvelope": {
-    "successCode": "0",
-    "fields": ["code", "message", "data", "timestamp", "requestId"]
+    "successField": "success",
+    "dataField": "data",
+    "errorField": "error",
+    "errorFields": ["code", "message"]
   },
   "pagination": {
     "fields": ["records", "current", "size", "total"],
@@ -34,7 +36,7 @@
   ],
   "time": {
     "defaultTimeZone": "UTC",
-    "serverCurrentTimeSource": "DateUtils",
+    "serverCurrentTimeSource": "time.Now().UTC()",
     "clientTimeZoneHeader": "X-Time-Zone",
     "localeHeader": "Accept-Language"
   },

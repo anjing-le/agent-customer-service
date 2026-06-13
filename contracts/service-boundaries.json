@@ -1,82 +1,51 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "applicationId": "agent-customer-service",
   "apiPrefix": "/api",
-  "targetBasePath": "/api/customer-service",
+  "stack": {
+    "frontend": "React + TypeScript + Vite",
+    "backend": "Go + net/http",
+    "database": "PostgreSQL + pgx/v5"
+  },
   "boundaries": [
     {
-      "id": "chat",
+      "id": "customer-service",
       "name": "Conversation Runtime",
       "kind": "runtime",
       "owner": "agent-customer-service",
-      "currentHost": "agent-customer-service",
-      "basePath": "/api/chat",
-      "targetBasePath": "/api/customer-service/chat",
-      "apiConstantsClass": "Chat",
-      "apiPathsKey": "chat",
-      "controller": "backend/src/main/java/com/anjing/module/chat/ChatController.java",
-      "openapi": false,
-      "copyAction": "keep and gradually migrate to targetBasePath",
+      "basePath": "/api/customer-service",
+      "goPackage": "internal/customer",
       "routes": [
-        { "name": "runtimeOverview", "path": "/api/chat/runtime/overview", "methods": ["POST"] },
-        { "name": "runtimeSnapshotCapture", "path": "/api/chat/runtime/snapshot/capture", "methods": ["POST"] },
-        { "name": "createSession", "path": "/api/chat/session/create", "methods": ["POST"] },
-        { "name": "listSessions", "path": "/api/chat/session/list", "methods": ["POST"] },
-        { "name": "getSession", "path": "/api/chat/session/get", "methods": ["POST"] },
-        { "name": "deleteSession", "path": "/api/chat/session/delete", "methods": ["POST"] },
-        { "name": "sendMessage", "path": "/api/chat/message/send", "methods": ["POST"] },
-        { "name": "listMessages", "path": "/api/chat/message/list", "methods": ["POST"] },
-        { "name": "updateContext", "path": "/api/chat/context/update", "methods": ["POST"] },
-        { "name": "getContext", "path": "/api/chat/context/get", "methods": ["POST"] }
+        { "name": "listConversations", "path": "/api/customer-service/conversations", "methods": ["GET"], "console": false },
+        { "name": "createConversation", "path": "/api/customer-service/conversations", "methods": ["POST"], "console": false },
+        { "name": "sendMessage", "path": "/api/customer-service/messages", "methods": ["POST"] }
       ]
     },
     {
       "id": "knowledge",
-      "name": "Knowledge Management",
+      "name": "Knowledge Operations",
       "kind": "runtime",
       "owner": "agent-customer-service",
-      "currentHost": "agent-customer-service",
       "basePath": "/api/knowledge",
-      "targetBasePath": "/api/customer-service/knowledge",
-      "apiConstantsClass": "Knowledge",
-      "apiPathsKey": "knowledge",
-      "controller": "backend/src/main/java/com/anjing/module/knowledge/KnowledgeController.java",
-      "openapi": false,
-      "copyAction": "keep product/activity/faq as runtime knowledge; keep industry/solution as reserved until wired into retrieval",
+      "goPackage": "internal/knowledge",
       "routes": [
-        { "name": "overview", "path": "/api/knowledge/overview", "methods": ["POST"] },
-        { "name": "productList", "path": "/api/knowledge/product/list", "methods": ["POST"] },
-        { "name": "activityList", "path": "/api/knowledge/activity/list", "methods": ["POST"] },
-        { "name": "faqList", "path": "/api/knowledge/faq/list", "methods": ["POST"] },
-        { "name": "gapSummary", "path": "/api/knowledge/gap/summary", "methods": ["POST"] },
-        { "name": "gapList", "path": "/api/knowledge/gap/list", "methods": ["POST"] },
-        { "name": "gapResolve", "path": "/api/knowledge/gap/resolve", "methods": ["POST"] },
-        { "name": "gapVerify", "path": "/api/knowledge/gap/verify", "methods": ["POST"] },
-        { "name": "industryList", "path": "/api/knowledge/industry/list", "methods": ["POST"] },
-        { "name": "solutionList", "path": "/api/knowledge/solution/list", "methods": ["POST"] },
-        { "name": "vectorize", "path": "/api/knowledge/vectorize", "methods": ["POST"] }
+        { "name": "listArticles", "path": "/api/knowledge/articles", "methods": ["GET"] },
+        { "name": "searchKnowledge", "path": "/api/knowledge/search", "methods": ["POST"], "console": false },
+        { "name": "resolveGap", "path": "/api/knowledge/gaps/resolve", "methods": ["POST"] },
+        { "name": "createArticleFromGap", "path": "/api/knowledge/gaps/create-article", "methods": ["POST"] }
       ]
     },
     {
-      "id": "scene",
-      "name": "Scene Configuration",
+      "id": "ops",
+      "name": "Operations Runtime",
       "kind": "runtime",
       "owner": "agent-customer-service",
-      "currentHost": "agent-customer-service",
-      "basePath": "/api/scene",
-      "targetBasePath": "/api/customer-service/scene",
-      "apiConstantsClass": "Scene",
-      "apiPathsKey": "scene",
-      "controller": "backend/src/main/java/com/anjing/module/scene/SceneController.java",
-      "openapi": false,
-      "copyAction": "keep CRUD and lightweight runtime integration; RuleEngine and PromptRuntime are already wired in lightweight mode",
+      "basePath": "/api/ops",
+      "goPackage": "internal/ops",
       "routes": [
-        { "name": "runtimeOverview", "path": "/api/scene/runtime/overview", "methods": ["POST"] },
-        { "name": "intentList", "path": "/api/scene/intent/list", "methods": ["POST"] },
-        { "name": "promptList", "path": "/api/scene/prompt/list", "methods": ["POST"] },
-        { "name": "promptTest", "path": "/api/scene/prompt/test", "methods": ["POST"] },
-        { "name": "ruleList", "path": "/api/scene/rule/list", "methods": ["POST"] },
-        { "name": "ruleTest", "path": "/api/scene/rule/test", "methods": ["POST"] }
+        { "name": "dashboard", "path": "/api/ops/dashboard", "methods": ["GET"] },
+        { "name": "testRule", "path": "/api/ops/rules/test", "methods": ["POST"] },
+        { "name": "resolveTransfer", "path": "/api/ops/transfers/resolve", "methods": ["POST"] }
       ]
     }
   ]

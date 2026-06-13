@@ -25,37 +25,29 @@ if (platform.apiPrefix !== '/api') {
   fail('platform apiPrefix must be /api');
 }
 
-if (platform.responseEnvelope.successCode !== '0') {
-  fail('success code must be string "0"');
+if (platform.responseEnvelope.successField !== 'success') {
+  fail('response envelope must use success boolean');
 }
 
-const apiConstants = readText('backend/src/main/java/com/anjing/model/constants/ApiConstants.java');
-const frontendApiFiles = [
-  'frontend/src/api/apiPaths.ts',
-  'frontend/src/api/customer-service/chat.ts',
-  'frontend/src/api/customer-service/knowledge.ts',
-  'frontend/src/api/customer-service/scene.ts'
+const goFiles = [
+  'internal/customer/routes.go',
+  'internal/knowledge/routes.go',
+  'internal/ops/routes.go'
 ].map(readText).join('\n');
+const consoleApp = readText('apps/console/src/main.tsx');
 
 for (const boundary of boundaries.boundaries) {
   if (!boundary.basePath.startsWith(boundaries.apiPrefix)) {
     fail(`${boundary.id} basePath must start with ${boundaries.apiPrefix}`);
   }
-  if (!apiConstants.includes(boundary.basePath)) {
-    fail(`${boundary.id} basePath ${boundary.basePath} missing in ApiConstants`);
-  }
   for (const route of boundary.routes || []) {
-    if (!apiConstants.includes(route.path)) {
-      fail(`${route.path} missing in backend ApiConstants`);
+    if (!goFiles.includes(route.path)) {
+      fail(`${route.path} missing in Go route handlers`);
     }
-    if (!frontendApiFiles.includes(route.path)) {
-      fail(`${route.path} missing in frontend customer-service API files`);
+    if (route.console !== false && !consoleApp.includes(route.path)) {
+      fail(`${route.path} missing in React console`);
     }
   }
-}
-
-if (frontendApiFiles.includes('m1.apifoxmock.com')) {
-  fail('runtime API files must not point to Apifox mock');
 }
 
 if (!process.exitCode) {

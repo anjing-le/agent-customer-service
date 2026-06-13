@@ -1,276 +1,74 @@
 # Domain Model
 
-本文档描述 `agent-customer-service` 的可靠客服 Agent 领域模型。当前运行链路已经引入 `AgentRuntime`，`ChatService` 只保留会话/消息持久化和前端 VO 映射。
+本文档描述 `agent-customer-service` 当前 Go runtime 的可靠客服 Agent 领域模型。
 
 ## Core Concepts
 
 | 模型 | 说明 | 当前来源 |
 |---|---|---|
-| `ConversationTurn` | 一次用户输入触发的完整处理回合 | `ChatDTO.SendMessageDTO`、`ChatMessage`、会话上下文 |
-| `ConversationMessage` | 会话历史中的单条消息 | `ChatMessage` |
-| `IntentAnalysis` | 场景、意图、置信度、情绪和分析引擎 | `LlmService.analyzeUserInput` 或关键词兜底 |
-| `KnowledgeRecall` | RAG 或关键词检索返回的知识证据集合 | Product、Activity、FAQ 检索结果 |
-| `KnowledgeEvidence` | 可被回复引用的一条证据，包含命中解释、可信度和是否可引用 | 商品、活动、FAQ、行业、解决方案、人工选择 |
-| `GuardrailDecision` | 防幻觉、安全和兜底决策 | 规则兜底、低置信度、无可靠知识、LLM 不可用 |
-| `AgentReply` | 一轮回复的完整结果 | `ChatVO.SendMessageVO` |
-| `ReasoningStep` | 可审计推理过程 | `ChatVO.ReasoningStepVO` |
-| `ChatAgentAudit` | Agent 单轮回复审计事实 | `AgentReply`、`ChatMessage` |
-| `SessionQuality` | 会话级可靠性质检摘要 | `ChatAgentAudit` 聚合 |
-| `ChatRuntimeSnapshot` | Chat Runtime 汇总快照 | `ChatVO.RuntimeOverviewVO` |
+| `Conversation` | 一条客服会话，记录客户、渠道、意图、风险和最后一句话 | `internal/platform/store` |
+| `Message` | 用户或助手的一条消息，包含回复引擎、证据和兜底原因 | `SendMessage` runtime |
+| `KnowledgeArticle` | 可引用的可信知识 | seed store 或 PostgreSQL |
+| `KnowledgeGap` | 无可靠证据时沉淀的知识缺口 | `NO_EVIDENCE_FALLBACK` |
+| `Rule` | 规则兜底或转人工策略 | seed store 或 PostgreSQL |
+| `RuleTestResult` | 对单句用户输入的规则测试结果 | `/api/ops/rules/test` |
+| `TransferTicket` | 转人工工单 | `TRANSFER_THRESHOLD` |
+| `Dashboard` | 会话、知识、规则、缺口和人工队列的运营聚合 | `/api/ops/dashboard` |
+
+## Runtime Flow
+
+```text
+user message
+  -> customer-service SendMessage
+  -> keyword knowledge recall
+  -> rule / guardrail decision
+  -> evidence answer OR safe fallback
+  -> create knowledge gap OR create transfer ticket when needed
+  -> dashboard / console visibility
+```
+
+## Reliability Boundaries
+
+| 场景 | 行为 |
+|---|---|
+| 命中可信知识 | 返回基于知识的 `rag+rule` 回复 |
+| 无可信知识 | 返回安全兜底，不自由生成；创建 `KnowledgeGap` |
+| 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` |
+| 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
+| 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
 
 ## Application Ports
 
-后端 `com.anjing.module.agent.application` 定义端口，`com.anjing.module.agent.runtime` 提供当前 JPA/LLM/规则实现：
+当前 `store.Runtime` 是路由层依赖的应用端口：
 
-| 端口 | 职责 | 不应该做 |
-|---|---|---|
-| `ConversationMemory` | 读取最近历史、写入用户消息和上下文 | 不调用 LLM，不做检索 |
-| `IntentAnalyzer` | 识别场景、意图、情绪和置信度 | 不生成最终回复 |
-| `KnowledgeRetriever` | 按意图和上下文召回知识证据 | 不拼接最终话术 |
-| `GuardrailPolicy` | 判断是否安全、是否要兜底、兜底原因 | 不直接访问 Controller |
-| `ReplyGenerator` | 基于证据生成 LLM 或规则回复 | 不保存会话 |
-| `AgentRuntime` | 编排一轮 Agent 处理 | 不承载具体仓储细节 |
-
-当前实现：
-
-| 实现 | 职责 |
+| 方法 | 职责 |
 |---|---|
-| `DefaultAgentRuntime` | 主编排：分析 -> 检索 -> 护栏 -> 回复 -> 推理步骤 |
-| `DefaultIntentAnalyzer` | LLM 分析优先，失败后关键词兜底 |
-| `JpaKnowledgeRetriever` | Product/Activity/FAQ 的 JPA 关键词检索和人工选择召回 |
-| `DefaultGuardrailPolicy` | 低置信度、无可靠知识等兜底决策 |
-| `DefaultReplyGenerator` | LLM 回复优先，触发护栏或 LLM 不可用时规则回复 |
-| `RuleEngine` | 执行启用规则，支持内置规则码和轻量 JSON 条件表达式，返回命中原因和动作 |
-| `PromptRuntime` | 渲染启用 SYSTEM Prompt，注入变量并返回可观测结果；变量 schema 在配置阶段校验 |
+| `ListConversations` / `CreateConversation` | 会话管理 |
+| `SendMessage` | 一轮用户输入的核心处理 |
+| `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |
+| `ResolveKnowledgeGap` | 关闭知识缺口 |
+| `CreateArticleFromGap` | 由缺口生成可信知识 |
+| `TestRule` | 规则兜底测试 |
+| `ResolveTransferTicket` | 人工工单处理 |
+| `Dashboard` | 运营聚合视图 |
 
-Chat 运行审计：
+实现：
 
-| 字段 | 说明 |
+- `Store`: in-memory seed runtime，用于课堂演示和无数据库启动。
+- `PostgresStore`: PostgreSQL runtime，用于真实持久化模式。
+
+## Data Ownership
+
+| 模块 | 主要数据 |
 |---|---|
-| `sessionId` / `messageId` | 对应一次助手回复 |
-| `sceneType` / `intentCode` / `intentName` / `confidence` | 意图分析结果 |
-| `replyEngine` | 本轮回复来自 LLM、规则或混合链路 |
-| `safe` / `fallbackRequired` / `fallbackReason` | 护栏和兜底结论 |
-| `knowledgeEvidenceCount` | 本轮召回证据数量 |
-| `ruleHitCount` | 本轮命中规则数量 |
-| `promptRenderCount` | 本轮渲染 Prompt 数量 |
-| `transferRecommended` / `transferPriority` | 是否建议转人工及优先级 |
+| `internal/customer` | conversation、message |
+| `internal/knowledge` | knowledge article、knowledge gap |
+| `internal/ops` | dashboard、rule test、transfer ticket |
+| `internal/platform/store` | runtime interface、seed store、Postgres store |
 
-Chat 运行趋势：
+## Current Limits
 
-| 指标 | 说明 |
-|---|---|
-| `qualitySummary.averageConfidence` | 已审计回复的平均意图置信度 |
-| `qualitySummary.fallbackRate` | 已审计回复中的兜底比例 |
-| `qualitySummary.unsafeRate` | 已审计回复中的不安全比例 |
-| `dailyTrends.replies` | 近 7 日每日 Agent 回复数 |
-| `dailyTrends.fallbackReplies` | 近 7 日每日兜底回复数 |
-| `dailyTrends.unsafeReplies` | 近 7 日每日不安全回复数 |
-
-会话质检摘要：
-
-| 指标 | 说明 |
-|---|---|
-| `sessionQuality.reliabilityScore` | 根据兜底率、不安全率和低置信度回复扣分后的会话可靠性评分 |
-| `sessionQuality.riskLevel` | `LOW`、`MEDIUM`、`HIGH`，用于运营判断是否需要复盘 |
-| `sessionQuality.primaryFallbackReason` | 当前会话最主要的兜底原因 |
-| `sessionQuality.fallbackRate` / `unsafeRate` | 当前会话内兜底和不安全回复占比 |
-| `sessionAudits` | 当前会话每轮 Agent 回复的审计明细，用于质检下钻 |
-
-转人工建议：
-
-| 场景 | 策略 |
-|---|---|
-| 安全规则拦截 | 标记 `transferRecommended=true`，优先级 `HIGH` |
-| 命中转人工阈值规则 | 按置信度输出 `HIGH`、`MEDIUM` 或 `LOW` 优先级 |
-| 意图置信度低于 `0.45` | 自动建议人工客服接手 |
-
-转人工队列：
-
-| 模型 | 说明 |
-|---|---|
-| `ChatTransferTicket` | 转人工工单，记录会话、消息、原因、优先级、状态、坐席和处理说明 |
-| `PENDING` | 已进入转人工队列，等待人工客服接管 |
-| `RESOLVED` | 人工客服已接管并回写处理结果 |
-
-转人工统计：
-
-| 指标 | 说明 |
-|---|---|
-| `transferSummary.pendingTickets` | 当前待处理转人工工单数 |
-| `transferSummary.todayCreatedTickets` | 今日新增转人工工单数 |
-| `transferSummary.todayResolvedTickets` | 今日已解决转人工工单数 |
-| `transferSummary.highPriorityPendingTickets` | 高优先级待处理工单数 |
-| `transferSummary.averageResolveMinutes` | 已解决工单的平均处理分钟数 |
-
-知识证据解释：
-
-| 字段 | 说明 |
-|---|---|
-| `matchReason` | 为什么召回这条证据，例如人工选择、FAQ 匹配、关键词触发 |
-| `trustLevel` | `HIGH`、`MEDIUM`、`LOW`，用于判断证据可信度 |
-| `quotable` | 是否允许作为回复依据直接引用 |
-
-知识负样本兜底：
-
-| 字段 | 说明 |
-|---|---|
-| `answerable` | 当前问题是否可以基于召回知识回答 |
-| `noAnswerReason` | 无法回答的原因，例如 `NO_EVIDENCE`、`LOW_TRUST_EVIDENCE`、`UNSUPPORTED_INTENT` |
-| `noAnswerDetail` | 面向运营和前端展示的原因说明 |
-| `hallucinationBlocked` | 是否已阻止 LLM 在缺少可靠证据时自由生成 |
-
-知识缺口池：
-
-| 模型 | 说明 |
-|---|---|
-| `KnowledgeGap` | 对话运行时暴露的无答案问题，记录会话、消息、意图、无答案原因和出现次数 |
-| `OPEN` | 等待运营补知识或人工确认 |
-| `RESOLVED` | 已补充 FAQ 或人工关闭 |
-| `resolvedKnowledgeType` / `resolvedKnowledgeId` | 缺口处理后关联的知识类型和知识 ID |
-
-知识缺口分析：
-
-| 指标 | 说明 |
-|---|---|
-| `openGaps` / `highPriorityOpenGaps` | 当前待补知识数量和高优先级缺口数量 |
-| `resolutionRate` | 已处理缺口占全部缺口的比例 |
-| `reasonStats` | 按无答案原因聚合的缺口分布 |
-| `topQuestions` | 按出现次数排序的高频知识缺口 |
-
-知识缺口回归验证：
-
-| 字段 | 说明 |
-|---|---|
-| `answerable` | 原问题是否已能命中可引用 FAQ |
-| `bestScore` / `trustLevel` | 最佳 FAQ 匹配分和可信度 |
-| `matchedFaqId` | 回归验证命中的 FAQ |
-| `suggestion` | 验证后的下一步建议 |
-
-Chat 运行快照：
-
-| 字段 | 说明 |
-|---|---|
-| `snapshotDate` | 快照归属日期 |
-| `snapshotType` | `manual` 手动采样或 `scheduled` 定时采样 |
-| `totalSessions` / `totalMessages` | 采样时累计会话和消息 |
-| `totalAuditedReplies` | 采样时累计已审计回复 |
-| `averageConfidence` / `fallbackRate` / `unsafeRate` | 采样时质量摘要 |
-
-定时采样默认关闭，可通过 `CS_RUNTIME_SNAPSHOT_ENABLED=true` 开启，并用 `CS_RUNTIME_SNAPSHOT_CRON` 覆盖默认 cron。
-
-Scene 运行趋势：
-
-| 指标 | 说明 |
-|---|---|
-| `sceneRuntime.trends.replies` | 每日 Agent 回复数量 |
-| `sceneRuntime.trends.ruleHits` | 每日规则命中总量 |
-| `sceneRuntime.trends.promptRenders` | 每日 Prompt 渲染总量 |
-| `sceneRuntime.trends.topSceneType` | 每日 Top 场景 |
-| `sceneRuntime.trends.topRuleCode` / `topPromptCode` | 每日 Top 规则和 Top Prompt，新审计数据会持续沉淀 |
-
-Scene 配置接入点：
-
-| 配置 | Runtime 影响 |
-|---|---|
-| 启用的 `Intent` | LLM 分析失败时，按优先级和触发关键词参与意图识别 |
-| 启用的 SYSTEM `Prompt` | 由 `PromptRuntime` 按场景过滤、变量渲染后注入 `LlmService` 上下文 |
-| 启用的 `Rule` | 由 `RuleEngine` 执行；支持 `SENSITIVE_FILTER`、`TRANSFER_THRESHOLD`、`VIP_PRIORITY` 内置规则码、JSON 条件表达式和表达式测试 |
-
-Scene 运行洞察：
-
-| 指标 | 说明 |
-|---|---|
-| 规则平均命中 | `totalRuleHits / activeRuleCount`，观察规则是否真实参与运行 |
-| Prompt 平均使用 | `totalPromptUsage / activeSystemPromptCount`，观察 SYSTEM Prompt 是否被消费 |
-| 规则集中度 | Top 规则命中占比，过高说明规则策略可能过度集中 |
-| Prompt 集中度 | Top Prompt 使用占比，过高说明提示词模板可能缺少场景分流 |
-
-## Rule Condition V1
-
-`Rule.conditions` 支持轻量 JSON 表达式；`Rule.actions` 支持配置命中后的原因和动作。空条件继续走内置规则码。
-
-```json
-{
-  "all": [
-    { "field": "intentCode", "op": "eq", "value": "RETURN_EXCHANGE" },
-    { "field": "confidence", "op": "lt", "value": 0.7 }
-  ]
-}
-```
-
-```json
-{
-  "reason": "退换货意图置信度不足，需要澄清或转人工",
-  "action": "TRANSFER_OR_CLARIFY"
-}
-```
-
-支持字段：`userMessage`、`sceneType`、`intentCode`、`intentName`、`confidence`、`emotion`、`knowledgeCount`、`hasReliableKnowledge`、`context.xxx`。
-
-支持操作符：`eq`、`ne`、`contains`、`not_contains`、`gt`、`gte`、`lt`、`lte`、`in`、`is_empty`、`is_not_empty`。
-
-## Runtime Boundary
-
-当前真实链路：
-
-```mermaid
-flowchart LR
-    A["ChatController"] --> B["ChatService"]
-    B --> C["AgentRuntime"]
-    C --> D["IntentAnalyzer"]
-    D --> E["KnowledgeRetriever"]
-    E --> F["GuardrailPolicy"]
-    F --> G["ReplyGenerator"]
-    G --> H["ChatVO.SendMessageVO"]
-```
-
-目标链路仍需继续补齐：
-
-```mermaid
-flowchart LR
-    A["Scene Config"] --> B["Rule Condition Editor"]
-    A --> C["Prompt Variable Schema"]
-    A --> D["Intent Statistics"]
-    E["Vector Store"] --> F["KnowledgeRetriever"]
-    G["Reliability Dashboard"] --> H["AgentReply Audit"]
-```
-
-## Reliability Rules
-
-- 回复必须能说明来源：`AgentReply.knowledgeRecall` 保留召回证据。
-- 无可靠知识时不能编造：`GuardrailDecision.fallbackRequired` 应触发规则兜底或转人工。
-- 低置信度意图不能强行执行动作：通过 `FallbackReason.LOW_CONFIDENCE` 标记。
-- LLM 不可用不影响基础客服：通过 `FallbackReason.LLM_UNAVAILABLE` 使用规则回复。
-- 安全或政策拦截必须可审计：通过 `policyTags` 和 `userVisibleNotice` 留痕。
-
-## Migration Plan
-
-1. 已完成：`ChatService` 调用 `AgentRuntime`，现有 API 和前端 VO 不变。
-2. 已完成：抽出 `IntentAnalyzer`、`KnowledgeRetriever`、`GuardrailPolicy`、`ReplyGenerator`。
-3. 已完成：Scene 配置轻量接入 `IntentAnalyzer`、`ReplyGenerator` 和 `GuardrailPolicy`。
-4. 已完成：轻量 `RuleEngine`，支持内置规则码命中和动作解释。
-5. 已完成：`PromptRuntime` 基础变量渲染，前端可靠性面板展示渲染结果。
-6. 已完成：`RuleEngine` 轻量 JSON 条件表达式，支持 `all`/`any`、字段操作符和动作驱动护栏。
-7. 已完成：Rule 条件/动作编辑器和前后端 JSON 校验。
-8. 已完成：Prompt 变量 schema、编辑态校验、运行时变量快捷填充和测试入口。
-9. 已完成：Rule 表达式测试入口，支持模拟运行时字段并查看命中原因和动作。
-10. 已完成：Scene Runtime Overview，展示启用配置、规则命中、Prompt 使用和 Top 项。
-11. 已完成：Chat Runtime Overview，展示会话、消息、活跃状态、今日消息和最近会话。
-12. 已完成：Chat Agent Audit，沉淀每轮回复的意图、引擎、护栏、召回、规则和 Prompt 审计事实。
-13. 已完成：Chat Runtime Trend，基于审计事实展示平均置信度、兜底率、不安全率和 7 日趋势。
-14. 已完成：Chat Runtime Snapshot，支持手动采样和可配置定时采样，沉淀长期趋势基础数据。
-15. 已完成：Scene Runtime Insight，展示规则/Prompt 平均使用和集中度，辅助配置运营。
-16. 已完成：Session Quality Summary，基于会话审计事实生成可靠性评分、风险等级和主要兜底原因。
-17. 已完成：Session Audit Drilldown，随会话详情和发送消息返回会话审计明细，并在可靠性面板展示。
-18. 下一步：将关键词检索升级为向量检索 + rerank。
-19. 已完成：Scene Runtime Trend，基于 Agent 审计聚合近 7 日场景、规则命中和 Prompt 消费趋势。
-20. 已完成：Transfer Recommendation，低置信度、安全拦截或转人工规则命中时沉淀转人工建议、原因和优先级。
-21. 已完成：Transfer Queue Simulation，自动生成转人工工单并支持人工接管结果回写。
-22. 已完成：Transfer Runtime Metrics，展示转人工待处理、今日新增、今日解决、高优先级待处理和平均解决耗时。
-23. 已完成：Knowledge Evidence Explanation，召回证据返回命中原因、可信度等级和是否可引用。
-24. 已完成：Knowledge No-answer Boundary，无可靠证据时返回无答案原因并阻止自由生成。
-25. 已完成：Knowledge Gap Queue，无可靠证据问题自动沉淀为知识缺口，支持补 FAQ 或人工关闭。
-26. 已完成：Knowledge Gap Analytics，展示待处理、高优先级、解决率、Top 无答案原因和重复问题。
-27. 已完成：Knowledge Gap Regression，补知识后可用原问题验证 FAQ 召回、可信度和可引用状态。
-28. 下一步：补对话回归用例集和一键批量验证。
+- 检索仍是轻量关键词匹配，V3 再引入向量检索和 rerank。
+- 规则引擎是确定性轻量规则，尚未接完整表达式 DSL。
+- 当前没有鉴权、多租户和限流。
+- LLM 调用暂未接入新 Go runtime，当前重点是可靠边界和教学闭环。

@@ -1,58 +1,64 @@
 # Scaffold Inheritance
 
-`agent-customer-service` 不是从零搭出的孤立项目，而是从 `infra-dev-scaffolding` 生长出来的可靠 Agent 客服样例。
+`agent-customer-service` 是按安静 DVSkyFolding 技术基线重构出来的可靠 Agent 客服样例。
 
-教学目标是让学习者把注意力放在业务设计上：多轮会话、RAG、规则兜底、防幻觉、运行时可观测。底层工程习惯、契约、质量门禁和前后端技术栈由脚手架统一提供。
+教学目标是让学习者把注意力放在业务设计上：多轮会话、RAG、规则兜底、防幻觉、知识运营闭环、人工接管和运行时可观测。底层工程习惯、契约、质量门禁和交付方式来自脚手架。
 
-## Inherited From Scaffold
+## Inherited From DVSkyFolding
 
 | 能力 | 脚手架约定 | 本项目状态 |
 |---|---|---|
-| 技术栈 | Vue 3.5 + TypeScript + Vite 7；Spring Boot 3.4.5 + Java 17 | 已继承，业务模块按客服场景扩展 |
-| 项目结构 | `frontend/`、`backend/`、`contracts/`、`project_document/`、`scripts/` | 已对齐 |
-| API 契约 | `/api` 前缀、统一 response envelope、分页约定、服务边界 manifest | 已有 `contracts/platform-contract.json` 和 `contracts/service-boundaries.json` |
-| 质量门禁 | `check-template`、`check-contracts`、`quality-gate` | 已接入并通过 |
-| 文档习惯 | 状态、路线图、边界、启动、约束分开维护 | 已接入项目文档 |
-| 前端习惯 | API 路径集中、页面只消费业务数据、生产环境不指向 mock | 已收口到 `ApiPaths` 和 customer-service API |
-| 后端习惯 | Controller 使用常量路径、统一响应、业务分层 | Chat/Knowledge/Scene 已迁移到 `APIResponse<T>`，Agent Runtime 已拆分 |
+| 前端 | React + TypeScript + Vite，统一大前端入口 | `apps/console` 已落地客服 Agent 控制台 |
+| 后端 | Go + `net/http` / `ServeMux`，不引入 Web 框架 | `cmd/*` 和 `internal/*` 已落地 |
+| 数据库 | PostgreSQL + `pgx/v5` + SQL，不引入 ORM | `infra/postgres/migrations` 和 Postgres store 已接入 |
+| 日志 | `log/slog` JSON 结构化日志 | `internal/platform/service` 已统一处理 |
+| 配置 | env first | `ANJING_ADDR`、`ANJING_DATABASE_URL`、`ANJING_CONSOLE_DIST` |
+| 交付 | 单镜像多 command；本地可 `platform-all` | `cmd/platform-all`、`customer-service-api`、`ops-api`、`console-web`、`migrate-db` |
+| 文档 | 状态、路线图、边界、启动、约束分开维护 | `project_document` 已按新基线更新 |
 
-## Business Added By This Agent
+## Business Added By This Project
 
-脚手架不关心客服业务，`agent-customer-service` 只在业务层新增：
+- `customer`: 会话、消息、Agent 回复、知识证据和转人工触发。
+- `knowledge`: 可信知识、知识缺口、缺口关闭、由缺口生成知识。
+- `ops`: 运行看板、规则测试、人工队列处理。
+- `platform/store`: seed runtime 与 PostgreSQL runtime 的统一接口。
+- `apps/console`: 对话中心、知识中心、场景配置、人工队列的 React 控制台。
 
-- `chat`: 会话、消息、多轮历史和 Agent Runtime 入口。
-- `knowledge`: Product、Activity、FAQ 等客服知识管理和检索素材。
-- `scene`: Intent、Prompt、Rule 配置，并轻量接入运行时。
-- `agent.domain`: `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 等领域模型。
-- `agent.runtime`: 分析、检索、护栏、回复生成和推理过程编排。
+## Legacy Reference
+
+旧 `backend/` 与 `frontend/` 目录暂作为迁移参考保留。新开发以 DVSkyFolding 目录为准：
+
+```text
+apps/console
+cmd/*
+internal/*
+infra/postgres
+infra/local
+```
+
+后续每迁移完成一个业务边界，就删除对应旧运行入口和旧教学描述。
 
 ## Teaching Narrative
 
-教学时按这个顺序讲：
-
-1. 先看脚手架：目录、技术栈、契约、质量门禁。
-2. 再看边界：客服 Agent 只新增 `chat/knowledge/scene/agent`。
-3. 再看链路：用户消息如何进入 `AgentRuntime`。
-4. 再看可靠性：知识证据、兜底原因、护栏标签如何被展示。
-5. 最后看扩展：向量检索、完整 RuleEngine、PromptRuntime 如何继续生长。
-
-## Non Goals
-
-- 不在业务项目里重新发明脚手架已有的通用能力。
-- 不为了单个 Agent 引入和脚手架不一致的前端框架、响应格式或脚本习惯。
-- 不把教学重点放在模板复制，而是放在“业务如何沿着脚手架边界生长”。
+1. 先看脚手架：Go command、React console、PostgreSQL migration、env 配置和 JSON 日志。
+2. 再看边界：客服 Agent 只新增会话、知识、规则、人工队列。
+3. 再看链路：用户消息如何触发 RAG、兜底、缺口、人工 ticket。
+4. 再看可靠性：没有证据不回答，转人工生成工单，缺口可以补知识。
+5. 最后看扩展：向量检索、流式回复、多租户和更完整的质检体系。
 
 ## Verification
 
-每批变更至少运行：
+每批 Go/React 改动至少运行：
 
 ```bash
-./scripts/check-template.sh
-./scripts/check-contracts.sh
+go test ./...
+pnpm build:console
 ```
 
-涉及前后端代码时运行：
+PostgreSQL 集成验证在本地数据库可用时运行：
 
 ```bash
-./scripts/quality-gate.sh
+pnpm db:up
+pnpm db:migrate
+pnpm test:postgres
 ```
