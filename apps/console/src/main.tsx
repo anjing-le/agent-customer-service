@@ -16,6 +16,7 @@ import {
   Download,
   UserRoundCheck
 } from 'lucide-react';
+import channelProtocolMatrix from '../../../contracts/channel-protocol-matrix.json';
 import channelProtocolExamples from '../../../contracts/examples/channel-protocols.json';
 import './styles.css';
 
@@ -192,6 +193,21 @@ type ChannelProtocolExample = {
     status: number;
     envelope: string;
   };
+};
+type ChannelProtocolMatrixRow = {
+  channel: string;
+  adapterEndpoint: string;
+  successExampleId: string;
+  conversationKey: string;
+  messageKey: string;
+  customerField: string;
+  contentField: string;
+  timestampField: string;
+  origin: string;
+  secretRef: string;
+  replayKey: string;
+  rateLimit: string;
+  errors: string[];
 };
 type ChannelDemoResult = {
   exampleId: string;
@@ -392,6 +408,7 @@ function App() {
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
+  const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
     if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
@@ -955,6 +972,35 @@ function App() {
                       </button>
                       <b className="status">{channelDemoResult?.exampleId === example.id ? channelDemoResult.status : example.expectedSuccess.status}</b>
                     </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">协议差异</p>
+                <h2>字段映射与幂等</h2>
+              </div>
+              <span className="status">{protocolMatrix.length}</span>
+            </div>
+            <div className="protocolMatrix">
+              {protocolMatrix.map((row) => (
+                <article className="matrixRow" key={row.channel}>
+                  <div>
+                    <strong>{row.channel}</strong>
+                    <span>{row.adapterEndpoint}</span>
+                    <span>{row.conversationKey} / {row.messageKey} / {row.timestampField}</span>
+                  </div>
+                  <div>
+                    <span>{row.origin}</span>
+                    <span>{row.replayKey}</span>
+                    <span>{row.rateLimit}</span>
+                  </div>
+                  <div>
+                    <span>{row.contentField} to content</span>
+                    <span>{row.customerField} to customer</span>
+                    <span>{row.errors.slice(0, 3).join(' / ')}</span>
                   </div>
                 </article>
               ))}

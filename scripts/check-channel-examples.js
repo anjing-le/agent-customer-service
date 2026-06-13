@@ -6,11 +6,14 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const examplesPath = path.join(root, 'contracts/examples/channel-protocols.json');
+const matrixPath = path.join(root, 'contracts/channel-protocol-matrix.json');
 const contractPath = path.join(root, 'contracts/api-contract.json');
 
 const examples = JSON.parse(fs.readFileSync(examplesPath, 'utf8'));
+const matrix = JSON.parse(fs.readFileSync(matrixPath, 'utf8'));
 const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
 const endpointKeys = new Set((contract.endpoints || []).map((endpoint) => `${endpoint.method} ${endpoint.path}`));
+const exampleIDs = new Set((examples.examples || []).map((example) => example.id));
 const knownErrorCodes = new Set();
 
 for (const endpoint of contract.endpoints || []) {
@@ -59,6 +62,24 @@ for (const item of examples.examples || []) {
 for (const error of examples.errorExamples || []) {
   if (!knownErrorCodes.has(error.code)) {
     fail(`${error.id} references unknown error code ${error.code}`);
+  }
+}
+
+if (JSON.stringify(matrix.signaturePayload) !== JSON.stringify(expectedPayload)) {
+  fail(`matrix signaturePayload must be ${expectedPayload.join(', ')}`);
+}
+
+for (const row of matrix.rows || []) {
+  if (!endpointKeys.has(row.adapterEndpoint)) {
+    fail(`${row.channel} matrix references unknown endpoint ${row.adapterEndpoint}`);
+  }
+  if (!exampleIDs.has(row.successExampleId)) {
+    fail(`${row.channel} matrix references unknown example ${row.successExampleId}`);
+  }
+  for (const code of row.errors || []) {
+    if (!knownErrorCodes.has(code)) {
+      fail(`${row.channel} matrix references unknown error code ${code}`);
+    }
   }
 }
 

@@ -5,6 +5,7 @@
 - `contracts/platform-contract.json`
 - `contracts/service-boundaries.json`
 - `contracts/api-contract.json`
+- `contracts/channel-protocol-matrix.json`
 - `contracts/examples/channel-protocols.json`
 
 ## Response Envelope
@@ -81,6 +82,8 @@ Go API 当前响应格式：
 本地服务启动后，可以执行 `./scripts/demo-channel-inbound.sh`，脚本会读取同一份样例，动态刷新 timestamp、消息 ID 和签名，并把请求发送到运行中的渠道入口。
 
 React 控制台的渠道接入区域也直接读取这份样例，展示 endpoint、来源头、secret ref、签名外部会话 ID 和预期状态码，并可用 demo secret 发送演示请求。请求成功后，控制台展示 Agent 回复、trace、证据标题和 fallback reason，便于课堂解释不同渠道如何归一到同一条可靠 Agent 链路。
+
+`contracts/channel-protocol-matrix.json` 补充真实渠道差异表，说明各 adapter 的外部会话键、消息幂等键、客户字段、内容字段、时间字段、来源白名单、secret ref、replay key、rate limit 和关键失败码。控制台会把这张矩阵展示为“协议差异”，让字段映射和可靠性边界可以直接对照。
 
 ## Pagination
 

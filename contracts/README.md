@@ -5,6 +5,7 @@
 - `platform-contract.json`: 平台级 API、响应、分页、请求上下文、时间、语言和错误码契约。
 - `service-boundaries.json`: 当前 Go runtime 的服务/模块边界。
 - `api-contract.json`: 当前 HTTP endpoint、request、response 和领域对象字段契约。
+- `channel-protocol-matrix.json`: 真实渠道字段映射、幂等键、来源、签名和错误码对照。
 - `examples/channel-protocols.json`: 渠道 inbound 与真实 adapter 的签名、来源和错误码样例。
 
 当前真实运行路径以 `service-boundaries.json` 为准：

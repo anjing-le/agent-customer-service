@@ -464,7 +464,8 @@ textarea {
 .tableList,
 .evidenceList,
 .ruleGrid,
-.protocolList {
+.protocolList,
+.protocolMatrix {
   display: grid;
   gap: 10px;
 }
@@ -625,6 +626,34 @@ textarea {
   gap: 6px;
 }
 
+.matrixRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.matrixRow div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.matrixRow strong {
+  line-height: 1.35;
+}
+
+.matrixRow span {
+  overflow: hidden;
+  color: #64786d;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .evidence {
   padding: 12px 0;
   border-top: 1px solid #edf2ef;
@@ -722,6 +751,10 @@ textarea {
 
   .metrics,
   .runtimeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .matrixRow {
     grid-template-columns: 1fr;
   }
 }

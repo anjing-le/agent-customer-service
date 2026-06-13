@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "signaturePayload": ["channel", "externalConversationId", "timestamp", "content"],
+  "rows": [
+    {
+      "channel": "WeChat",
+      "adapterEndpoint": "POST /api/channels/wechat/inbound",
+      "successExampleId": "wechat-adapter-inbound",
+      "conversationKey": "openId",
+      "messageKey": "msgId",
+      "customerField": "nickname",
+      "contentField": "text",
+      "timestampField": "timestamp",
+      "origin": "https://wechat.example.com",
+      "secretRef": "ANJING_CHANNEL_WECHAT_SECRET",
+      "replayKey": "channel + msgId",
+      "rateLimit": "60/min",
+      "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_signature"]
+    },
+    {
+      "channel": "App",
+      "adapterEndpoint": "POST /api/channels/app/inbound",
+      "successExampleId": "app-adapter-inbound",
+      "conversationKey": "deviceId",
+      "messageKey": "messageId",
+      "customerField": "userName",
+      "contentField": "body",
+      "timestampField": "sentAt",
+      "origin": "app://agent-customer-service",
+      "secretRef": "ANJING_CHANNEL_APP_SECRET",
+      "replayKey": "channel + messageId",
+      "rateLimit": "90/min",
+      "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "stale_signature"]
+    },
+    {
+      "channel": "Marketplace",
+      "adapterEndpoint": "POST /api/channels/marketplace/inbound",
+      "successExampleId": "marketplace-adapter-inbound",
+      "conversationKey": "buyerId",
+      "messageKey": "eventId",
+      "customerField": "buyerName",
+      "contentField": "message",
+      "timestampField": "occurredAt",
+      "origin": "https://marketplace.example.com",
+      "secretRef": "ANJING_CHANNEL_MARKETPLACE_SECRET",
+      "replayKey": "channel + eventId",
+      "rateLimit": "45/min",
+      "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_timestamp"]
+    }
+  ]
+}
