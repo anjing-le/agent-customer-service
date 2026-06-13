@@ -12,7 +12,12 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		if !httpjson.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
-		httpjson.OK(w, st.ListKnowledge())
+		items, err := st.ListKnowledge()
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, items)
 	})
 
 	mux.HandleFunc("/api/knowledge/search", func(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +31,11 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			httpjson.BadRequest(w, err.Error())
 			return
 		}
-		httpjson.OK(w, st.SearchKnowledge(req.Query))
+		items, err := st.SearchKnowledge(req.Query)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, items)
 	})
 }

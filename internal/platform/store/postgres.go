@@ -18,7 +18,7 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{pool: pool}
 }
 
-func (s *PostgresStore) ListConversations() []Conversation {
+func (s *PostgresStore) ListConversations() ([]Conversation, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, customer, channel, intent, status, risk_level, started_at, last_message
 		from conversations
@@ -26,48 +26,67 @@ func (s *PostgresStore) ListConversations() []Conversation {
 		limit 50
 	`)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("list conversations: %w", err)
 	}
 	defer rows.Close()
 
-	return scanConversations(rows)
+	items, err := scanConversations(rows)
+	if err != nil {
+		return nil, fmt.Errorf("scan conversations: %w", err)
+	}
+	return items, nil
 }
 
-func (s *PostgresStore) CreateConversation(customer, channel string) Conversation {
+func (s *PostgresStore) CreateConversation(customer, channel string) (Conversation, error) {
 	now := time.Now().UTC()
 	conv := Conversation{
 		ID: fmt.Sprintf("conv_%d", now.UnixNano()), Customer: fallback(customer, "访客"),
 		Channel: fallback(channel, "Web"), Intent: "待识别", Status: "Active",
 		RiskLevel: "LOW", StartedAt: now.Format(time.RFC3339),
 	}
-	_, _ = s.pool.Exec(context.Background(), `
+	if _, err := s.pool.Exec(context.Background(), `
 		insert into conversations (id, customer, channel, intent, status, risk_level, started_at, last_message)
 		values ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, conv.ID, conv.Customer, conv.Channel, conv.Intent, conv.Status, conv.RiskLevel, now, conv.LastMessage)
-	return conv
+	`, conv.ID, conv.Customer, conv.Channel, conv.Intent, conv.Status, conv.RiskLevel, now, conv.LastMessage); err != nil {
+		return Conversation{}, fmt.Errorf("create conversation: %w", err)
+	}
+	return conv, nil
 }
 
-func (s *PostgresStore) SendMessage(conversationID, content string) SendMessageResult {
+func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessageResult, error) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 	if conversationID == "" {
-		conversationID = s.CreateConversation("访客", "Web").ID
+		conv, err := s.CreateConversation("访客", "Web")
+		if err != nil {
+			return SendMessageResult{}, err
+		}
+		conversationID = conv.ID
 	}
-	if !s.conversationExists(ctx, conversationID) {
-		_, _ = s.pool.Exec(ctx, `
+	exists, err := s.conversationExists(ctx, conversationID)
+	if err != nil {
+		return SendMessageResult{}, err
+	}
+	if !exists {
+		if _, err := s.pool.Exec(ctx, `
 			insert into conversations (id, customer, channel, intent, status, risk_level, started_at, last_message)
 			values ($1, '访客', 'Web', '待识别', 'Active', 'LOW', $2, '')
 			on conflict (id) do nothing
-		`, conversationID, now)
+		`, conversationID, now); err != nil {
+			return SendMessageResult{}, fmt.Errorf("ensure conversation: %w", err)
+		}
 	}
 
 	userMessage := Message{ID: fmt.Sprintf("msg_%d_user", now.UnixNano()), ConversationID: conversationID, Role: "user", Content: content, Engine: "customer", Safe: true, CreatedAt: now.Format(time.RFC3339)}
-	evidence := s.SearchKnowledge(content)
+	evidence, err := s.SearchKnowledge(content)
+	if err != nil {
+		return SendMessageResult{}, err
+	}
 	agentMessage, gap := postgresAgentReply(conversationID, content, evidence, now)
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return SendMessageResult{UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+		return SendMessageResult{}, fmt.Errorf("begin send message: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -75,20 +94,20 @@ func (s *PostgresStore) SendMessage(conversationID, content string) SendMessageR
 		insert into conversation_messages (id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at)
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`, userMessage.ID, userMessage.ConversationID, userMessage.Role, userMessage.Content, userMessage.Engine, userMessage.Safe, userMessage.FallbackReason, userMessage.EvidenceIDs, now); err != nil {
-		return SendMessageResult{UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+		return SendMessageResult{}, fmt.Errorf("insert user message: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
 		insert into conversation_messages (id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at)
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`, agentMessage.ID, agentMessage.ConversationID, agentMessage.Role, agentMessage.Content, agentMessage.Engine, agentMessage.Safe, agentMessage.FallbackReason, agentMessage.EvidenceIDs, now); err != nil {
-		return SendMessageResult{UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+		return SendMessageResult{}, fmt.Errorf("insert agent message: %w", err)
 	}
 	if gap != nil {
 		if _, err := tx.Exec(ctx, `
 			insert into knowledge_gaps (id, conversation_id, question, reason, status, priority, created_at)
 			values ($1, $2, $3, $4, $5, $6, $7)
 		`, gap.ID, gap.ConversationID, gap.Question, gap.Reason, gap.Status, gap.Priority, now); err != nil {
-			return SendMessageResult{UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+			return SendMessageResult{}, fmt.Errorf("insert knowledge gap: %w", err)
 		}
 	}
 
@@ -102,31 +121,38 @@ func (s *PostgresStore) SendMessage(conversationID, content string) SendMessageR
 		    risk_level = excluded.risk_level,
 		    last_message = excluded.last_message
 	`, conv.ID, conv.Customer, conv.Channel, conv.Intent, conv.Status, conv.RiskLevel, now, conv.LastMessage); err != nil {
-		return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+		return SendMessageResult{}, fmt.Errorf("update conversation state: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+		return SendMessageResult{}, fmt.Errorf("commit send message: %w", err)
 	}
-	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
 }
 
-func (s *PostgresStore) ListKnowledge() []KnowledgeArticle {
+func (s *PostgresStore) ListKnowledge() ([]KnowledgeArticle, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, title, category, content, tags, trust_level, updated_at
 		from knowledge_articles
 		order by updated_at desc, id
 	`)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("list knowledge: %w", err)
 	}
 	defer rows.Close()
 
-	return scanKnowledge(rows)
+	items, err := scanKnowledge(rows)
+	if err != nil {
+		return nil, fmt.Errorf("scan knowledge: %w", err)
+	}
+	return items, nil
 }
 
-func (s *PostgresStore) SearchKnowledge(query string) []KnowledgeArticle {
-	items := s.ListKnowledge()
+func (s *PostgresStore) SearchKnowledge(query string) ([]KnowledgeArticle, error) {
+	items, err := s.ListKnowledge()
+	if err != nil {
+		return nil, err
+	}
 	query = strings.ToLower(query)
 	matches := make([]KnowledgeArticle, 0)
 	for _, item := range items {
@@ -153,14 +179,26 @@ func (s *PostgresStore) SearchKnowledge(query string) []KnowledgeArticle {
 			}
 		}
 	}
-	return matches
+	return matches, nil
 }
 
-func (s *PostgresStore) Dashboard() Dashboard {
-	conversations := s.ListConversations()
-	knowledge := s.ListKnowledge()
-	gaps := s.listGaps()
-	rules := s.listRules()
+func (s *PostgresStore) Dashboard() (Dashboard, error) {
+	conversations, err := s.ListConversations()
+	if err != nil {
+		return Dashboard{}, err
+	}
+	knowledge, err := s.ListKnowledge()
+	if err != nil {
+		return Dashboard{}, err
+	}
+	gaps, err := s.listGaps()
+	if err != nil {
+		return Dashboard{}, err
+	}
+	rules, err := s.listRules()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -179,16 +217,18 @@ func (s *PostgresStore) Dashboard() Dashboard {
 		Conversations: conversations,
 		KnowledgeGaps: gaps,
 		Rules:         rules,
-	}
+	}, nil
 }
 
-func (s *PostgresStore) conversationExists(ctx context.Context, id string) bool {
+func (s *PostgresStore) conversationExists(ctx context.Context, id string) (bool, error) {
 	var exists bool
-	_ = s.pool.QueryRow(ctx, "select exists(select 1 from conversations where id = $1)", id).Scan(&exists)
-	return exists
+	if err := s.pool.QueryRow(ctx, "select exists(select 1 from conversations where id = $1)", id).Scan(&exists); err != nil {
+		return false, fmt.Errorf("check conversation exists: %w", err)
+	}
+	return exists, nil
 }
 
-func (s *PostgresStore) listGaps() []KnowledgeGap {
+func (s *PostgresStore) listGaps() ([]KnowledgeGap, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, conversation_id, question, reason, status, priority, created_at
 		from knowledge_gaps
@@ -196,7 +236,7 @@ func (s *PostgresStore) listGaps() []KnowledgeGap {
 		limit 50
 	`)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("list knowledge gaps: %w", err)
 	}
 	defer rows.Close()
 
@@ -204,59 +244,75 @@ func (s *PostgresStore) listGaps() []KnowledgeGap {
 	for rows.Next() {
 		var item KnowledgeGap
 		var createdAt time.Time
-		if err := rows.Scan(&item.ID, &item.ConversationID, &item.Question, &item.Reason, &item.Status, &item.Priority, &createdAt); err == nil {
-			item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
-			gaps = append(gaps, item)
+		if err := rows.Scan(&item.ID, &item.ConversationID, &item.Question, &item.Reason, &item.Status, &item.Priority, &createdAt); err != nil {
+			return nil, err
 		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		gaps = append(gaps, item)
 	}
-	return gaps
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return gaps, nil
 }
 
-func (s *PostgresStore) listRules() []Rule {
+func (s *PostgresStore) listRules() ([]Rule, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, code, name, trigger_expr, action, enabled
 		from agent_rules
 		order by code
 	`)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("list agent rules: %w", err)
 	}
 	defer rows.Close()
 
 	rules := make([]Rule, 0)
 	for rows.Next() {
 		var item Rule
-		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Trigger, &item.Action, &item.Enabled); err == nil {
-			rules = append(rules, item)
+		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Trigger, &item.Action, &item.Enabled); err != nil {
+			return nil, err
 		}
+		rules = append(rules, item)
 	}
-	return rules
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return rules, nil
 }
 
-func scanConversations(rows pgx.Rows) []Conversation {
+func scanConversations(rows pgx.Rows) ([]Conversation, error) {
 	items := make([]Conversation, 0)
 	for rows.Next() {
 		var item Conversation
 		var startedAt time.Time
-		if err := rows.Scan(&item.ID, &item.Customer, &item.Channel, &item.Intent, &item.Status, &item.RiskLevel, &startedAt, &item.LastMessage); err == nil {
-			item.StartedAt = startedAt.UTC().Format(time.RFC3339)
-			items = append(items, item)
+		if err := rows.Scan(&item.ID, &item.Customer, &item.Channel, &item.Intent, &item.Status, &item.RiskLevel, &startedAt, &item.LastMessage); err != nil {
+			return nil, err
 		}
+		item.StartedAt = startedAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
 	}
-	return items
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func scanKnowledge(rows pgx.Rows) []KnowledgeArticle {
+func scanKnowledge(rows pgx.Rows) ([]KnowledgeArticle, error) {
 	items := make([]KnowledgeArticle, 0)
 	for rows.Next() {
 		var item KnowledgeArticle
 		var updatedAt time.Time
-		if err := rows.Scan(&item.ID, &item.Title, &item.Category, &item.Content, &item.Tags, &item.TrustLevel, &updatedAt); err == nil {
-			item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
-			items = append(items, item)
+		if err := rows.Scan(&item.ID, &item.Title, &item.Category, &item.Content, &item.Tags, &item.TrustLevel, &updatedAt); err != nil {
+			return nil, err
 		}
+		item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
 	}
-	return items
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func postgresAgentReply(conversationID, content string, evidence []KnowledgeArticle, now time.Time) (Message, *KnowledgeGap) {

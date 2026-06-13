@@ -8,12 +8,12 @@ import (
 )
 
 type Runtime interface {
-	ListConversations() []Conversation
-	CreateConversation(customer, channel string) Conversation
-	SendMessage(conversationID, content string) SendMessageResult
-	ListKnowledge() []KnowledgeArticle
-	SearchKnowledge(query string) []KnowledgeArticle
-	Dashboard() Dashboard
+	ListConversations() ([]Conversation, error)
+	CreateConversation(customer, channel string) (Conversation, error)
+	SendMessage(conversationID, content string) (SendMessageResult, error)
+	ListKnowledge() ([]KnowledgeArticle, error)
+	SearchKnowledge(query string) ([]KnowledgeArticle, error)
+	Dashboard() (Dashboard, error)
 }
 
 type Store struct {
@@ -131,13 +131,13 @@ func NewSeedStore() *Store {
 	return st
 }
 
-func (s *Store) ListConversations() []Conversation {
+func (s *Store) ListConversations() ([]Conversation, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]Conversation(nil), s.conversations...)
+	return append([]Conversation(nil), s.conversations...), nil
 }
 
-func (s *Store) CreateConversation(customer, channel string) Conversation {
+func (s *Store) CreateConversation(customer, channel string) (Conversation, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -147,10 +147,10 @@ func (s *Store) CreateConversation(customer, channel string) Conversation {
 		RiskLevel: "LOW", StartedAt: now,
 	}
 	s.conversations = append([]Conversation{conv}, s.conversations...)
-	return conv
+	return conv, nil
 }
 
-func (s *Store) SendMessage(conversationID, content string) SendMessageResult {
+func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -169,22 +169,22 @@ func (s *Store) SendMessage(conversationID, content string) SendMessageResult {
 	s.messages = append(s.messages, userMessage, agentMessage)
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
-	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}
+	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
 }
 
-func (s *Store) ListKnowledge() []KnowledgeArticle {
+func (s *Store) ListKnowledge() ([]KnowledgeArticle, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]KnowledgeArticle(nil), s.knowledge...)
+	return append([]KnowledgeArticle(nil), s.knowledge...), nil
 }
 
-func (s *Store) SearchKnowledge(query string) []KnowledgeArticle {
+func (s *Store) SearchKnowledge(query string) ([]KnowledgeArticle, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.searchLocked(query)
+	return s.searchLocked(query), nil
 }
 
-func (s *Store) Dashboard() Dashboard {
+func (s *Store) Dashboard() (Dashboard, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	openGaps := 0
@@ -203,7 +203,7 @@ func (s *Store) Dashboard() Dashboard {
 		Conversations: append([]Conversation(nil), s.conversations...),
 		KnowledgeGaps: append([]KnowledgeGap(nil), s.gaps...),
 		Rules:         append([]Rule(nil), s.rules...),
-	}
+	}, nil
 }
 
 func (s *Store) searchLocked(query string) []KnowledgeArticle {

@@ -11,7 +11,12 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 	mux.HandleFunc("/api/customer-service/conversations", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			httpjson.OK(w, st.ListConversations())
+			items, err := st.ListConversations()
+			if err != nil {
+				httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+				return
+			}
+			httpjson.OK(w, items)
 		case http.MethodPost:
 			var req struct {
 				Customer string `json:"customer"`
@@ -21,7 +26,12 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 				httpjson.BadRequest(w, err.Error())
 				return
 			}
-			httpjson.Created(w, st.CreateConversation(req.Customer, req.Channel))
+			conv, err := st.CreateConversation(req.Customer, req.Channel)
+			if err != nil {
+				httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+				return
+			}
+			httpjson.Created(w, conv)
 		default:
 			httpjson.MethodNotAllowed(w)
 		}
@@ -43,6 +53,11 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			httpjson.BadRequest(w, "content is required")
 			return
 		}
-		httpjson.OK(w, st.SendMessage(req.ConversationID, req.Content))
+		result, err := st.SendMessage(req.ConversationID, req.Content)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, result)
 	})
 }
