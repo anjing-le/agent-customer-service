@@ -28,7 +28,8 @@ Go API 当前响应格式：
 ## Current Runtime Boundaries
 
 - `/api/customer-service/conversations`: 会话列表和创建。
-- `/api/customer-service/messages`: 发送用户消息，触发 RAG、兜底、缺口和人工 ticket。
+- `GET /api/customer-service/messages?conversationId=...`: 读取指定会话历史消息。
+- `POST /api/customer-service/messages`: 发送用户消息，触发 RAG、兜底、缺口和人工 ticket。
 - `/api/knowledge/articles`: 可信知识列表。
 - `/api/knowledge/search`: 知识检索。
 - `/api/knowledge/gaps/resolve`: 关闭知识缺口。

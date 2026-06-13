@@ -10,6 +10,7 @@ import (
 type Runtime interface {
 	ListConversations() ([]Conversation, error)
 	CreateConversation(customer, channel string) (Conversation, error)
+	ListMessages(conversationID string) ([]Message, error)
 	SendMessage(conversationID, content string) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -181,6 +182,18 @@ func (s *Store) CreateConversation(customer, channel string) (Conversation, erro
 	}
 	s.conversations = append([]Conversation{conv}, s.conversations...)
 	return conv, nil
+}
+
+func (s *Store) ListMessages(conversationID string) ([]Message, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]Message, 0)
+	for _, item := range s.messages {
+		if item.ConversationID == conversationID {
+			items = append(items, item)
+		}
+	}
+	return items, nil
 }
 
 func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, error) {

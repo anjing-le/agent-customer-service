@@ -20,6 +20,10 @@ func (f failingRuntime) CreateConversation(string, string) (store.Conversation, 
 	return store.Conversation{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ListMessages(string) ([]store.Message, error) {
+	return nil, errors.New("database unavailable")
+}
+
 func (f failingRuntime) SendMessage(string, string) (store.SendMessageResult, error) {
 	return store.SendMessageResult{}, errors.New("database unavailable")
 }
@@ -65,5 +69,21 @@ func TestConversationRouteReturnsStoreErrorEnvelope(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"store_error"`) {
 		t.Fatalf("expected store_error envelope, got %s", rec.Body.String())
+	}
+}
+
+func TestListMessagesRouteReturnsConversationHistory(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/customer-service/messages?conversationId=conv_demo_refund", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"conversationId":"conv_demo_refund"`) {
+		t.Fatalf("expected conversation history, got %s", rec.Body.String())
 	}
 }

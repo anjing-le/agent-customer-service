@@ -69,6 +69,17 @@ type KnowledgeArticle = {
   tags?: string[];
   trustLevel: string;
 };
+type Message = {
+  id: string;
+  conversationId: string;
+  role: string;
+  content: string;
+  engine: string;
+  safe: boolean;
+  fallbackReason?: string;
+  evidenceIds?: string[];
+  createdAt: string;
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
@@ -103,13 +114,18 @@ function App() {
   const [ruleInput, setRuleInput] = useState('我已经投诉很多次了，现在必须转人工');
   const [ruleResult, setRuleResult] = useState<RuleTestResult | null>(null);
   const [result, setResult] = useState<SendMessageResult | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [history, setHistory] = useState<Message[]>([]);
   const [error, setError] = useState('');
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
   const rules = dashboard?.rules ?? [];
   const transfers = dashboard?.transfers ?? [];
-  const activeConversation = useMemo(() => conversations[0], [conversations]);
+  const activeConversation = useMemo(
+    () => conversations.find((item) => item.id === selectedConversationId) ?? conversations[0],
+    [conversations, selectedConversationId]
+  );
   const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
   const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
   const openTransferCount = transfers.filter((item) => item.status === 'OPEN').length;
@@ -135,6 +151,30 @@ function App() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!selectedConversationId && conversations[0]?.id) {
+      setSelectedConversationId(conversations[0].id);
+    }
+  }, [conversations, selectedConversationId]);
+
+  const loadMessages = async (conversationId: string) => {
+    if (!conversationId) {
+      setHistory([]);
+      return;
+    }
+    setHistory(await api<Message[]>(`/api/customer-service/messages?conversationId=${encodeURIComponent(conversationId)}`));
+  };
+
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      setHistory([]);
+      return;
+    }
+    void loadMessages(activeConversation.id).catch((err) => {
+      setError(err instanceof Error ? err.message : 'load messages failed');
+    });
+  }, [activeConversation?.id]);
+
   const send = async () => {
     setError('');
     try {
@@ -143,7 +183,9 @@ function App() {
         body: JSON.stringify({ conversationId: activeConversation?.id, content: message })
       });
       setResult(data);
+      setSelectedConversationId(data.conversation.id);
       await load();
+      await loadMessages(data.conversation.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'send failed');
     }
@@ -284,6 +326,21 @@ function App() {
                 <p>{result.agentMessage.content}</p>
               </div>
             )}
+            <div className="history">
+              <div className="historyHeader">
+                <strong>会话历史</strong>
+                <span>{history.length} messages</span>
+              </div>
+              {history.map((item) => (
+                <article className={`message ${item.role}`} key={item.id}>
+                  <span>{item.role} · {item.engine}</span>
+                  <p>{item.content}</p>
+                  {(item.evidenceIds?.length ?? 0) > 0 && <small>{item.evidenceIds?.join(', ')}</small>}
+                  {item.fallbackReason && <small>{item.fallbackReason}</small>}
+                </article>
+              ))}
+              {history.length === 0 && <p className="empty">选择会话后展示历史消息</p>}
+            </div>
           </section>
 
           <section className="panel queuePanel">
@@ -295,7 +352,11 @@ function App() {
             </div>
             <div className="tableList">
               {conversations.map((item) => (
-                <article className="tableRow" key={item.id}>
+                <article
+                  className={`tableRow selectable ${item.id === activeConversation?.id ? 'selected' : ''}`}
+                  key={item.id}
+                  onClick={() => setSelectedConversationId(item.id)}
+                >
                   <div>
                     <strong>{item.customer}</strong>
                     <span>{item.lastMessage}</span>

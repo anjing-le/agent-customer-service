@@ -318,6 +318,46 @@ textarea {
   font-weight: 800;
 }
 
+.history {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #edf2ef;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.historyHeader span,
+.message span,
+.message small {
+  color: #64786d;
+  font-size: 12px;
+}
+
+.message {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #dfe9e4;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.message.assistant {
+  border-color: #c8e4d6;
+  background: #eef7f2;
+}
+
+.message p {
+  line-height: 1.6;
+}
+
 .tableList,
 .evidenceList,
 .ruleGrid {
@@ -331,6 +371,18 @@ textarea {
   gap: 12px;
   padding: 12px 0;
   border-top: 1px solid #edf2ef;
+}
+
+.tableRow.selectable {
+  cursor: pointer;
+  margin: 0 -8px;
+  padding: 12px 8px;
+  border-radius: 6px;
+}
+
+.tableRow.selectable:hover,
+.tableRow.selectable.selected {
+  background: #f1f8f4;
 }
 
 .tableRow:first-child {

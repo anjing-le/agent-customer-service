@@ -19,6 +19,17 @@ func TestSendMessageUsesKnowledgeEvidence(t *testing.T) {
 	if result.Gap != nil {
 		t.Fatalf("expected no gap, got %#v", result.Gap)
 	}
+
+	history, err := st.ListMessages("conv_demo_refund")
+	if err != nil {
+		t.Fatalf("list messages: %v", err)
+	}
+	if len(history) < 4 {
+		t.Fatalf("expected seeded and new conversation history, got %#v", history)
+	}
+	if history[len(history)-2].Role != "user" || history[len(history)-1].Role != "assistant" {
+		t.Fatalf("expected latest user/assistant pair, got %#v", history[len(history)-2:])
+	}
 }
 
 func TestSendMessageCreatesGapWhenEvidenceMissing(t *testing.T) {

@@ -53,6 +53,37 @@ func (s *PostgresStore) CreateConversation(customer, channel string) (Conversati
 	return conv, nil
 }
 
+func (s *PostgresStore) ListMessages(conversationID string) ([]Message, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at
+		from conversation_messages
+		where conversation_id = $1
+		order by created_at asc, id asc
+	`, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("list messages: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]Message, 0)
+	for rows.Next() {
+		var item Message
+		var createdAt time.Time
+		if err := rows.Scan(
+			&item.ID, &item.ConversationID, &item.Role, &item.Content, &item.Engine,
+			&item.Safe, &item.FallbackReason, &item.EvidenceIDs, &createdAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan message: %w", err)
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate messages: %w", err)
+	}
+	return items, nil
+}
+
 func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessageResult, error) {
 	ctx := context.Background()
 	now := time.Now().UTC()

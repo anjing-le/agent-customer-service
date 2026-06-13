@@ -18,6 +18,7 @@
       "routes": [
         { "name": "listConversations", "path": "/api/customer-service/conversations", "methods": ["GET"], "console": false },
         { "name": "createConversation", "path": "/api/customer-service/conversations", "methods": ["POST"], "console": false },
+        { "name": "listMessages", "path": "/api/customer-service/messages", "methods": ["GET"] },
         { "name": "sendMessage", "path": "/api/customer-service/messages", "methods": ["POST"] }
       ]
     },
