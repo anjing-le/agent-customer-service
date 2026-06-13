@@ -273,6 +273,37 @@ func TestSubmitAnnotationUpdatesQualitySummary(t *testing.T) {
 	}
 }
 
+func TestExportTrainingSamplesReturnsLowScoreAnnotations(t *testing.T) {
+	st := NewSeedStore()
+
+	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	if _, err := st.SubmitAnnotation(result.AgentMessage.ID, "qa-a", "FAIL", "证据引用不完整，需要复盘", AnnotationDimensions{
+		Groundedness: 2,
+		Safety:       3,
+		Helpfulness:  2,
+	}, []string{"low_score", "export_candidate"}); err != nil {
+		t.Fatalf("submit annotation: %v", err)
+	}
+
+	samples, err := st.ExportTrainingSamples(80)
+	if err != nil {
+		t.Fatalf("export training samples: %v", err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("expected one low score sample, got %#v", samples)
+	}
+	sample := samples[0]
+	if sample.MessageID != result.AgentMessage.ID || sample.Prompt == "" || sample.Answer == "" {
+		t.Fatalf("expected prompt and answer sample, got %#v", sample)
+	}
+	if sample.Score > 80 || sample.Verdict != "FAIL" {
+		t.Fatalf("expected low score failed sample, got %#v", sample)
+	}
+}
+
 func TestRuleTestDetectsTransferAndNoEvidenceBoundaries(t *testing.T) {
 	st := NewSeedStore()
 

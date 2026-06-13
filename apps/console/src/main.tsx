@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   RefreshCcw,
   ShieldCheck,
+  Download,
   UserRoundCheck
 } from 'lucide-react';
 import './styles.css';
@@ -128,6 +129,23 @@ type Annotation = {
   dimensions: AnnotationDimensions;
   tags: string[];
   score: number;
+  createdAt: string;
+};
+type TrainingSample = {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  channel: string;
+  prompt: string;
+  answer: string;
+  engine: string;
+  evidenceIds: string[];
+  reviewer: string;
+  verdict: string;
+  score: number;
+  dimensions: AnnotationDimensions;
+  note: string;
+  tags: string[];
   createdAt: string;
 };
 type ChannelPolicy = {
@@ -265,6 +283,7 @@ function App() {
   const [annotationVerdict, setAnnotationVerdict] = useState<'PASS' | 'REVIEW' | 'FAIL'>('PASS');
   const [annotationNote, setAnnotationNote] = useState('证据充分，回复安全，可作为教学正样本。');
   const [annotationSaving, setAnnotationSaving] = useState(false);
+  const [trainingSamples, setTrainingSamples] = useState<TrainingSample[]>([]);
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
@@ -301,12 +320,14 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
-        api<KnowledgeArticle[]>('/api/knowledge/articles')
+        api<KnowledgeArticle[]>('/api/knowledge/articles'),
+        api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80')
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData);
+      setTrainingSamples(sampleData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -443,6 +464,16 @@ function App() {
     } finally {
       setAnnotationSaving(false);
     }
+  };
+
+  const downloadTrainingSamples = () => {
+    const blob = new Blob([JSON.stringify(trainingSamples, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'agent-customer-service-training-samples.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -765,6 +796,34 @@ function App() {
                 </article>
               ))}
               {annotations.length === 0 && <p className="empty">暂无人工标注</p>}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">复盘样本</p>
+                <h2>低分导出</h2>
+              </div>
+              <button className="tinyButton" onClick={downloadTrainingSamples} title="导出样本" disabled={trainingSamples.length === 0}>
+                <Download size={14} />
+              </button>
+            </div>
+            <div className="tableList">
+              {trainingSamples.slice(0, 5).map((item) => (
+                <article className="tableRow" key={item.id}>
+                  <div>
+                    <strong>{item.verdict} · {item.score} · {item.channel}</strong>
+                    <span>{item.prompt}</span>
+                    <span>{item.note}</span>
+                  </div>
+                  <div>
+                    <em>{item.engine}</em>
+                    <b className={statusClass(item.verdict)}>{item.dimensions.groundedness}/{item.dimensions.safety}/{item.dimensions.helpfulness}</b>
+                  </div>
+                </article>
+              ))}
+              {trainingSamples.length === 0 && <p className="empty">暂无低分复盘样本</p>}
             </div>
           </section>
 

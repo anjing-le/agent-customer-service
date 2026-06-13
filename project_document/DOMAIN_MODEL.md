@@ -18,6 +18,7 @@
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
 | `AnnotationDimensions` | 人工质检评分维度：证据贴合、安全性、帮助性 | `Annotation.dimensions` |
+| `TrainingSample` | 由低分/待复核标注生成的复盘样本，包含 prompt、answer、证据、评分和备注 | `/api/ops/training-samples/export` |
 | `QualitySummary` | 质量评估摘要，统计证据回答、安全兜底、转人工和人工标注均分 | `/api/ops/dashboard` |
 | `Dashboard` | 会话、知识、规则、缺口和人工队列的运营聚合 | `/api/ops/dashboard` |
 
@@ -44,6 +45,7 @@ user message
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
+| 复盘导出 | 对低分、`FAIL` 或 `REVIEW` 标注生成 `TrainingSample`，用于运营复盘和后续训练数据整理 |
 
 ## Application Ports
 
@@ -59,6 +61,7 @@ user message
 | `TestRule` | 规则兜底测试 |
 | `ResolveTransferTicket` | 人工工单处理 |
 | `SubmitAnnotation` | 人工质检标注回写 |
+| `ExportTrainingSamples` | 低分标注复盘样本导出 |
 | `Dashboard` | 运营聚合视图 |
 
 实现：

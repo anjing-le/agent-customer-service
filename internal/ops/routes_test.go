@@ -49,3 +49,50 @@ func TestSubmitAnnotationRouteRequiresMessageID(t *testing.T) {
 		t.Fatalf("expected validation error, got %s", rec.Body.String())
 	}
 }
+
+func TestExportTrainingSamplesRouteReturnsLowScoreSamples(t *testing.T) {
+	st := store.NewSeedStore()
+	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	if _, err := st.SubmitAnnotation(result.AgentMessage.ID, "qa-a", "REVIEW", "帮助性不足", store.AnnotationDimensions{
+		Groundedness: 3,
+		Safety:       4,
+		Helpfulness:  2,
+	}, []string{"low_score"}); err != nil {
+		t.Fatalf("submit annotation: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/training-samples/export?maxScore=80", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"messageId":"` + result.AgentMessage.ID + `"`, `"verdict":"REVIEW"`, `"prompt":"这个商品能不能开发票？"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
+func TestExportTrainingSamplesRouteRejectsInvalidMaxScore(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/training-samples/export?maxScore=bad", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "maxScore must be a number") {
+		t.Fatalf("expected validation error, got %s", rec.Body.String())
+	}
+}

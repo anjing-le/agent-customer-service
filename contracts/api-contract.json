@@ -104,6 +104,14 @@
       "path": "/api/ops/annotations/submit",
       "request": { "body": "SubmitAnnotationRequest" },
       "response": { "status": 201, "schema": "Annotation" }
+    },
+    {
+      "id": "exportTrainingSamples",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/training-samples/export",
+      "request": { "query": "ExportTrainingSamplesQuery" },
+      "response": { "status": 200, "schema": "TrainingSample[]" }
     }
   ],
   "schemas": {
@@ -191,6 +199,11 @@
         "note": "string",
         "dimensions": "AnnotationDimensions",
         "tags": "string[]"
+      }
+    },
+    "ExportTrainingSamplesQuery": {
+      "fields": {
+        "maxScore": "number"
       }
     },
     "Conversation": {
@@ -332,6 +345,26 @@
         "groundedness": "number",
         "safety": "number",
         "helpfulness": "number"
+      }
+    },
+    "TrainingSample": {
+      "required": ["id", "conversationId", "messageId", "channel", "prompt", "answer", "engine", "evidenceIds", "reviewer", "verdict", "score", "dimensions", "note", "tags", "createdAt"],
+      "fields": {
+        "id": "string",
+        "conversationId": "string",
+        "messageId": "string",
+        "channel": "string",
+        "prompt": "string",
+        "answer": "string",
+        "engine": "customer|rule|rag+rule|llm+rag",
+        "evidenceIds": "string[]",
+        "reviewer": "string",
+        "verdict": "PASS|REVIEW|FAIL",
+        "score": "number",
+        "dimensions": "AnnotationDimensions",
+        "note": "string",
+        "tags": "string[]",
+        "createdAt": "RFC3339 string"
       }
     },
     "Metric": {

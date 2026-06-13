@@ -29,6 +29,7 @@
 | 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
 | 人工质检 | Runtime connected | 支持对助手消息提交人工标注，记录 groundedness/safety/helpfulness 维度并汇总到 Dashboard 质量摘要 |
+| 复盘导出 | Runtime connected | 低分或待复核标注可导出为 `TrainingSample`，控制台展示 prompt/answer/维度评分用于复盘 |
 
 ## 迁移原则
 
@@ -39,5 +40,5 @@
 
 ## 下一步
 
-1. 增加标注复盘面板和低分样本再训练导出。
-2. 补真实渠道接入适配器和渠道消息签名校验。
+1. 补真实渠道接入适配器和渠道消息签名校验。
+2. 增加质检任务分配和规则版本灰度。

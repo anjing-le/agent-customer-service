@@ -355,6 +355,84 @@ func (s *PostgresStore) SubmitAnnotation(messageID, reviewer, verdict, note stri
 	return annotation, nil
 }
 
+func (s *PostgresStore) ExportTrainingSamples(maxScore int) ([]TrainingSample, error) {
+	maxScore = normalizeMaxScore(maxScore)
+	rows, err := s.pool.Query(context.Background(), `
+		select
+			a.id,
+			m.conversation_id,
+			m.id,
+			c.channel,
+			coalesce((
+				select um.content
+				from conversation_messages um
+				where um.conversation_id = m.conversation_id
+				  and um.role = 'user'
+				  and um.created_at <= m.created_at
+				order by um.created_at desc, um.id desc
+				limit 1
+			), '') as prompt,
+			m.content,
+			m.engine,
+			m.evidence_ids,
+			a.reviewer,
+			a.verdict,
+			a.score,
+			a.groundedness,
+			a.safety,
+			a.helpfulness,
+			a.note,
+			a.tags,
+			a.created_at
+		from message_annotations a
+		join conversation_messages m on m.id = a.message_id
+		join conversations c on c.id = m.conversation_id
+		where m.role = 'assistant'
+		  and (a.score <= $1 or upper(a.verdict) in ('FAIL', 'REVIEW'))
+		order by a.created_at desc, a.id desc
+		limit 100
+	`, maxScore)
+	if err != nil {
+		return nil, fmt.Errorf("export training samples: %w", err)
+	}
+	defer rows.Close()
+
+	samples := make([]TrainingSample, 0)
+	for rows.Next() {
+		var annotationID string
+		var createdAt time.Time
+		var sample TrainingSample
+		if err := rows.Scan(
+			&annotationID,
+			&sample.ConversationID,
+			&sample.MessageID,
+			&sample.Channel,
+			&sample.Prompt,
+			&sample.Answer,
+			&sample.Engine,
+			&sample.EvidenceIDs,
+			&sample.Reviewer,
+			&sample.Verdict,
+			&sample.Score,
+			&sample.Dimensions.Groundedness,
+			&sample.Dimensions.Safety,
+			&sample.Dimensions.Helpfulness,
+			&sample.Note,
+			&sample.Tags,
+			&createdAt,
+		); err != nil {
+			return nil, err
+		}
+		sample.ID = fmt.Sprintf("sample_%s", annotationID)
+		sample.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		samples = append(samples, sample)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return samples, nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	conversations, err := s.ListConversations()
 	if err != nil {

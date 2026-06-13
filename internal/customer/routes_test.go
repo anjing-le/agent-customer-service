@@ -56,6 +56,10 @@ func (f failingRuntime) SubmitAnnotation(string, string, string, string, store.A
 	return store.Annotation{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ExportTrainingSamples(int) ([]store.TrainingSample, error) {
+	return nil, errors.New("database unavailable")
+}
+
 func (f failingRuntime) Dashboard() (store.Dashboard, error) {
 	return store.Dashboard{}, errors.New("database unavailable")
 }

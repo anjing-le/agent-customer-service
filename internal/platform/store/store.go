@@ -44,6 +44,7 @@ type Runtime interface {
 	TestRule(content string) (RuleTestResult, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
 	SubmitAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string) (Annotation, error)
+	ExportTrainingSamples(maxScore int) ([]TrainingSample, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -188,6 +189,24 @@ type AnnotationDimensions struct {
 	Groundedness int `json:"groundedness"`
 	Safety       int `json:"safety"`
 	Helpfulness  int `json:"helpfulness"`
+}
+
+type TrainingSample struct {
+	ID             string               `json:"id"`
+	ConversationID string               `json:"conversationId"`
+	MessageID      string               `json:"messageId"`
+	Channel        string               `json:"channel"`
+	Prompt         string               `json:"prompt"`
+	Answer         string               `json:"answer"`
+	Engine         string               `json:"engine"`
+	EvidenceIDs    []string             `json:"evidenceIds"`
+	Reviewer       string               `json:"reviewer"`
+	Verdict        string               `json:"verdict"`
+	Score          int                  `json:"score"`
+	Dimensions     AnnotationDimensions `json:"dimensions"`
+	Note           string               `json:"note"`
+	Tags           []string             `json:"tags"`
+	CreatedAt      string               `json:"createdAt"`
 }
 
 type Dashboard struct {
@@ -414,6 +433,12 @@ func (s *Store) SubmitAnnotation(messageID, reviewer, verdict, note string, dime
 	annotation := newAnnotation(messageID, reviewer, verdict, note, dimensions, tags, time.Now().UTC().Format(time.RFC3339))
 	s.annotations = append([]Annotation{annotation}, s.annotations...)
 	return annotation, nil
+}
+
+func (s *Store) ExportTrainingSamples(maxScore int) ([]TrainingSample, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return trainingSamples(s.annotations, s.messages, s.conversations, normalizeMaxScore(maxScore)), nil
 }
 
 func (s *Store) Dashboard() (Dashboard, error) {
@@ -854,6 +879,87 @@ func clampScore(value int) int {
 
 func annotationScore(dimensions AnnotationDimensions) int {
 	return (dimensions.Groundedness + dimensions.Safety + dimensions.Helpfulness) * 100 / 15
+}
+
+func normalizeMaxScore(maxScore int) int {
+	if maxScore <= 0 {
+		return 80
+	}
+	if maxScore > 100 {
+		return 100
+	}
+	return maxScore
+}
+
+func trainingSamples(annotations []Annotation, messages []Message, conversations []Conversation, maxScore int) []TrainingSample {
+	samples := make([]TrainingSample, 0)
+	for _, annotation := range annotations {
+		if !needsReview(annotation, maxScore) {
+			continue
+		}
+		answer, ok := messageByID(messages, annotation.MessageID)
+		if !ok || answer.Role != "assistant" {
+			continue
+		}
+		conversation := conversationByID(conversations, answer.ConversationID)
+		samples = append(samples, TrainingSample{
+			ID:             fmt.Sprintf("sample_%s", annotation.ID),
+			ConversationID: answer.ConversationID,
+			MessageID:      answer.ID,
+			Channel:        fallback(conversation.Channel, "Web"),
+			Prompt:         previousUserPrompt(messages, answer),
+			Answer:         answer.Content,
+			Engine:         answer.Engine,
+			EvidenceIDs:    append([]string(nil), answer.EvidenceIDs...),
+			Reviewer:       annotation.Reviewer,
+			Verdict:        annotation.Verdict,
+			Score:          annotation.Score,
+			Dimensions:     annotation.Dimensions,
+			Note:           annotation.Note,
+			Tags:           append([]string(nil), annotation.Tags...),
+			CreatedAt:      annotation.CreatedAt,
+		})
+	}
+	return samples
+}
+
+func needsReview(annotation Annotation, maxScore int) bool {
+	verdict := strings.ToUpper(strings.TrimSpace(annotation.Verdict))
+	return annotation.Score <= maxScore || verdict == "FAIL" || verdict == "REVIEW"
+}
+
+func messageByID(messages []Message, id string) (Message, bool) {
+	for _, message := range messages {
+		if message.ID == id {
+			return message, true
+		}
+	}
+	return Message{}, false
+}
+
+func conversationByID(conversations []Conversation, id string) Conversation {
+	for _, conversation := range conversations {
+		if conversation.ID == id {
+			return conversation
+		}
+	}
+	return Conversation{ID: id, Customer: "访客", Channel: "Web", Status: "Active", RiskLevel: "LOW"}
+}
+
+func previousUserPrompt(messages []Message, answer Message) string {
+	prompt := ""
+	for _, message := range messages {
+		if message.ConversationID != answer.ConversationID {
+			continue
+		}
+		if message.ID == answer.ID {
+			break
+		}
+		if message.Role == "user" {
+			prompt = message.Content
+		}
+	}
+	return prompt
 }
 
 func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferTicket, annotations []Annotation) QualitySummary {

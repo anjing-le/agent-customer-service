@@ -2,6 +2,7 @@ package ops
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/anjing-le/agent-customer-service/internal/platform/httpjson"
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
@@ -90,5 +91,26 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			return
 		}
 		httpjson.Created(w, annotation)
+	})
+
+	mux.HandleFunc("/api/ops/training-samples/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		maxScore := 80
+		if raw := r.URL.Query().Get("maxScore"); raw != "" {
+			parsed, err := strconv.Atoi(raw)
+			if err != nil {
+				httpjson.BadRequest(w, "maxScore must be a number")
+				return
+			}
+			maxScore = parsed
+		}
+		samples, err := st.ExportTrainingSamples(maxScore)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, samples)
 	})
 }
