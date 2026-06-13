@@ -297,13 +297,25 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "quality"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
         "knowledgeGaps": "KnowledgeGap[]",
         "rules": "Rule[]",
-        "transfers": "TransferTicket[]"
+        "transfers": "TransferTicket[]",
+        "quality": "QualitySummary"
+      }
+    },
+    "QualitySummary": {
+      "required": ["score", "reviewedMessages", "evidenceAnswers", "safeFallbacks", "humanTransfers", "notes"],
+      "fields": {
+        "score": "number",
+        "reviewedMessages": "number",
+        "evidenceAnswers": "number",
+        "safeFallbacks": "number",
+        "humanTransfers": "number",
+        "notes": "string[]"
       }
     },
     "SendMessageResult": {

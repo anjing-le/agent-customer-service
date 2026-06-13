@@ -81,22 +81,9 @@ func (s *PostgresStore) ListMessages(conversationID string) ([]Message, error) {
 
 	items := make([]Message, 0)
 	for rows.Next() {
-		var item Message
-		var createdAt time.Time
-		var traceBytes []byte
-		if err := rows.Scan(
-			&item.ID, &item.ConversationID, &item.Role, &item.Content, &item.Engine,
-			&item.Safe, &item.FallbackReason, &item.EvidenceIDs, &createdAt, &traceBytes,
-		); err != nil {
-			return nil, fmt.Errorf("scan message: %w", err)
-		}
-		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
-		if len(traceBytes) > 0 && string(traceBytes) != "{}" {
-			var trace AgentTrace
-			if err := json.Unmarshal(traceBytes, &trace); err != nil {
-				return nil, fmt.Errorf("decode message trace: %w", err)
-			}
-			item.Trace = &trace
+		item, err := scanMessage(rows)
+		if err != nil {
+			return nil, err
 		}
 		items = append(items, item)
 	}
@@ -367,6 +354,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	messages, err := s.listRecentMessages()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -393,6 +384,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		KnowledgeGaps: gaps,
 		Rules:         rules,
 		Transfers:     transfers,
+		Quality:       qualitySummary(messages, gaps, transfers),
 	}, nil
 }
 
@@ -491,6 +483,56 @@ func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {
 		return nil, err
 	}
 	return tickets, nil
+}
+
+func (s *PostgresStore) listRecentMessages() ([]Message, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at, trace
+		from conversation_messages
+		order by created_at desc, id desc
+		limit 200
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list recent messages: %w", err)
+	}
+	defer rows.Close()
+	return scanMessages(rows)
+}
+
+func scanMessages(rows pgx.Rows) ([]Message, error) {
+	items := make([]Message, 0)
+	for rows.Next() {
+		item, err := scanMessage(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func scanMessage(rows pgx.Rows) (Message, error) {
+	var item Message
+	var createdAt time.Time
+	var traceBytes []byte
+	if err := rows.Scan(
+		&item.ID, &item.ConversationID, &item.Role, &item.Content, &item.Engine,
+		&item.Safe, &item.FallbackReason, &item.EvidenceIDs, &createdAt, &traceBytes,
+	); err != nil {
+		return Message{}, fmt.Errorf("scan message: %w", err)
+	}
+	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	if len(traceBytes) > 0 && string(traceBytes) != "{}" {
+		var trace AgentTrace
+		if err := json.Unmarshal(traceBytes, &trace); err != nil {
+			return Message{}, fmt.Errorf("decode message trace: %w", err)
+		}
+		item.Trace = &trace
+	}
+	return item, nil
 }
 
 func scanConversations(rows pgx.Rows) ([]Conversation, error) {

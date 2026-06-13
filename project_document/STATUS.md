@@ -26,6 +26,7 @@
 | 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
 | 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
 | 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
+| 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
 
 ## 迁移原则
 
@@ -36,5 +37,5 @@
 
 ## 下一步
 
-1. 增加质量评估集和人工标注反馈。
-2. 补坐席处理 SLA、优先级升级和工单筛选。
+1. 补坐席处理 SLA、优先级升级和工单筛选。
+2. 增加更细的人工标注维度和质检审核流。

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "evidence answer counts as quality signal",
+    "content": "这个商品能不能开发票？",
+    "expectMinScore": 80,
+    "expectEvidenceAnswers": 1,
+    "expectSafeFallbacks": 0,
+    "expectHumanTransfers": 0
+  },
+  {
+    "name": "unknown policy counts safe fallback",
+    "content": "完全没有资料的新品保价规则是什么？",
+    "expectMinScore": 60,
+    "expectEvidenceAnswers": 0,
+    "expectSafeFallbacks": 1,
+    "expectHumanTransfers": 0
+  },
+  {
+    "name": "complaint counts human transfer",
+    "content": "我已经投诉很多次了，现在必须转人工",
+    "expectMinScore": 60,
+    "expectEvidenceAnswers": 0,
+    "expectSafeFallbacks": 0,
+    "expectHumanTransfers": 1
+  }
+]

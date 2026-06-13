@@ -173,6 +173,45 @@ h2 {
   margin-bottom: 14px;
 }
 
+.qualityBand {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #d9e3de;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.qualityBand strong {
+  margin-right: 8px;
+  color: #1f6f52;
+  font-size: 26px;
+}
+
+.qualityBand span,
+.qualityBand small {
+  color: #64786d;
+  font-size: 12px;
+}
+
+.qualityStats,
+.qualityNotes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qualityStats span,
+.qualityNotes small {
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef7f2;
+}
+
 .metric,
 .panel {
   background: #ffffff;

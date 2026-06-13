@@ -16,6 +16,7 @@
     "build:go": "go build ./cmd/...",
     "test:go": "go test ./...",
     "test:agent-regression": "./scripts/check-agent-regression.sh",
+    "test:agent-quality": "./scripts/check-agent-quality.sh",
     "verify": "./scripts/quality-gate.sh"
   },
   "workspaces": [

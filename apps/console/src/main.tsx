@@ -98,12 +98,21 @@ type Message = {
   createdAt: string;
   trace?: AgentTrace;
 };
+type QualitySummary = {
+  score: number;
+  reviewedMessages: number;
+  evidenceAnswers: number;
+  safeFallbacks: number;
+  humanTransfers: number;
+  notes: string[];
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
   knowledgeGaps: KnowledgeGap[] | null;
   rules: Rule[] | null;
   transfers: TransferTicket[] | null;
+  quality: QualitySummary;
 };
 type SendMessageResult = {
   conversation: Conversation;
@@ -399,6 +408,24 @@ function App() {
           </article>
           {loading && <article className="metric skeleton">Loading</article>}
         </section>
+
+        {dashboard?.quality && (
+          <section className="qualityBand">
+            <div>
+              <p className="sectionLabel">质量评估</p>
+              <strong>{dashboard.quality.score}</strong>
+              <span>{dashboard.quality.reviewedMessages} reviewed messages</span>
+            </div>
+            <div className="qualityStats">
+              <span>{dashboard.quality.evidenceAnswers} evidence</span>
+              <span>{dashboard.quality.safeFallbacks} fallback</span>
+              <span>{dashboard.quality.humanTransfers} transfer</span>
+            </div>
+            <div className="qualityNotes">
+              {dashboard.quality.notes.map((note) => <small key={note}>{note}</small>)}
+            </div>
+          </section>
+        )}
 
         <section className="runtimeGrid">
           <section className="panel agentPanel">

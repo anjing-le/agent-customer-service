@@ -14,6 +14,9 @@ go test ./...
 echo "quality-gate: agent regression"
 ./scripts/check-agent-regression.sh
 
+echo "quality-gate: agent quality evaluation"
+./scripts/check-agent-quality.sh
+
 echo "quality-gate: frontend build"
 pnpm build:console
 

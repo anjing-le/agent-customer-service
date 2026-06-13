@@ -160,12 +160,22 @@ type Dashboard struct {
 	KnowledgeGaps []KnowledgeGap   `json:"knowledgeGaps"`
 	Rules         []Rule           `json:"rules"`
 	Transfers     []TransferTicket `json:"transfers"`
+	Quality       QualitySummary   `json:"quality"`
 }
 
 type Metric struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
 	Note  string `json:"note"`
+}
+
+type QualitySummary struct {
+	Score            int      `json:"score"`
+	ReviewedMessages int      `json:"reviewedMessages"`
+	EvidenceAnswers  int      `json:"evidenceAnswers"`
+	SafeFallbacks    int      `json:"safeFallbacks"`
+	HumanTransfers   int      `json:"humanTransfers"`
+	Notes            []string `json:"notes"`
 }
 
 type SendMessageResult struct {
@@ -367,6 +377,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
+	quality := qualitySummary(s.messages, s.gaps, s.tickets)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
@@ -379,6 +390,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		KnowledgeGaps: append([]KnowledgeGap(nil), s.gaps...),
 		Rules:         append([]Rule(nil), s.rules...),
 		Transfers:     append([]TransferTicket(nil), s.tickets...),
+		Quality:       quality,
 	}, nil
 }
 
@@ -649,4 +661,64 @@ func transferEvents(ticket TransferTicket) []TransferEvent {
 		})
 	}
 	return events
+}
+
+func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferTicket) QualitySummary {
+	summary := QualitySummary{}
+	for _, message := range messages {
+		if message.Role != "assistant" {
+			continue
+		}
+		summary.ReviewedMessages++
+		if message.Safe {
+			summary.Score += 50
+		}
+		switch message.Engine {
+		case "rag+rule", "llm+rag":
+			summary.EvidenceAnswers++
+			summary.Score += 30
+		}
+		switch message.FallbackReason {
+		case "NO_EVIDENCE":
+			summary.SafeFallbacks++
+			summary.Score += 20
+		case "TRANSFER_THRESHOLD":
+			summary.HumanTransfers++
+			summary.Score += 20
+		}
+	}
+	if summary.ReviewedMessages > 0 {
+		summary.Score = summary.Score / summary.ReviewedMessages
+	}
+	if summary.Score > 100 {
+		summary.Score = 100
+	}
+	summary.Notes = []string{
+		fmt.Sprintf("%d evidence-backed replies", summary.EvidenceAnswers),
+		fmt.Sprintf("%d safe no-evidence fallbacks", summary.SafeFallbacks),
+		fmt.Sprintf("%d human transfer decisions", summary.HumanTransfers),
+		fmt.Sprintf("%d open knowledge gaps", openGapCount(gaps)),
+		fmt.Sprintf("%d open transfer tickets", openTransferCount(tickets)),
+	}
+	return summary
+}
+
+func openGapCount(gaps []KnowledgeGap) int {
+	count := 0
+	for _, gap := range gaps {
+		if gap.Status == "OPEN" {
+			count++
+		}
+	}
+	return count
+}
+
+func openTransferCount(tickets []TransferTicket) int {
+	count := 0
+	for _, ticket := range tickets {
+		if ticket.Status == "OPEN" {
+			count++
+		}
+	}
+	return count
 }

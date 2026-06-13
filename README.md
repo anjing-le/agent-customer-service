@@ -79,6 +79,7 @@ curl -N -X POST http://localhost:10002/api/customer-service/messages/stream \
 
 ```bash
 ./scripts/check-agent-regression.sh
+./scripts/check-agent-quality.sh
 go test ./...
 pnpm build:console
 ```
