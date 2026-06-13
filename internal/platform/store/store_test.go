@@ -1,6 +1,22 @@
 package store
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
+
+type fakeReplyGenerator struct {
+	reply string
+	err   error
+}
+
+func (f fakeReplyGenerator) GenerateReply(context.Context, ReplyRequest) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.reply, nil
+}
 
 func TestSendMessageUsesKnowledgeEvidence(t *testing.T) {
 	st := NewSeedStore()
@@ -29,6 +45,41 @@ func TestSendMessageUsesKnowledgeEvidence(t *testing.T) {
 	}
 	if history[len(history)-2].Role != "user" || history[len(history)-1].Role != "assistant" {
 		t.Fatalf("expected latest user/assistant pair, got %#v", history[len(history)-2:])
+	}
+}
+
+func TestSendMessageUsesLLMWhenEvidenceExists(t *testing.T) {
+	st := NewSeedStore(WithReplyGenerator(fakeReplyGenerator{reply: "模型基于发票知识生成的客服回复。"}))
+
+	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+
+	if result.AgentMessage.Engine != "llm+rag" {
+		t.Fatalf("expected llm+rag engine, got %q", result.AgentMessage.Engine)
+	}
+	if result.AgentMessage.Content != "模型基于发票知识生成的客服回复。" {
+		t.Fatalf("expected model reply, got %q", result.AgentMessage.Content)
+	}
+	if len(result.AgentMessage.EvidenceIDs) == 0 {
+		t.Fatalf("expected evidence ids, got %#v", result.AgentMessage)
+	}
+}
+
+func TestSendMessageFallsBackWhenLLMUnavailable(t *testing.T) {
+	st := NewSeedStore(WithReplyGenerator(fakeReplyGenerator{err: errors.New("model timeout")}))
+
+	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+
+	if result.AgentMessage.Engine != "rag+rule" {
+		t.Fatalf("expected rag+rule fallback, got %q", result.AgentMessage.Engine)
+	}
+	if result.AgentMessage.FallbackReason != "" {
+		t.Fatalf("expected no safety fallback reason for evidence answer, got %q", result.AgentMessage.FallbackReason)
 	}
 }
 

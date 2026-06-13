@@ -29,6 +29,19 @@ pnpm db:psql
 pnpm db:down
 ```
 
+## Optional Model Runtime
+
+模型生成默认关闭。需要演示 `llm+rag` 路径时，配置 OpenAI-compatible Chat Completions 地址：
+
+```bash
+export ANJING_LLM_API_URL='https://example.com/v1/chat/completions'
+export ANJING_LLM_API_KEY='your-api-key'
+export ANJING_LLM_MODEL='gpt-4o-mini'
+go run ./cmd/platform-all
+```
+
+模型只在命中知识证据时参与生成；无证据、高风险和模型失败都会回到规则兜底。
+
 ## Smoke Checks
 
 ```bash

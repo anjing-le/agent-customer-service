@@ -11,11 +11,24 @@ import (
 )
 
 type PostgresStore struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	generator ReplyGenerator
 }
 
-func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
-	return &PostgresStore{pool: pool}
+type PostgresOption func(*PostgresStore)
+
+func WithPostgresReplyGenerator(generator ReplyGenerator) PostgresOption {
+	return func(s *PostgresStore) {
+		s.generator = generator
+	}
+}
+
+func NewPostgresStore(pool *pgxpool.Pool, options ...PostgresOption) *PostgresStore {
+	st := &PostgresStore{pool: pool}
+	for _, option := range options {
+		option(st)
+	}
+	return st
 }
 
 func (s *PostgresStore) ListConversations() ([]Conversation, error) {
@@ -113,7 +126,11 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 	if err != nil {
 		return SendMessageResult{}, err
 	}
-	agentMessage, gap := postgresAgentReply(conversationID, content, evidence, now)
+	history, err := s.ListMessages(conversationID)
+	if err != nil {
+		return SendMessageResult{}, err
+	}
+	agentMessage, gap := postgresAgentReply(s.generator, conversationID, content, evidence, history, now)
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -499,7 +516,7 @@ func scanKnowledge(rows pgx.Rows) ([]KnowledgeArticle, error) {
 	return items, nil
 }
 
-func postgresAgentReply(conversationID, content string, evidence []KnowledgeArticle, now time.Time) (Message, *KnowledgeGap) {
+func postgresAgentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, now time.Time) (Message, *KnowledgeGap) {
 	if shouldTransfer(content) {
 		return Message{
 			ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
@@ -521,6 +538,20 @@ func postgresAgentReply(conversationID, content string, evidence []KnowledgeArti
 	ids := make([]string, 0, len(evidence))
 	for _, item := range evidence {
 		ids = append(ids, item.ID)
+	}
+	if generator != nil {
+		reply, err := generator.GenerateReply(context.Background(), ReplyRequest{
+			ConversationID: conversationID,
+			Question:       content,
+			Evidence:       evidence,
+			History:        history,
+		})
+		if err == nil && strings.TrimSpace(reply) != "" {
+			return Message{
+				ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
+				Content: strings.TrimSpace(reply), Engine: "llm+rag", Safe: true, EvidenceIDs: ids, CreatedAt: now.Format(time.RFC3339),
+			}, nil
+		}
 	}
 	return Message{
 		ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",

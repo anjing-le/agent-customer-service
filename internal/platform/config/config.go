@@ -11,6 +11,13 @@ type Config struct {
 	StaticDir     string
 	DatabaseURL   string
 	MigrationsDir string
+	LLM           LLMConfig
+}
+
+type LLMConfig struct {
+	APIURL string
+	APIKey string
+	Model  string
 }
 
 func Load(serviceName, defaultPort string) Config {
@@ -20,6 +27,11 @@ func Load(serviceName, defaultPort string) Config {
 		StaticDir:     env("ANJING_CONSOLE_DIST", "apps/console/dist"),
 		DatabaseURL:   env("ANJING_DATABASE_URL", ""),
 		MigrationsDir: env("ANJING_MIGRATIONS_DIR", "infra/postgres/migrations"),
+		LLM: LLMConfig{
+			APIURL: env("ANJING_LLM_API_URL", ""),
+			APIKey: env("ANJING_LLM_API_KEY", ""),
+			Model:  env("ANJING_LLM_MODEL", "gpt-4o-mini"),
+		},
 	}
 }
 

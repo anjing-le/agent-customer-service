@@ -29,7 +29,7 @@ internal/ops        运营看板 API
 infra/postgres      PostgreSQL migrations
 ```
 
-旧 `backend/` 与 `frontend/` 暂作为迁移参考保留，后续会按模块迁移完成后退场。
+早期运行面已退场，当前运行时只保留 DVSkyFolding 口径的 Go、React/Vite 和 PostgreSQL 结构。
 
 ## 快速开始
 
@@ -49,6 +49,17 @@ pnpm db:migrate
 export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable'
 go run ./cmd/platform-all
 ```
+
+可选模型生成模式：
+
+```bash
+export ANJING_LLM_API_URL='https://example.com/v1/chat/completions'
+export ANJING_LLM_API_KEY='your-api-key'
+export ANJING_LLM_MODEL='gpt-4o-mini'
+go run ./cmd/platform-all
+```
+
+模型客户端默认关闭；开启后也只在命中知识证据时参与回复生成。无证据、高风险或模型不可用时仍走规则兜底。
 
 ## 校验
 

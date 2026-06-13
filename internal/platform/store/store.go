@@ -1,11 +1,31 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 )
+
+type ReplyGenerator interface {
+	GenerateReply(ctx context.Context, req ReplyRequest) (string, error)
+}
+
+type ReplyRequest struct {
+	ConversationID string
+	Question       string
+	Evidence       []KnowledgeArticle
+	History        []Message
+}
+
+type Option func(*Store)
+
+func WithReplyGenerator(generator ReplyGenerator) Option {
+	return func(s *Store) {
+		s.generator = generator
+	}
+}
 
 type Runtime interface {
 	ListConversations() ([]Conversation, error)
@@ -30,6 +50,7 @@ type Store struct {
 	gaps          []KnowledgeGap
 	rules         []Rule
 	tickets       []TransferTicket
+	generator     ReplyGenerator
 }
 
 type Conversation struct {
@@ -130,7 +151,7 @@ type SendMessageResult struct {
 	Gap          *KnowledgeGap      `json:"gap,omitempty"`
 }
 
-func NewSeedStore() *Store {
+func NewSeedStore(options ...Option) *Store {
 	now := time.Now().UTC().Format(time.RFC3339)
 	st := &Store{
 		conversations: []Conversation{
@@ -161,6 +182,9 @@ func NewSeedStore() *Store {
 	}
 	st.tickets = []TransferTicket{
 		{ID: "ticket_demo_transfer", ConversationID: "conv_demo_transfer", Question: "我已经催了三次，必须马上找人工处理。", Reason: "TRANSFER_THRESHOLD", Priority: "HIGH", Status: "OPEN", CreatedAt: now},
+	}
+	for _, option := range options {
+		option(st)
 	}
 	return st
 }
@@ -198,8 +222,6 @@ func (s *Store) ListMessages(conversationID string) ([]Message, error) {
 
 func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	now := time.Now().UTC().Format(time.RFC3339)
 	if conversationID == "" {
 		conversationID = fmt.Sprintf("conv_%d", time.Now().UnixNano())
@@ -211,7 +233,17 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 
 	userMessage := Message{ID: fmt.Sprintf("msg_%d_user", time.Now().UnixNano()), ConversationID: conversationID, Role: "user", Content: content, Engine: "customer", Safe: true, CreatedAt: now}
 	evidence := s.searchLocked(content)
-	agentMessage, gap := s.agentReplyLocked(conversationID, content, evidence, now)
+	history := s.messagesLocked(conversationID)
+	generator := s.generator
+	s.mu.Unlock()
+
+	agentMessage, gap := agentReply(generator, conversationID, content, evidence, history, now)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if gap != nil {
+		s.gaps = append([]KnowledgeGap{*gap}, s.gaps...)
+	}
 	s.messages = append(s.messages, userMessage, agentMessage)
 	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
 		s.tickets = append([]TransferTicket{newTransferTicket(conversationID, content, now)}, s.tickets...)
@@ -357,7 +389,7 @@ func (s *Store) searchLocked(query string) []KnowledgeArticle {
 	return matches
 }
 
-func (s *Store) agentReplyLocked(conversationID, content string, evidence []KnowledgeArticle, now string) (Message, *KnowledgeGap) {
+func agentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, now string) (Message, *KnowledgeGap) {
 	if shouldTransfer(content) {
 		return Message{
 			ID: fmt.Sprintf("msg_%d_agent", time.Now().UnixNano()), ConversationID: conversationID, Role: "assistant",
@@ -370,7 +402,6 @@ func (s *Store) agentReplyLocked(conversationID, content string, evidence []Know
 			ID: fmt.Sprintf("gap_%d", time.Now().UnixNano()), ConversationID: conversationID,
 			Question: content, Reason: "NO_EVIDENCE", Status: "OPEN", Priority: "MEDIUM", CreatedAt: now,
 		}
-		s.gaps = append([]KnowledgeGap{gap}, s.gaps...)
 		return Message{
 			ID: fmt.Sprintf("msg_%d_agent", time.Now().UnixNano()), ConversationID: conversationID, Role: "assistant",
 			Content: "这个问题我还没有找到可靠知识依据，已记录给运营补充知识。为了避免误导，我先不直接下结论。",
@@ -381,11 +412,35 @@ func (s *Store) agentReplyLocked(conversationID, content string, evidence []Know
 	for _, item := range evidence {
 		ids = append(ids, item.ID)
 	}
+	if generator != nil {
+		reply, err := generator.GenerateReply(context.Background(), ReplyRequest{
+			ConversationID: conversationID,
+			Question:       content,
+			Evidence:       evidence,
+			History:        history,
+		})
+		if err == nil && strings.TrimSpace(reply) != "" {
+			return Message{
+				ID: fmt.Sprintf("msg_%d_agent", time.Now().UnixNano()), ConversationID: conversationID, Role: "assistant",
+				Content: strings.TrimSpace(reply), Engine: "llm+rag", Safe: true, EvidenceIDs: ids, CreatedAt: now,
+			}, nil
+		}
+	}
 	return Message{
 		ID: fmt.Sprintf("msg_%d_agent", time.Now().UnixNano()), ConversationID: conversationID, Role: "assistant",
 		Content: fmt.Sprintf("根据知识库《%s》：%s", evidence[0].Title, evidence[0].Content),
 		Engine:  "rag+rule", Safe: true, EvidenceIDs: ids, CreatedAt: now,
 	}, nil
+}
+
+func (s *Store) messagesLocked(conversationID string) []Message {
+	items := make([]Message, 0)
+	for _, item := range s.messages {
+		if item.ConversationID == conversationID {
+			items = append(items, item)
+		}
+	}
+	return items
 }
 
 func (s *Store) touchConversationLocked(conversationID, content string, evidence []KnowledgeArticle, gap *KnowledgeGap) Conversation {

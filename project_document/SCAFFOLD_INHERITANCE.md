@@ -12,7 +12,7 @@
 | 后端 | Go + `net/http` / `ServeMux`，不引入 Web 框架 | `cmd/*` 和 `internal/*` 已落地 |
 | 数据库 | PostgreSQL + `pgx/v5` + SQL，不引入 ORM | `infra/postgres/migrations` 和 Postgres store 已接入 |
 | 日志 | `log/slog` JSON 结构化日志 | `internal/platform/service` 已统一处理 |
-| 配置 | env first | `ANJING_ADDR`、`ANJING_DATABASE_URL`、`ANJING_CONSOLE_DIST` |
+| 配置 | env first | `ANJING_ADDR`、`ANJING_DATABASE_URL`、`ANJING_CONSOLE_DIST`、`ANJING_LLM_*` |
 | 交付 | 单镜像多 command；本地可 `platform-all` | `cmd/platform-all`、`customer-service-api`、`ops-api`、`console-web`、`migrate-db` |
 | 文档 | 状态、路线图、边界、启动、约束分开维护 | `project_document` 已按新基线更新 |
 
@@ -24,9 +24,9 @@
 - `platform/store`: seed runtime 与 PostgreSQL runtime 的统一接口。
 - `apps/console`: 对话中心、知识中心、场景配置、人工队列的 React 控制台。
 
-## Legacy Reference
+## Runtime Structure
 
-旧 `backend/` 与 `frontend/` 目录暂作为迁移参考保留。新开发以 DVSkyFolding 目录为准：
+当前运行时以 DVSkyFolding 目录为准：
 
 ```text
 apps/console
@@ -36,7 +36,7 @@ infra/postgres
 infra/local
 ```
 
-后续每迁移完成一个业务边界，就删除对应旧运行入口和旧教学描述。
+早期运行入口已退场，教学材料只围绕当前脚手架结构展开。
 
 ## Teaching Narrative
 
@@ -44,7 +44,7 @@ infra/local
 2. 再看边界：客服 Agent 只新增会话、知识、规则、人工队列。
 3. 再看链路：用户消息如何触发 RAG、兜底、缺口、人工 ticket。
 4. 再看可靠性：没有证据不回答，转人工生成工单，缺口可以补知识。
-5. 最后看扩展：向量检索、流式回复、多租户和更完整的质检体系。
+5. 最后看扩展：可选模型客户端、向量检索、流式回复、多租户和更完整的质检体系。
 
 ## Verification
 
