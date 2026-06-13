@@ -53,6 +53,7 @@ type RuleTestResult = {
 type TransferTicket = {
   id: string;
   conversationId: string;
+  channel: string;
   question: string;
   reason: string;
   priority: string;
@@ -129,12 +130,22 @@ type Annotation = {
   score: number;
   createdAt: string;
 };
+type ChannelPolicy = {
+  channel: string;
+  displayName: string;
+  tone: string;
+  slaMinutes: number;
+  riskBoost: string;
+  escalationNote: string;
+  enabled: boolean;
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
   knowledgeGaps: KnowledgeGap[] | null;
   rules: Rule[] | null;
   transfers: TransferTicket[] | null;
+  channelPolicies: ChannelPolicy[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
 };
@@ -250,6 +261,7 @@ function App() {
   const [streaming, setStreaming] = useState(false);
   const [streamReply, setStreamReply] = useState('');
   const [transferFilter, setTransferFilter] = useState<'ALL' | 'OPEN' | 'ESCALATED' | 'RESOLVED'>('ALL');
+  const [channelFilter, setChannelFilter] = useState('ALL');
   const [annotationVerdict, setAnnotationVerdict] = useState<'PASS' | 'REVIEW' | 'FAIL'>('PASS');
   const [annotationNote, setAnnotationNote] = useState('证据充分，回复安全，可作为教学正样本。');
   const [annotationSaving, setAnnotationSaving] = useState(false);
@@ -259,7 +271,12 @@ function App() {
   const rules = dashboard?.rules ?? [];
   const transfers = dashboard?.transfers ?? [];
   const annotations = dashboard?.annotations ?? [];
+  const channelPolicies = dashboard?.channelPolicies ?? [];
+  const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
+    if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
+      return false;
+    }
     if (transferFilter === 'OPEN') {
       return ticket.status === 'OPEN';
     }
@@ -272,8 +289,8 @@ function App() {
     return true;
   });
   const activeConversation = useMemo(
-    () => conversations.find((item) => item.id === selectedConversationId) ?? conversations[0],
-    [conversations, selectedConversationId]
+    () => conversations.find((item) => item.id === selectedConversationId) ?? visibleConversations[0] ?? conversations[0],
+    [conversations, selectedConversationId, visibleConversations]
   );
   const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
   const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
@@ -596,8 +613,19 @@ function App() {
                 <h2>会话队列</h2>
               </div>
             </div>
+            <div className="filterRow">
+              {['ALL', ...channelPolicies.map((item) => item.channel)].map((item) => (
+                <button
+                  className={channelFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => setChannelFilter(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
             <div className="tableList">
-              {conversations.map((item) => (
+              {visibleConversations.map((item) => (
                 <article
                   className={`tableRow selectable ${item.id === activeConversation?.id ? 'selected' : ''}`}
                   key={item.id}
@@ -608,11 +636,13 @@ function App() {
                     <span>{item.lastMessage}</span>
                   </div>
                   <div>
+                    <em>{item.channel}</em>
                     <em>{item.intent}</em>
                     <b className={statusClass(item.riskLevel)}>{item.status}</b>
                   </div>
                 </article>
               ))}
+              {visibleConversations.length === 0 && <p className="empty">暂无匹配会话</p>}
             </div>
             <div className="panelDivider" />
             <div className="panelHeader compactHeader">
@@ -638,7 +668,7 @@ function App() {
                 <article className="tableRow" key={ticket.id}>
                   <div>
                     <strong>{ticket.question}</strong>
-                    <span>{ticket.reason} · {ticket.conversationId}</span>
+                    <span>{ticket.channel} · {ticket.reason} · {ticket.conversationId}</span>
                     <span>{ticket.slaStatus} · {ticket.waitMinutes}m / {ticket.slaMinutes}m SLA</span>
                     {ticket.assignee && <span>{ticket.assignee} · {ticket.resolutionNote}</span>}
                     <div className="timeline">
@@ -683,6 +713,32 @@ function App() {
                   {item.content && <p>{item.content}</p>}
                 </article>
               ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">渠道策略</p>
+                <h2>多渠道 SLA</h2>
+              </div>
+              <span className="status">{channelPolicies.length}</span>
+            </div>
+            <div className="tableList">
+              {channelPolicies.map((policy) => (
+                <article className="tableRow" key={policy.channel}>
+                  <div>
+                    <strong>{policy.displayName}</strong>
+                    <span>{policy.tone}</span>
+                    <span>{policy.escalationNote}</span>
+                  </div>
+                  <div>
+                    <em>{policy.slaMinutes}m</em>
+                    <b className={statusClass(policy.riskBoost)}>{policy.riskBoost}</b>
+                  </div>
+                </article>
+              ))}
+              {channelPolicies.length === 0 && <p className="empty">暂无渠道策略</p>}
             </div>
           </section>
 

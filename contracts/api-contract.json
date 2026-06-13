@@ -283,10 +283,11 @@
       }
     },
     "TransferTicket": {
-      "required": ["id", "conversationId", "question", "reason", "priority", "status", "createdAt"],
+      "required": ["id", "conversationId", "channel", "question", "reason", "priority", "status", "createdAt"],
       "fields": {
         "id": "string",
         "conversationId": "string",
+        "channel": "string",
         "question": "string",
         "reason": "TRANSFER_THRESHOLD",
         "priority": "LOW|MEDIUM|HIGH|CRITICAL",
@@ -342,15 +343,28 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "quality", "annotations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "quality", "annotations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
         "knowledgeGaps": "KnowledgeGap[]",
         "rules": "Rule[]",
         "transfers": "TransferTicket[]",
+        "channelPolicies": "ChannelPolicy[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]"
+      }
+    },
+    "ChannelPolicy": {
+      "required": ["channel", "displayName", "tone", "slaMinutes", "riskBoost", "escalationNote", "enabled"],
+      "fields": {
+        "channel": "string",
+        "displayName": "string",
+        "tone": "string",
+        "slaMinutes": "number",
+        "riskBoost": "NORMAL|HIGH",
+        "escalationNote": "string",
+        "enabled": "boolean"
       }
     },
     "QualitySummary": {

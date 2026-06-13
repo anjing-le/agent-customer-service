@@ -50,14 +50,15 @@ type Runtime interface {
 type Store struct {
 	mu sync.RWMutex
 
-	conversations []Conversation
-	messages      []Message
-	knowledge     []KnowledgeArticle
-	gaps          []KnowledgeGap
-	rules         []Rule
-	tickets       []TransferTicket
-	annotations   []Annotation
-	generator     ReplyGenerator
+	conversations   []Conversation
+	messages        []Message
+	knowledge       []KnowledgeArticle
+	gaps            []KnowledgeGap
+	rules           []Rule
+	tickets         []TransferTicket
+	channelPolicies []ChannelPolicy
+	annotations     []Annotation
+	generator       ReplyGenerator
 }
 
 type Conversation struct {
@@ -138,6 +139,7 @@ type RuleTestResult struct {
 type TransferTicket struct {
 	ID             string          `json:"id"`
 	ConversationID string          `json:"conversationId"`
+	Channel        string          `json:"channel"`
 	Question       string          `json:"question"`
 	Reason         string          `json:"reason"`
 	Priority       string          `json:"priority"`
@@ -151,6 +153,16 @@ type TransferTicket struct {
 	CreatedAt      string          `json:"createdAt"`
 	ResolvedAt     string          `json:"resolvedAt,omitempty"`
 	Events         []TransferEvent `json:"events,omitempty"`
+}
+
+type ChannelPolicy struct {
+	Channel        string `json:"channel"`
+	DisplayName    string `json:"displayName"`
+	Tone           string `json:"tone"`
+	SLAMinutes     int    `json:"slaMinutes"`
+	RiskBoost      string `json:"riskBoost"`
+	EscalationNote string `json:"escalationNote"`
+	Enabled        bool   `json:"enabled"`
 }
 
 type TransferEvent struct {
@@ -179,13 +191,14 @@ type AnnotationDimensions struct {
 }
 
 type Dashboard struct {
-	Metrics       []Metric         `json:"metrics"`
-	Conversations []Conversation   `json:"conversations"`
-	KnowledgeGaps []KnowledgeGap   `json:"knowledgeGaps"`
-	Rules         []Rule           `json:"rules"`
-	Transfers     []TransferTicket `json:"transfers"`
-	Quality       QualitySummary   `json:"quality"`
-	Annotations   []Annotation     `json:"annotations"`
+	Metrics         []Metric         `json:"metrics"`
+	Conversations   []Conversation   `json:"conversations"`
+	KnowledgeGaps   []KnowledgeGap   `json:"knowledgeGaps"`
+	Rules           []Rule           `json:"rules"`
+	Transfers       []TransferTicket `json:"transfers"`
+	ChannelPolicies []ChannelPolicy  `json:"channelPolicies"`
+	Quality         QualitySummary   `json:"quality"`
+	Annotations     []Annotation     `json:"annotations"`
 }
 
 type Metric struct {
@@ -237,6 +250,7 @@ func NewSeedStore(options ...Option) *Store {
 			{ID: "rule_low_evidence", Code: "NO_EVIDENCE_FALLBACK", Name: "无可靠证据兜底", Trigger: "knowledge evidence empty", Action: "safe_fallback_and_create_gap", Enabled: true},
 			{ID: "rule_human_transfer", Code: "TRANSFER_THRESHOLD", Name: "转人工阈值", Trigger: "投诉/催办/法律风险", Action: "recommend_human_transfer", Enabled: true},
 		},
+		channelPolicies: defaultChannelPolicies(),
 	}
 	st.messages = []Message{
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
@@ -244,7 +258,7 @@ func NewSeedStore(options ...Option) *Store {
 	}
 	oldTransferAt := time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339)
 	st.tickets = []TransferTicket{
-		demoTransferTicket("ticket_demo_transfer", "conv_demo_transfer", "我已经催了三次，必须马上找人工处理。", oldTransferAt),
+		demoTransferTicket("ticket_demo_transfer", "conv_demo_transfer", "WeChat", "我已经催了三次，必须马上找人工处理。", oldTransferAt),
 	}
 	for _, option := range options {
 		option(st)
@@ -293,6 +307,7 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 			Status: "Active", RiskLevel: "LOW", StartedAt: now,
 		}}, s.conversations...)
 	}
+	channel := s.conversationChannelLocked(conversationID)
 
 	userMessage := Message{ID: fmt.Sprintf("msg_%d_user", time.Now().UnixNano()), ConversationID: conversationID, Role: "user", Content: content, Engine: "customer", Safe: true, CreatedAt: now}
 	evidence := s.searchLocked(content)
@@ -309,7 +324,7 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 	}
 	s.messages = append(s.messages, userMessage, agentMessage)
 	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
-		s.tickets = append([]TransferTicket{newTransferTicket(conversationID, content, now)}, s.tickets...)
+		s.tickets = append([]TransferTicket{newTransferTicket(conversationID, channel, content, now)}, s.tickets...)
 	}
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
@@ -384,7 +399,7 @@ func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket
 			s.tickets[idx].ResolutionNote = fallback(note, "人工已处理")
 			s.tickets[idx].ResolvedAt = time.Now().UTC().Format(time.RFC3339)
 			s.tickets[idx].Events = transferEvents(s.tickets[idx])
-			return withTransferSLA(s.tickets[idx], time.Now().UTC()), nil
+			return withTransferSLA(s.tickets[idx], s.channelPolicies, time.Now().UTC()), nil
 		}
 	}
 	return TransferTicket{}, fmt.Errorf("transfer ticket %s not found", id)
@@ -416,23 +431,25 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
-	transfers := withTransferSLAs(s.tickets, time.Now().UTC())
+	transfers := withTransferSLAs(s.tickets, s.channelPolicies, time.Now().UTC())
 	quality := qualitySummary(s.messages, s.gaps, transfers, s.annotations)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
 			{Label: "Knowledge items", Value: fmt.Sprintf("%d", len(s.knowledge)), Note: "seeded trusted articles"},
 			{Label: "Open gaps", Value: fmt.Sprintf("%d", openGaps), Note: "created by no-evidence fallback"},
+			{Label: "Channels", Value: fmt.Sprintf("%d", activeChannelCount(s.conversations)), Note: "conversation sources with policies"},
 			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(s.rules)), Note: "guardrail and transfer policies"},
 		},
-		Conversations: append([]Conversation(nil), s.conversations...),
-		KnowledgeGaps: append([]KnowledgeGap(nil), s.gaps...),
-		Rules:         append([]Rule(nil), s.rules...),
-		Transfers:     transfers,
-		Quality:       quality,
-		Annotations:   append([]Annotation(nil), s.annotations...),
+		Conversations:   append([]Conversation(nil), s.conversations...),
+		KnowledgeGaps:   append([]KnowledgeGap(nil), s.gaps...),
+		Rules:           append([]Rule(nil), s.rules...),
+		Transfers:       transfers,
+		ChannelPolicies: append([]ChannelPolicy(nil), s.channelPolicies...),
+		Quality:         quality,
+		Annotations:     append([]Annotation(nil), s.annotations...),
 	}, nil
 }
 
@@ -551,6 +568,15 @@ func (s *Store) messageExistsLocked(messageID string) bool {
 		}
 	}
 	return false
+}
+
+func (s *Store) conversationChannelLocked(conversationID string) string {
+	for _, item := range s.conversations {
+		if item.ID == conversationID {
+			return fallback(item.Channel, "Web")
+		}
+	}
+	return "Web"
 }
 
 func (s *Store) touchConversationLocked(conversationID, content string, evidence []KnowledgeArticle, gap *KnowledgeGap) Conversation {
@@ -675,17 +701,18 @@ func ruleEnabled(rules []Rule, code string) bool {
 	return false
 }
 
-func newTransferTicket(conversationID, question, createdAt string) TransferTicket {
-	return demoTransferTicket(fmt.Sprintf("ticket_%d", time.Now().UnixNano()), conversationID, question, createdAt)
+func newTransferTicket(conversationID, channel, question, createdAt string) TransferTicket {
+	return demoTransferTicket(fmt.Sprintf("ticket_%d", time.Now().UnixNano()), conversationID, channel, question, createdAt)
 }
 
-func demoTransferTicket(id, conversationID, question, createdAt string) TransferTicket {
+func demoTransferTicket(id, conversationID, channel, question, createdAt string) TransferTicket {
 	if id == "" {
 		id = fmt.Sprintf("ticket_%d", time.Now().UnixNano())
 	}
 	ticket := TransferTicket{
 		ID:             id,
 		ConversationID: conversationID,
+		Channel:        fallback(channel, "Web"),
 		Question:       question,
 		Reason:         "TRANSFER_THRESHOLD",
 		Priority:       "HIGH",
@@ -693,7 +720,7 @@ func demoTransferTicket(id, conversationID, question, createdAt string) Transfer
 		CreatedAt:      createdAt,
 	}
 	ticket.Events = transferEvents(ticket)
-	return withTransferSLA(ticket, time.Now().UTC())
+	return withTransferSLA(ticket, defaultChannelPolicies(), time.Now().UTC())
 }
 
 func transferEvents(ticket TransferTicket) []TransferEvent {
@@ -714,23 +741,24 @@ func transferEvents(ticket TransferTicket) []TransferEvent {
 	return events
 }
 
-func withTransferSLAs(tickets []TransferTicket, now time.Time) []TransferTicket {
+func withTransferSLAs(tickets []TransferTicket, policies []ChannelPolicy, now time.Time) []TransferTicket {
 	items := make([]TransferTicket, 0, len(tickets))
 	for _, ticket := range tickets {
-		items = append(items, withTransferSLA(ticket, now))
+		items = append(items, withTransferSLA(ticket, policies, now))
 	}
 	return items
 }
 
-func withTransferSLA(ticket TransferTicket, now time.Time) TransferTicket {
-	const slaMinutes = 30
-	ticket.SLAMinutes = slaMinutes
+func withTransferSLA(ticket TransferTicket, policies []ChannelPolicy, now time.Time) TransferTicket {
+	policy := channelPolicyFor(policies, ticket.Channel)
+	ticket.Channel = policy.Channel
+	ticket.SLAMinutes = policy.SLAMinutes
 	ticket.WaitMinutes = transferWaitMinutes(ticket, now)
 	if ticket.Status == "RESOLVED" {
 		ticket.SLAStatus = "RESOLVED"
 		return ticket
 	}
-	if ticket.WaitMinutes >= slaMinutes {
+	if ticket.WaitMinutes >= ticket.SLAMinutes {
 		ticket.SLAStatus = "BREACHED"
 		ticket.Escalated = true
 		ticket.Priority = "CRITICAL"
@@ -738,6 +766,39 @@ func withTransferSLA(ticket TransferTicket, now time.Time) TransferTicket {
 	}
 	ticket.SLAStatus = "ON_TRACK"
 	return ticket
+}
+
+func defaultChannelPolicies() []ChannelPolicy {
+	return []ChannelPolicy{
+		{Channel: "Web", DisplayName: "Web 客服", Tone: "标准、清晰、可追溯", SLAMinutes: 30, RiskBoost: "NORMAL", EscalationNote: "网页渠道按标准客服 SLA 处理。", Enabled: true},
+		{Channel: "WeChat", DisplayName: "微信客服", Tone: "简洁、安抚、快速接管", SLAMinutes: 15, RiskBoost: "HIGH", EscalationNote: "微信投诉和催办要更快进入人工队列。", Enabled: true},
+		{Channel: "App", DisplayName: "App 客服", Tone: "直接、产品化、引导自助", SLAMinutes: 20, RiskBoost: "NORMAL", EscalationNote: "App 内问题优先引导订单和售后入口。", Enabled: true},
+		{Channel: "Marketplace", DisplayName: "平台店铺客服", Tone: "谨慎、合规、避免承诺", SLAMinutes: 10, RiskBoost: "HIGH", EscalationNote: "平台投诉可能影响店铺指标，优先升级。", Enabled: true},
+	}
+}
+
+func channelPolicyFor(policies []ChannelPolicy, channel string) ChannelPolicy {
+	normalized := strings.ToLower(strings.TrimSpace(channel))
+	for _, policy := range policies {
+		if strings.ToLower(policy.Channel) == normalized && policy.Enabled {
+			return policy
+		}
+	}
+	for _, policy := range defaultChannelPolicies() {
+		if strings.ToLower(policy.Channel) == normalized {
+			return policy
+		}
+	}
+	return defaultChannelPolicies()[0]
+}
+
+func activeChannelCount(conversations []Conversation) int {
+	seen := map[string]bool{}
+	for _, conv := range conversations {
+		channel := fallback(conv.Channel, "Web")
+		seen[channel] = true
+	}
+	return len(seen)
 }
 
 func transferWaitMinutes(ticket TransferTicket, now time.Time) int {

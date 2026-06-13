@@ -60,4 +60,7 @@ func TestPostgresStoreRuntime(t *testing.T) {
 	if len(dashboard.Transfers) == 0 {
 		t.Fatalf("expected persisted transfer ticket, got %#v", dashboard)
 	}
+	if len(dashboard.ChannelPolicies) == 0 {
+		t.Fatalf("expected channel policies, got %#v", dashboard)
+	}
 }

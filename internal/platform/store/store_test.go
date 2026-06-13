@@ -195,7 +195,7 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 
 func TestTransferTicketSLAEscalatesOpenTicket(t *testing.T) {
 	createdAt := time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339)
-	ticket := withTransferSLA(demoTransferTicket("ticket_sla", "conv_sla", "必须人工处理", createdAt), time.Now().UTC())
+	ticket := withTransferSLA(demoTransferTicket("ticket_sla", "conv_sla", "Web", "必须人工处理", createdAt), defaultChannelPolicies(), time.Now().UTC())
 
 	if !ticket.Escalated {
 		t.Fatalf("expected escalated ticket, got %#v", ticket)
@@ -205,6 +205,36 @@ func TestTransferTicketSLAEscalatesOpenTicket(t *testing.T) {
 	}
 	if ticket.WaitMinutes < ticket.SLAMinutes {
 		t.Fatalf("expected wait minutes past SLA, got %#v", ticket)
+	}
+}
+
+func TestChannelPolicyControlsTransferSLA(t *testing.T) {
+	st := NewSeedStore()
+
+	conv, err := st.CreateConversation("平台客户", "Marketplace")
+	if err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	result, err := st.SendMessage(conv.ID, "我已经投诉很多次了，必须马上转人工")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	if result.Conversation.Channel != "Marketplace" {
+		t.Fatalf("expected channel to remain Marketplace, got %#v", result.Conversation)
+	}
+
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ChannelPolicies) < 4 {
+		t.Fatalf("expected seeded channel policies, got %#v", dashboard.ChannelPolicies)
+	}
+	if len(dashboard.Transfers) == 0 || dashboard.Transfers[0].Channel != "Marketplace" {
+		t.Fatalf("expected marketplace transfer ticket, got %#v", dashboard.Transfers)
+	}
+	if dashboard.Transfers[0].SLAMinutes != 10 {
+		t.Fatalf("expected marketplace SLA, got %#v", dashboard.Transfers[0])
 	}
 }
 

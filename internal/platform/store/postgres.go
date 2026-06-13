@@ -96,12 +96,14 @@ func (s *PostgresStore) ListMessages(conversationID string) ([]Message, error) {
 func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessageResult, error) {
 	ctx := context.Background()
 	now := time.Now().UTC()
+	channel := "Web"
 	if conversationID == "" {
 		conv, err := s.CreateConversation("访客", "Web")
 		if err != nil {
 			return SendMessageResult{}, err
 		}
 		conversationID = conv.ID
+		channel = conv.Channel
 	}
 	exists, err := s.conversationExists(ctx, conversationID)
 	if err != nil {
@@ -114,6 +116,11 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 			on conflict (id) do nothing
 		`, conversationID, now); err != nil {
 			return SendMessageResult{}, fmt.Errorf("ensure conversation: %w", err)
+		}
+	} else {
+		channel, err = s.conversationChannel(ctx, conversationID)
+		if err != nil {
+			return SendMessageResult{}, err
 		}
 	}
 
@@ -147,11 +154,11 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 		return SendMessageResult{}, fmt.Errorf("insert agent message: %w", err)
 	}
 	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
-		ticket := newTransferTicket(conversationID, content, now.Format(time.RFC3339))
+		ticket := newTransferTicket(conversationID, channel, content, now.Format(time.RFC3339))
 		if _, err := tx.Exec(ctx, `
-			insert into transfer_tickets (id, conversation_id, question, reason, priority, status, created_at)
-			values ($1, $2, $3, $4, $5, $6, $7)
-		`, ticket.ID, ticket.ConversationID, ticket.Question, ticket.Reason, ticket.Priority, ticket.Status, now); err != nil {
+			insert into transfer_tickets (id, conversation_id, channel, question, reason, priority, status, created_at)
+			values ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, ticket.ID, ticket.ConversationID, ticket.Channel, ticket.Question, ticket.Reason, ticket.Priority, ticket.Status, now); err != nil {
 			return SendMessageResult{}, fmt.Errorf("insert transfer ticket: %w", err)
 		}
 	}
@@ -164,7 +171,7 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 		}
 	}
 
-	conv := postgresConversationState(conversationID, content, evidence, gap, now)
+	conv := postgresConversationState(conversationID, channel, content, evidence, gap, now)
 	if _, err := tx.Exec(ctx, `
 		insert into conversations (id, customer, channel, intent, status, risk_level, started_at, last_message)
 		values ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -369,6 +376,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	channelPolicies, err := s.listChannelPolicies()
+	if err != nil {
+		return Dashboard{}, err
+	}
 	messages, err := s.listRecentMessages()
 	if err != nil {
 		return Dashboard{}, err
@@ -390,23 +401,25 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
-	transfers = withTransferSLAs(transfers, time.Now().UTC())
+	transfers = withTransferSLAs(transfers, channelPolicies, time.Now().UTC())
 
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(conversations)), Note: "PostgreSQL runtime"},
 			{Label: "Knowledge items", Value: fmt.Sprintf("%d", len(knowledge)), Note: "trusted articles in PostgreSQL"},
 			{Label: "Open gaps", Value: fmt.Sprintf("%d", openGaps), Note: "created by no-evidence fallback"},
+			{Label: "Channels", Value: fmt.Sprintf("%d", activeChannelCount(conversations)), Note: "conversation sources with policies"},
 			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(rules)), Note: "guardrail and transfer policies"},
 		},
-		Conversations: conversations,
-		KnowledgeGaps: gaps,
-		Rules:         rules,
-		Transfers:     transfers,
-		Quality:       qualitySummary(messages, gaps, transfers, annotations),
-		Annotations:   annotations,
+		Conversations:   conversations,
+		KnowledgeGaps:   gaps,
+		Rules:           rules,
+		Transfers:       transfers,
+		ChannelPolicies: channelPolicies,
+		Quality:         qualitySummary(messages, gaps, transfers, annotations),
+		Annotations:     annotations,
 	}, nil
 }
 
@@ -416,6 +429,14 @@ func (s *PostgresStore) conversationExists(ctx context.Context, id string) (bool
 		return false, fmt.Errorf("check conversation exists: %w", err)
 	}
 	return exists, nil
+}
+
+func (s *PostgresStore) conversationChannel(ctx context.Context, id string) (string, error) {
+	var channel string
+	if err := s.pool.QueryRow(ctx, "select channel from conversations where id = $1", id).Scan(&channel); err != nil {
+		return "", fmt.Errorf("load conversation channel: %w", err)
+	}
+	return fallback(channel, "Web"), nil
 }
 
 func (s *PostgresStore) listGaps() ([]KnowledgeGap, error) {
@@ -473,7 +494,7 @@ func (s *PostgresStore) listRules() ([]Rule, error) {
 
 func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, conversation_id, question, reason, priority, status, assignee, resolution_note, created_at, resolved_at
+		select id, conversation_id, channel, question, reason, priority, status, assignee, resolution_note, created_at, resolved_at
 		from transfer_tickets
 		order by created_at desc
 		limit 50
@@ -489,7 +510,7 @@ func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {
 		var createdAt time.Time
 		var resolvedAt *time.Time
 		if err := rows.Scan(
-			&item.ID, &item.ConversationID, &item.Question, &item.Reason, &item.Priority, &item.Status,
+			&item.ID, &item.ConversationID, &item.Channel, &item.Question, &item.Reason, &item.Priority, &item.Status,
 			&item.Assignee, &item.ResolutionNote, &createdAt, &resolvedAt,
 		); err != nil {
 			return nil, err
@@ -505,6 +526,34 @@ func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {
 		return nil, err
 	}
 	return tickets, nil
+}
+
+func (s *PostgresStore) listChannelPolicies() ([]ChannelPolicy, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select channel, display_name, tone, sla_minutes, risk_boost, escalation_note, enabled
+		from channel_policies
+		order by sla_minutes asc, channel asc
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel policies: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]ChannelPolicy, 0)
+	for rows.Next() {
+		var item ChannelPolicy
+		if err := rows.Scan(&item.Channel, &item.DisplayName, &item.Tone, &item.SLAMinutes, &item.RiskBoost, &item.EscalationNote, &item.Enabled); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return defaultChannelPolicies(), nil
+	}
+	return items, nil
 }
 
 func (s *PostgresStore) listRecentMessages() ([]Message, error) {
@@ -691,7 +740,7 @@ func messageTraceJSON(trace *AgentTrace) []byte {
 	return payload
 }
 
-func postgresConversationState(conversationID, content string, evidence []KnowledgeArticle, gap *KnowledgeGap, now time.Time) Conversation {
+func postgresConversationState(conversationID, channel, content string, evidence []KnowledgeArticle, gap *KnowledgeGap, now time.Time) Conversation {
 	status := "Active"
 	risk := "LOW"
 	intent := "知识问答"
@@ -709,7 +758,7 @@ func postgresConversationState(conversationID, content string, evidence []Knowle
 		intent = evidence[0].Category
 	}
 	return Conversation{
-		ID: conversationID, Customer: "访客", Channel: "Web", Intent: intent,
+		ID: conversationID, Customer: "访客", Channel: fallback(channel, "Web"), Intent: intent,
 		Status: status, RiskLevel: risk, StartedAt: now.Format(time.RFC3339), LastMessage: content,
 	}
 }

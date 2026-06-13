@@ -14,6 +14,7 @@
 | `Rule` | 规则兜底或转人工策略 | seed store 或 PostgreSQL |
 | `RuleTestResult` | 对单句用户输入的规则测试结果 | `/api/ops/rules/test` |
 | `TransferTicket` | 转人工工单，包含 SLA、升级状态、创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
+| `ChannelPolicy` | 渠道级客服策略，定义语气、风险加权、转人工 SLA 和升级说明 | seed store 或 PostgreSQL |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
 | `AnnotationDimensions` | 人工质检评分维度：证据贴合、安全性、帮助性 | `Annotation.dimensions` |
@@ -39,6 +40,7 @@ user message
 | 命中可信知识 | 默认返回基于知识的 `rag+rule` 回复；配置模型客户端后可生成 `llm+rag` 回复 |
 | 无可信知识 | 返回安全兜底，不自由生成；创建 `KnowledgeGap` |
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
+| 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
@@ -70,7 +72,7 @@ user message
 |---|---|
 | `internal/customer` | conversation、message |
 | `internal/knowledge` | knowledge article、knowledge gap |
-| `internal/ops` | dashboard、rule test、transfer ticket、annotation |
+| `internal/ops` | dashboard、rule test、transfer ticket、channel policy、annotation |
 | `internal/platform/store` | runtime interface、seed store、Postgres store |
 
 ## Current Limits
