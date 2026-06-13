@@ -198,6 +198,9 @@ type ChannelDemoResult = {
   status: number;
   conversationId: string;
   reply: string;
+  evidenceTitles: string[];
+  fallbackReason?: string;
+  trace?: AgentTrace;
 };
 type Dashboard = {
   metrics: Metric[];
@@ -586,7 +589,10 @@ function App() {
         exampleId: example.id,
         status: response.status,
         conversationId: payload.data.conversation.id,
-        reply: payload.data.agentMessage.content
+        reply: payload.data.agentMessage.content,
+        evidenceTitles: payload.data.evidence.map((item) => item.title),
+        fallbackReason: payload.data.agentMessage.fallbackReason,
+        trace: payload.data.agentMessage.trace
       });
       await load();
       await loadMessages(payload.data.conversation.id);
@@ -920,7 +926,20 @@ function App() {
                     <strong>{example.channel}</strong>
                     <span>{example.endpoint}</span>
                     <span>{example.headers['X-Channel-Origin']}</span>
-                    {channelDemoResult?.exampleId === example.id && <small>{channelDemoResult.reply}</small>}
+                    {channelDemoResult?.exampleId === example.id && (
+                      <div className="protocolTrace">
+                        <small>{channelDemoResult.reply}</small>
+                        <span>
+                          {[
+                            channelDemoResult.trace?.strategy,
+                            `${channelDemoResult.trace?.evidenceCount ?? channelDemoResult.evidenceTitles.length} evidence`,
+                            `${channelDemoResult.trace?.historyCount ?? 0} history`,
+                            channelDemoResult.fallbackReason ? `fallback ${channelDemoResult.fallbackReason}` : ''
+                          ].filter(Boolean).join(' · ')}
+                        </span>
+                        {channelDemoResult.evidenceTitles.length > 0 && <span>{channelDemoResult.evidenceTitles.join(' / ')}</span>}
+                      </div>
+                    )}
                   </div>
                   <div className="protocolMeta">
                     <span>{example.secretRef}</span>

@@ -598,10 +598,20 @@ textarea {
   white-space: nowrap;
 }
 
-.protocolSummary small {
+.protocolTrace {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.protocolTrace small {
   color: #314c40;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.protocolTrace span {
+  white-space: normal;
 }
 
 .protocolMeta {
