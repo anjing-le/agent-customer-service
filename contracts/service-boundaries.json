@@ -62,6 +62,8 @@
         { "name": "dashboard", "path": "/api/ops/dashboard", "methods": ["GET"] },
         { "name": "testRule", "path": "/api/ops/rules/test", "methods": ["POST"] },
         { "name": "resolveTransfer", "path": "/api/ops/transfers/resolve", "methods": ["POST"] },
+        { "name": "assignReviewTask", "path": "/api/ops/review-tasks/assign", "methods": ["POST"] },
+        { "name": "completeReviewTask", "path": "/api/ops/review-tasks/complete", "methods": ["POST"] },
         { "name": "submitAnnotation", "path": "/api/ops/annotations/submit", "methods": ["POST"] },
         { "name": "exportTrainingSamples", "path": "/api/ops/training-samples/export", "methods": ["GET"] }
       ]

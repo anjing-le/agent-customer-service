@@ -23,6 +23,7 @@
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
 | `AnnotationDimensions` | 人工质检评分维度：证据贴合、安全性、帮助性 | `Annotation.dimensions` |
+| `ReviewTask` | 待复核任务，绑定助手消息、会话、渠道、优先级、领取人和完成时间 | `/api/ops/review-tasks/*` |
 | `TrainingSample` | 由低分/待复核标注生成的复盘样本，包含 prompt、answer、证据、评分和备注 | `/api/ops/training-samples/export` |
 | `QualitySummary` | 质量评估摘要，统计证据回答、安全兜底、转人工和人工标注均分 | `/api/ops/dashboard` |
 | `Dashboard` | 会话、知识、规则、缺口和人工队列的运营聚合 | `/api/ops/dashboard` |
@@ -50,6 +51,7 @@ user message
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
+| 质检任务 | 每条助手回复生成 `ReviewTask`，运营可领取/完成；提交 `Annotation` 会自动完成对应任务 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
 | 复盘导出 | 对低分、`FAIL` 或 `REVIEW` 标注生成 `TrainingSample`，用于运营复盘和后续训练数据整理 |
 
@@ -68,6 +70,7 @@ user message
 | `CreateArticleFromGap` | 由缺口生成可信知识 |
 | `TestRule` | 规则兜底测试 |
 | `ResolveTransferTicket` | 人工工单处理 |
+| `AssignReviewTask` / `CompleteReviewTask` | 质检任务领取和完成 |
 | `SubmitAnnotation` | 人工质检标注回写 |
 | `ExportTrainingSamples` | 低分标注复盘样本导出 |
 | `Dashboard` | 运营聚合视图 |
@@ -84,7 +87,7 @@ user message
 | `internal/customer` | conversation、message |
 | `internal/channels` | channel adapters、inbound webhook、signature verification、replay protection、channel conversation mapping |
 | `internal/knowledge` | knowledge article、knowledge gap |
-| `internal/ops` | dashboard、rule test、transfer ticket、channel policy、channel integration、annotation |
+| `internal/ops` | dashboard、rule test、transfer ticket、channel policy、channel integration、review task、annotation |
 | `internal/platform/store` | runtime interface、seed store、Postgres store |
 
 ## Current Limits

@@ -136,6 +136,22 @@
       "response": { "status": 200, "schema": "TransferTicket" }
     },
     {
+      "id": "assignReviewTask",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/review-tasks/assign",
+      "request": { "body": "AssignReviewTaskRequest" },
+      "response": { "status": 200, "schema": "ReviewTask" }
+    },
+    {
+      "id": "completeReviewTask",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/review-tasks/complete",
+      "request": { "body": "CompleteReviewTaskRequest" },
+      "response": { "status": 200, "schema": "ReviewTask" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -271,6 +287,19 @@
         "id": "string",
         "assignee": "string",
         "note": "string"
+      }
+    },
+    "AssignReviewTaskRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string",
+        "assignee": "string"
+      }
+    },
+    "CompleteReviewTaskRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string"
       }
     },
     "SubmitAnnotationRequest": {
@@ -430,6 +459,21 @@
         "helpfulness": "number"
       }
     },
+    "ReviewTask": {
+      "required": ["id", "messageId", "conversationId", "channel", "status", "priority", "reason", "createdAt"],
+      "fields": {
+        "id": "string",
+        "messageId": "string",
+        "conversationId": "string",
+        "channel": "string",
+        "assignee": "string",
+        "status": "OPEN|ASSIGNED|COMPLETED",
+        "priority": "NORMAL|HIGH",
+        "reason": "string",
+        "createdAt": "RFC3339 string",
+        "completedAt": "RFC3339 string"
+      }
+    },
     "TrainingSample": {
       "required": ["id", "conversationId", "messageId", "channel", "prompt", "answer", "engine", "evidenceIds", "reviewer", "verdict", "score", "dimensions", "note", "tags", "createdAt"],
       "fields": {
@@ -459,7 +503,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations", "reviewTasks"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -470,7 +514,8 @@
         "integrations": "ChannelIntegration[]",
         "channelAlerts": "ChannelAlert[]",
         "quality": "QualitySummary",
-        "annotations": "Annotation[]"
+        "annotations": "Annotation[]",
+        "reviewTasks": "ReviewTask[]"
       }
     },
     "ChannelAlert": {

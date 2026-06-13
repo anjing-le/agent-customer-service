@@ -50,6 +50,45 @@ func TestSubmitAnnotationRouteRequiresMessageID(t *testing.T) {
 	}
 }
 
+func TestReviewTaskRoutesAssignAndCompleteTask(t *testing.T) {
+	st := store.NewSeedStore()
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ReviewTasks) == 0 {
+		t.Fatal("expected seeded review task")
+	}
+	taskID := dashboard.ReviewTasks[0].ID
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	assignReq := httptest.NewRequest(http.MethodPost, "/api/ops/review-tasks/assign", strings.NewReader(`{"id":"`+taskID+`","assignee":"qa-a"}`))
+	assignRec := httptest.NewRecorder()
+	mux.ServeHTTP(assignRec, assignReq)
+
+	if assignRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", assignRec.Code, assignRec.Body.String())
+	}
+	for _, expected := range []string{`"id":"` + taskID + `"`, `"status":"ASSIGNED"`, `"assignee":"qa-a"`} {
+		if !strings.Contains(assignRec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, assignRec.Body.String())
+		}
+	}
+
+	completeReq := httptest.NewRequest(http.MethodPost, "/api/ops/review-tasks/complete", strings.NewReader(`{"id":"`+taskID+`"}`))
+	completeRec := httptest.NewRecorder()
+	mux.ServeHTTP(completeRec, completeReq)
+
+	if completeRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", completeRec.Code, completeRec.Body.String())
+	}
+	if !strings.Contains(completeRec.Body.String(), `"status":"COMPLETED"`) {
+		t.Fatalf("expected completed task, got %s", completeRec.Body.String())
+	}
+}
+
 func TestExportTrainingSamplesRouteReturnsLowScoreSamples(t *testing.T) {
 	st := store.NewSeedStore()
 	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")

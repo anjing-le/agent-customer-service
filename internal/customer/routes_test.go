@@ -73,6 +73,14 @@ func (f failingRuntime) ResolveTransferTicket(string, string, string) (store.Tra
 	return store.TransferTicket{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) AssignReviewTask(string, string) (store.ReviewTask, error) {
+	return store.ReviewTask{}, errors.New("database unavailable")
+}
+
+func (f failingRuntime) CompleteReviewTask(string) (store.ReviewTask, error) {
+	return store.ReviewTask{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) SubmitAnnotation(string, string, string, string, store.AnnotationDimensions, []string) (store.Annotation, error) {
 	return store.Annotation{}, errors.New("database unavailable")
 }

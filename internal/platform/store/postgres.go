@@ -162,6 +162,14 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 			return SendMessageResult{}, fmt.Errorf("insert transfer ticket: %w", err)
 		}
 	}
+	reviewTask := newReviewTask(agentMessage.ID, conversationID, channel, reviewPriority(agentMessage), reviewReason(agentMessage), now.Format(time.RFC3339))
+	if _, err := tx.Exec(ctx, `
+		insert into review_tasks (id, message_id, conversation_id, channel, assignee, status, priority, reason, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		on conflict (id) do nothing
+	`, reviewTask.ID, reviewTask.MessageID, reviewTask.ConversationID, reviewTask.Channel, reviewTask.Assignee, reviewTask.Status, reviewTask.Priority, reviewTask.Reason, now); err != nil {
+		return SendMessageResult{}, fmt.Errorf("insert review task: %w", err)
+	}
 	if gap != nil {
 		if _, err := tx.Exec(ctx, `
 			insert into knowledge_gaps (id, conversation_id, question, reason, status, priority, created_at)
@@ -455,7 +463,12 @@ func (s *PostgresStore) SubmitAnnotation(messageID, reviewer, verdict, note stri
 	createdAt := time.Now().UTC()
 	annotation := newAnnotation(messageID, reviewer, verdict, note, dimensions, tags, createdAt.Format(time.RFC3339))
 	ctx := context.Background()
-	if _, err := s.pool.Exec(ctx, `
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Annotation{}, fmt.Errorf("begin submit annotation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
 		insert into message_annotations (id, message_id, reviewer, verdict, note, groundedness, safety, helpfulness, tags, score, created_at)
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`, annotation.ID, annotation.MessageID, annotation.Reviewer, annotation.Verdict, annotation.Note,
@@ -463,7 +476,49 @@ func (s *PostgresStore) SubmitAnnotation(messageID, reviewer, verdict, note stri
 		annotation.Tags, annotation.Score, createdAt); err != nil {
 		return Annotation{}, fmt.Errorf("submit annotation: %w", err)
 	}
+	if _, err := tx.Exec(ctx, `
+		update review_tasks
+		set status = 'COMPLETED',
+		    assignee = coalesce(nullif(assignee, ''), $2),
+		    completed_at = $3
+		where message_id = $1
+		  and status <> 'COMPLETED'
+	`, messageID, annotation.Reviewer, createdAt); err != nil {
+		return Annotation{}, fmt.Errorf("complete review task from annotation: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Annotation{}, fmt.Errorf("commit submit annotation: %w", err)
+	}
 	return annotation, nil
+}
+
+func (s *PostgresStore) AssignReviewTask(id, assignee string) (ReviewTask, error) {
+	task, err := s.updateReviewTask(`
+		update review_tasks
+		set status = case when status = 'COMPLETED' then status else 'ASSIGNED' end,
+		    assignee = case when status = 'COMPLETED' then assignee else $2 end
+		where id = $1
+		returning id, message_id, conversation_id, channel, assignee, status, priority, reason, created_at, completed_at
+	`, id, fallback(assignee, "qa-operator"))
+	if err != nil {
+		return ReviewTask{}, fmt.Errorf("assign review task: %w", err)
+	}
+	return task, nil
+}
+
+func (s *PostgresStore) CompleteReviewTask(id string) (ReviewTask, error) {
+	task, err := s.updateReviewTask(`
+		update review_tasks
+		set status = 'COMPLETED',
+		    assignee = coalesce(nullif(assignee, ''), 'qa-operator'),
+		    completed_at = coalesce(completed_at, now())
+		where id = $1
+		returning id, message_id, conversation_id, channel, assignee, status, priority, reason, created_at, completed_at
+	`, id)
+	if err != nil {
+		return ReviewTask{}, fmt.Errorf("complete review task: %w", err)
+	}
+	return task, nil
 }
 
 func (s *PostgresStore) ExportTrainingSamples(maxScore int) ([]TrainingSample, error) {
@@ -581,6 +636,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	reviewTasks, err := s.listReviewTasks()
+	if err != nil {
+		return Dashboard{}, err
+	}
 	channelAlerts, err := s.listChannelAlerts()
 	if err != nil {
 		return Dashboard{}, err
@@ -598,6 +657,12 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
+	openReviews := 0
+	for _, task := range reviewTasks {
+		if task.Status != "COMPLETED" {
+			openReviews++
+		}
+	}
 	transfers = withTransferSLAs(transfers, channelPolicies, time.Now().UTC())
 
 	return Dashboard{
@@ -610,6 +675,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(rules)), Note: "guardrail and transfer policies"},
 			{Label: "Channel failures", Value: fmt.Sprintf("%d", channelAlertCount(channelAlerts)), Note: "rejected inbound requests"},
+			{Label: "Review tasks", Value: fmt.Sprintf("%d", openReviews), Note: "assistant replies awaiting QA"},
 		},
 		Conversations:   conversations,
 		KnowledgeGaps:   gaps,
@@ -620,6 +686,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		ChannelAlerts:   channelAlerts,
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
+		ReviewTasks:     reviewTasks,
 	}, nil
 }
 
@@ -887,6 +954,65 @@ func (s *PostgresStore) listAnnotations() ([]Annotation, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func (s *PostgresStore) listReviewTasks() ([]ReviewTask, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, message_id, conversation_id, channel, assignee, status, priority, reason, created_at, completed_at
+		from review_tasks
+		order by
+		  case when status = 'COMPLETED' then 1 else 0 end,
+		  created_at desc,
+		  id desc
+		limit 50
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list review tasks: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]ReviewTask, 0)
+	for rows.Next() {
+		item, err := scanReviewTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (s *PostgresStore) updateReviewTask(query string, args ...any) (ReviewTask, error) {
+	row := s.pool.QueryRow(context.Background(), query, args...)
+	item, err := scanReviewTask(row)
+	if err != nil {
+		return ReviewTask{}, err
+	}
+	return item, nil
+}
+
+type reviewTaskScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanReviewTask(row reviewTaskScanner) (ReviewTask, error) {
+	var item ReviewTask
+	var createdAt time.Time
+	var completedAt *time.Time
+	if err := row.Scan(
+		&item.ID, &item.MessageID, &item.ConversationID, &item.Channel, &item.Assignee,
+		&item.Status, &item.Priority, &item.Reason, &createdAt, &completedAt,
+	); err != nil {
+		return ReviewTask{}, err
+	}
+	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	if completedAt != nil {
+		item.CompletedAt = completedAt.UTC().Format(time.RFC3339)
+	}
+	return item, nil
 }
 
 func scanMessages(rows pgx.Rows) ([]Message, error) {

@@ -54,6 +54,8 @@ type Runtime interface {
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
+	AssignReviewTask(id, assignee string) (ReviewTask, error)
+	CompleteReviewTask(id string) (ReviewTask, error)
 	SubmitAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string) (Annotation, error)
 	ExportTrainingSamples(maxScore int) ([]TrainingSample, error)
 	Dashboard() (Dashboard, error)
@@ -71,6 +73,7 @@ type Store struct {
 	channelPolicies []ChannelPolicy
 	integrations    []ChannelIntegration
 	annotations     []Annotation
+	reviewTasks     []ReviewTask
 	inboundReplay   map[string]ChannelInboundReceipt
 	rateWindows     map[string]int
 	channelFailures []ChannelFailureEvent
@@ -222,6 +225,19 @@ type AnnotationDimensions struct {
 	Helpfulness  int `json:"helpfulness"`
 }
 
+type ReviewTask struct {
+	ID             string `json:"id"`
+	MessageID      string `json:"messageId"`
+	ConversationID string `json:"conversationId"`
+	Channel        string `json:"channel"`
+	Assignee       string `json:"assignee,omitempty"`
+	Status         string `json:"status"`
+	Priority       string `json:"priority"`
+	Reason         string `json:"reason"`
+	CreatedAt      string `json:"createdAt"`
+	CompletedAt    string `json:"completedAt,omitempty"`
+}
+
 type TrainingSample struct {
 	ID             string               `json:"id"`
 	ConversationID string               `json:"conversationId"`
@@ -251,6 +267,7 @@ type Dashboard struct {
 	ChannelAlerts   []ChannelAlert       `json:"channelAlerts"`
 	Quality         QualitySummary       `json:"quality"`
 	Annotations     []Annotation         `json:"annotations"`
+	ReviewTasks     []ReviewTask         `json:"reviewTasks"`
 }
 
 type Metric struct {
@@ -347,6 +364,9 @@ func NewSeedStore(options ...Option) *Store {
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
 		{ID: "msg_demo_2", ConversationID: "conv_demo_refund", Role: "assistant", Content: "根据售后知识库，签收 7 天内可申请无理由退货；非质量问题寄回运费通常由用户承担，质量问题由商家承担。", Engine: "rag+rule", Safe: true, EvidenceIDs: []string{"kb_refund_7d"}, CreatedAt: now},
 	}
+	st.reviewTasks = []ReviewTask{
+		newReviewTask("msg_demo_2", "conv_demo_refund", "Web", "HIGH", "种子回复需验证证据完整性", now),
+	}
 	oldTransferAt := time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339)
 	st.tickets = []TransferTicket{
 		demoTransferTicket("ticket_demo_transfer", "conv_demo_transfer", "WeChat", "我已经催了三次，必须马上找人工处理。", oldTransferAt),
@@ -417,6 +437,7 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
 		s.tickets = append([]TransferTicket{newTransferTicket(conversationID, channel, content, now)}, s.tickets...)
 	}
+	s.reviewTasks = append([]ReviewTask{newReviewTask(agentMessage.ID, conversationID, channel, reviewPriority(agentMessage), reviewReason(agentMessage), now)}, s.reviewTasks...)
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
 	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
@@ -578,7 +599,39 @@ func (s *Store) SubmitAnnotation(messageID, reviewer, verdict, note string, dime
 	}
 	annotation := newAnnotation(messageID, reviewer, verdict, note, dimensions, tags, time.Now().UTC().Format(time.RFC3339))
 	s.annotations = append([]Annotation{annotation}, s.annotations...)
+	s.completeReviewTaskByMessageLocked(messageID, annotation.Reviewer, annotation.CreatedAt)
 	return annotation, nil
+}
+
+func (s *Store) AssignReviewTask(id, assignee string) (ReviewTask, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx := range s.reviewTasks {
+		if s.reviewTasks[idx].ID == id {
+			if s.reviewTasks[idx].Status != "COMPLETED" {
+				s.reviewTasks[idx].Status = "ASSIGNED"
+				s.reviewTasks[idx].Assignee = fallback(assignee, "qa-operator")
+			}
+			return s.reviewTasks[idx], nil
+		}
+	}
+	return ReviewTask{}, fmt.Errorf("review task %s not found", id)
+}
+
+func (s *Store) CompleteReviewTask(id string) (ReviewTask, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx := range s.reviewTasks {
+		if s.reviewTasks[idx].ID == id {
+			s.reviewTasks[idx].Status = "COMPLETED"
+			s.reviewTasks[idx].CompletedAt = time.Now().UTC().Format(time.RFC3339)
+			if s.reviewTasks[idx].Assignee == "" {
+				s.reviewTasks[idx].Assignee = "qa-operator"
+			}
+			return s.reviewTasks[idx], nil
+		}
+	}
+	return ReviewTask{}, fmt.Errorf("review task %s not found", id)
 }
 
 func (s *Store) ExportTrainingSamples(maxScore int) ([]TrainingSample, error) {
@@ -602,6 +655,12 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
+	openReviews := 0
+	for _, task := range s.reviewTasks {
+		if task.Status != "COMPLETED" {
+			openReviews++
+		}
+	}
 	transfers := withTransferSLAs(s.tickets, s.channelPolicies, time.Now().UTC())
 	quality := qualitySummary(s.messages, s.gaps, transfers, s.annotations)
 	channelAlerts := channelAlerts(s.channelFailures)
@@ -615,6 +674,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(s.rules)), Note: "guardrail and transfer policies"},
 			{Label: "Channel failures", Value: fmt.Sprintf("%d", channelAlertCount(channelAlerts)), Note: "rejected inbound requests"},
+			{Label: "Review tasks", Value: fmt.Sprintf("%d", openReviews), Note: "assistant replies awaiting QA"},
 		},
 		Conversations:   append([]Conversation(nil), s.conversations...),
 		KnowledgeGaps:   append([]KnowledgeGap(nil), s.gaps...),
@@ -625,6 +685,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelAlerts:   channelAlerts,
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
+		ReviewTasks:     append([]ReviewTask(nil), s.reviewTasks...),
 	}, nil
 }
 
@@ -1064,6 +1125,53 @@ func newAnnotation(messageID, reviewer, verdict, note string, dimensions Annotat
 	}
 	annotation.Score = annotationScore(annotation.Dimensions)
 	return annotation
+}
+
+func newReviewTask(messageID, conversationID, channel, priority, reason, createdAt string) ReviewTask {
+	return ReviewTask{
+		ID:             fmt.Sprintf("review_%s", strings.TrimPrefix(messageID, "msg_")),
+		MessageID:      messageID,
+		ConversationID: conversationID,
+		Channel:        fallback(channel, "Web"),
+		Status:         "OPEN",
+		Priority:       fallback(priority, "NORMAL"),
+		Reason:         fallback(reason, "Agent 回复抽检"),
+		CreatedAt:      createdAt,
+	}
+}
+
+func reviewPriority(message Message) string {
+	if message.FallbackReason != "" || !message.Safe {
+		return "HIGH"
+	}
+	if message.Engine == "llm+rag" {
+		return "HIGH"
+	}
+	return "NORMAL"
+}
+
+func reviewReason(message Message) string {
+	switch message.FallbackReason {
+	case "NO_EVIDENCE":
+		return "无证据兜底需要确认是否应补知识"
+	case "TRANSFER_THRESHOLD":
+		return "转人工边界需要确认话术与升级理由"
+	}
+	if message.Engine == "llm+rag" {
+		return "模型生成回复需要抽检事实一致性"
+	}
+	return "RAG 回复抽检证据引用"
+}
+
+func (s *Store) completeReviewTaskByMessageLocked(messageID, reviewer, completedAt string) {
+	for idx := range s.reviewTasks {
+		if s.reviewTasks[idx].MessageID == messageID && s.reviewTasks[idx].Status != "COMPLETED" {
+			s.reviewTasks[idx].Status = "COMPLETED"
+			s.reviewTasks[idx].Assignee = fallback(reviewer, s.reviewTasks[idx].Assignee)
+			s.reviewTasks[idx].CompletedAt = completedAt
+			return
+		}
+	}
 }
 
 func normalizeAnnotationDimensions(dimensions AnnotationDimensions) AnnotationDimensions {

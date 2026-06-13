@@ -276,6 +276,54 @@ func TestSubmitAnnotationUpdatesQualitySummary(t *testing.T) {
 	}
 }
 
+func TestReviewTaskAssignmentAndAnnotationCompletion(t *testing.T) {
+	st := NewSeedStore()
+
+	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	var task ReviewTask
+	for _, candidate := range dashboard.ReviewTasks {
+		if candidate.MessageID == result.AgentMessage.ID {
+			task = candidate
+			break
+		}
+	}
+	if task.ID == "" || task.Status != "OPEN" {
+		t.Fatalf("expected open review task for agent reply, got %#v", dashboard.ReviewTasks)
+	}
+
+	assigned, err := st.AssignReviewTask(task.ID, "qa-a")
+	if err != nil {
+		t.Fatalf("assign review task: %v", err)
+	}
+	if assigned.Status != "ASSIGNED" || assigned.Assignee != "qa-a" {
+		t.Fatalf("expected assigned task, got %#v", assigned)
+	}
+
+	if _, err := st.SubmitAnnotation(result.AgentMessage.ID, "qa-a", "PASS", "证据充分", AnnotationDimensions{
+		Groundedness: 5,
+		Safety:       5,
+		Helpfulness:  5,
+	}, nil); err != nil {
+		t.Fatalf("submit annotation: %v", err)
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	for _, candidate := range dashboard.ReviewTasks {
+		if candidate.ID == task.ID && (candidate.Status != "COMPLETED" || candidate.CompletedAt == "") {
+			t.Fatalf("expected completed review task after annotation, got %#v", candidate)
+		}
+	}
+}
+
 func TestExportTrainingSamplesReturnsLowScoreAnnotations(t *testing.T) {
 	st := NewSeedStore()
 

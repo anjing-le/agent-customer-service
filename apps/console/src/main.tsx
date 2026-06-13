@@ -134,6 +134,18 @@ type Annotation = {
   score: number;
   createdAt: string;
 };
+type ReviewTask = {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  channel: string;
+  assignee?: string;
+  status: string;
+  priority: string;
+  reason: string;
+  createdAt: string;
+  completedAt?: string;
+};
 type TrainingSample = {
   id: string;
   conversationId: string;
@@ -251,6 +263,7 @@ type Dashboard = {
   channelAlerts: ChannelAlert[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
+  reviewTasks: ReviewTask[] | null;
 };
 type SendMessageResult = {
   conversation: Conversation;
@@ -453,6 +466,7 @@ function App() {
   const rules = dashboard?.rules ?? [];
   const transfers = dashboard?.transfers ?? [];
   const annotations = dashboard?.annotations ?? [];
+  const reviewTasks = dashboard?.reviewTasks ?? [];
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
   const channelAlerts = dashboard?.channelAlerts ?? [];
@@ -482,6 +496,7 @@ function App() {
   const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
   const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
   const openTransferCount = transfers.filter((item) => item.status === 'OPEN').length;
+  const openReviewCount = reviewTasks.filter((item) => item.status !== 'COMPLETED').length;
   const latestAssistantMessage = result?.agentMessage ?? [...history].reverse().find((item) => item.role === 'assistant');
 
   const load = async () => {
@@ -604,6 +619,32 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'resolve transfer failed');
+    }
+  };
+
+  const assignReviewTask = async (task: ReviewTask) => {
+    setError('');
+    try {
+      await api<ReviewTask>('/api/ops/review-tasks/assign', {
+        method: 'POST',
+        body: JSON.stringify({ id: task.id, assignee: 'qa-operator' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'assign review task failed');
+    }
+  };
+
+  const completeReviewTask = async (task: ReviewTask) => {
+    setError('');
+    try {
+      await api<ReviewTask>('/api/ops/review-tasks/complete', {
+        method: 'POST',
+        body: JSON.stringify({ id: task.id })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'complete review task failed');
     }
   };
 
@@ -789,6 +830,11 @@ function App() {
             <span>Human queue</span>
             <strong>{openTransferCount}</strong>
             <small>open transfer tickets</small>
+          </article>
+          <article className="metric">
+            <span>QA queue</span>
+            <strong>{openReviewCount}</strong>
+            <small>assistant replies awaiting review</small>
           </article>
           {loading && <article className="metric skeleton">Loading</article>}
         </section>
@@ -1194,6 +1240,42 @@ function App() {
                 </article>
               ))}
               {channelPolicies.length === 0 && <p className="empty">暂无渠道策略</p>}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">质检任务</p>
+                <h2>待复核队列</h2>
+              </div>
+              <span className="status">{openReviewCount}</span>
+            </div>
+            <div className="tableList">
+              {reviewTasks.slice(0, 6).map((task) => (
+                <article className="tableRow" key={task.id}>
+                  <div>
+                    <strong>{task.reason}</strong>
+                    <span>{task.channel} · {task.conversationId}</span>
+                    <span>{task.messageId}</span>
+                    {task.assignee && <span>{task.assignee}{task.completedAt ? ` · ${task.completedAt.slice(11, 19)}` : ''}</span>}
+                  </div>
+                  <div className="gapActions">
+                    <b className={statusClass(task.priority)}>{task.status}</b>
+                    {task.status !== 'COMPLETED' && (
+                      <span>
+                        <button className="tinyButton" onClick={() => assignReviewTask(task)} title="领取任务">
+                          <UserRoundCheck size={14} />
+                        </button>
+                        <button className="tinyButton" onClick={() => completeReviewTask(task)} title="完成任务">
+                          <CheckCircle2 size={14} />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+              {reviewTasks.length === 0 && <p className="empty">暂无待复核任务</p>}
             </div>
           </section>
 
