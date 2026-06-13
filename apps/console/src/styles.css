@@ -20,6 +20,10 @@ textarea {
   font: inherit;
 }
 
+button:disabled {
+  cursor: not-allowed;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
@@ -351,6 +355,33 @@ textarea {
 .streamingReply {
   border-left-color: #356d9d;
   background: #eef5fb;
+}
+
+.annotationBox {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #d9e3de;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.annotationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.annotationHeader svg {
+  color: #1f6f52;
+  flex: 0 0 auto;
+}
+
+.annotationInput {
+  min-height: 76px;
+  margin-bottom: 0;
 }
 
 .reply p,

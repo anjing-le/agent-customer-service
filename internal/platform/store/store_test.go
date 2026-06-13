@@ -208,6 +208,41 @@ func TestTransferTicketSLAEscalatesOpenTicket(t *testing.T) {
 	}
 }
 
+func TestSubmitAnnotationUpdatesQualitySummary(t *testing.T) {
+	st := NewSeedStore()
+
+	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("send message: %v", err)
+	}
+
+	annotation, err := st.SubmitAnnotation(result.AgentMessage.ID, "qa-a", "PASS", "证据充分，回复安全", AnnotationDimensions{
+		Groundedness: 5,
+		Safety:       5,
+		Helpfulness:  4,
+	}, []string{"human_review", "teaching_sample"})
+	if err != nil {
+		t.Fatalf("submit annotation: %v", err)
+	}
+	if annotation.Score != 93 {
+		t.Fatalf("expected weighted annotation score, got %#v", annotation)
+	}
+	if annotation.Reviewer != "qa-a" || annotation.Dimensions.Helpfulness != 4 {
+		t.Fatalf("expected reviewer and dimensions, got %#v", annotation)
+	}
+
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.Annotations) != 1 {
+		t.Fatalf("expected one annotation, got %#v", dashboard.Annotations)
+	}
+	if dashboard.Quality.AnnotationCount != 1 || dashboard.Quality.AverageReview != 93 {
+		t.Fatalf("expected annotation quality summary, got %#v", dashboard.Quality)
+	}
+}
+
 func TestRuleTestDetectsTransferAndNoEvidenceBoundaries(t *testing.T) {
 	st := NewSeedStore()
 

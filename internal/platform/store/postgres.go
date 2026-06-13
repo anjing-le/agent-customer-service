@@ -333,6 +333,21 @@ func (s *PostgresStore) ResolveTransferTicket(id, assignee, note string) (Transf
 	return item, nil
 }
 
+func (s *PostgresStore) SubmitAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string) (Annotation, error) {
+	createdAt := time.Now().UTC()
+	annotation := newAnnotation(messageID, reviewer, verdict, note, dimensions, tags, createdAt.Format(time.RFC3339))
+	ctx := context.Background()
+	if _, err := s.pool.Exec(ctx, `
+		insert into message_annotations (id, message_id, reviewer, verdict, note, groundedness, safety, helpfulness, tags, score, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`, annotation.ID, annotation.MessageID, annotation.Reviewer, annotation.Verdict, annotation.Note,
+		annotation.Dimensions.Groundedness, annotation.Dimensions.Safety, annotation.Dimensions.Helpfulness,
+		annotation.Tags, annotation.Score, createdAt); err != nil {
+		return Annotation{}, fmt.Errorf("submit annotation: %w", err)
+	}
+	return annotation, nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	conversations, err := s.ListConversations()
 	if err != nil {
@@ -355,6 +370,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		return Dashboard{}, err
 	}
 	messages, err := s.listRecentMessages()
+	if err != nil {
+		return Dashboard{}, err
+	}
+	annotations, err := s.listAnnotations()
 	if err != nil {
 		return Dashboard{}, err
 	}
@@ -386,7 +405,8 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		KnowledgeGaps: gaps,
 		Rules:         rules,
 		Transfers:     transfers,
-		Quality:       qualitySummary(messages, gaps, transfers),
+		Quality:       qualitySummary(messages, gaps, transfers, annotations),
+		Annotations:   annotations,
 	}, nil
 }
 
@@ -499,6 +519,38 @@ func (s *PostgresStore) listRecentMessages() ([]Message, error) {
 	}
 	defer rows.Close()
 	return scanMessages(rows)
+}
+
+func (s *PostgresStore) listAnnotations() ([]Annotation, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, message_id, reviewer, verdict, note, groundedness, safety, helpfulness, tags, score, created_at
+		from message_annotations
+		order by created_at desc, id desc
+		limit 50
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list annotations: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]Annotation, 0)
+	for rows.Next() {
+		var item Annotation
+		var createdAt time.Time
+		if err := rows.Scan(
+			&item.ID, &item.MessageID, &item.Reviewer, &item.Verdict, &item.Note,
+			&item.Dimensions.Groundedness, &item.Dimensions.Safety, &item.Dimensions.Helpfulness,
+			&item.Tags, &item.Score, &createdAt,
+		); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func scanMessages(rows pgx.Rows) ([]Message, error) {

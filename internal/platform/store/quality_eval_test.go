@@ -35,7 +35,7 @@ func TestQualityEvaluationCases(t *testing.T) {
 			if err != nil {
 				t.Fatalf("send message: %v", err)
 			}
-			summary := qualitySummary([]Message{result.AgentMessage}, nil, nil)
+			summary := qualitySummary([]Message{result.AgentMessage}, nil, nil, nil)
 			if summary.Score < tc.ExpectMinScore {
 				t.Fatalf("quality score too low: got %d want >= %d", summary.Score, tc.ExpectMinScore)
 			}

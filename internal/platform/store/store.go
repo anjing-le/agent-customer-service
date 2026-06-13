@@ -43,6 +43,7 @@ type Runtime interface {
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
+	SubmitAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string) (Annotation, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -55,6 +56,7 @@ type Store struct {
 	gaps          []KnowledgeGap
 	rules         []Rule
 	tickets       []TransferTicket
+	annotations   []Annotation
 	generator     ReplyGenerator
 }
 
@@ -158,6 +160,24 @@ type TransferEvent struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+type Annotation struct {
+	ID         string               `json:"id"`
+	MessageID  string               `json:"messageId"`
+	Reviewer   string               `json:"reviewer"`
+	Verdict    string               `json:"verdict"`
+	Note       string               `json:"note"`
+	Dimensions AnnotationDimensions `json:"dimensions"`
+	Tags       []string             `json:"tags"`
+	Score      int                  `json:"score"`
+	CreatedAt  string               `json:"createdAt"`
+}
+
+type AnnotationDimensions struct {
+	Groundedness int `json:"groundedness"`
+	Safety       int `json:"safety"`
+	Helpfulness  int `json:"helpfulness"`
+}
+
 type Dashboard struct {
 	Metrics       []Metric         `json:"metrics"`
 	Conversations []Conversation   `json:"conversations"`
@@ -165,6 +185,7 @@ type Dashboard struct {
 	Rules         []Rule           `json:"rules"`
 	Transfers     []TransferTicket `json:"transfers"`
 	Quality       QualitySummary   `json:"quality"`
+	Annotations   []Annotation     `json:"annotations"`
 }
 
 type Metric struct {
@@ -179,6 +200,8 @@ type QualitySummary struct {
 	EvidenceAnswers  int      `json:"evidenceAnswers"`
 	SafeFallbacks    int      `json:"safeFallbacks"`
 	HumanTransfers   int      `json:"humanTransfers"`
+	AnnotationCount  int      `json:"annotationCount"`
+	AverageReview    int      `json:"averageReview"`
 	Notes            []string `json:"notes"`
 }
 
@@ -367,6 +390,17 @@ func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket
 	return TransferTicket{}, fmt.Errorf("transfer ticket %s not found", id)
 }
 
+func (s *Store) SubmitAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string) (Annotation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.messageExistsLocked(messageID) {
+		return Annotation{}, fmt.Errorf("message %s not found", messageID)
+	}
+	annotation := newAnnotation(messageID, reviewer, verdict, note, dimensions, tags, time.Now().UTC().Format(time.RFC3339))
+	s.annotations = append([]Annotation{annotation}, s.annotations...)
+	return annotation, nil
+}
+
 func (s *Store) Dashboard() (Dashboard, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -383,7 +417,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		}
 	}
 	transfers := withTransferSLAs(s.tickets, time.Now().UTC())
-	quality := qualitySummary(s.messages, s.gaps, transfers)
+	quality := qualitySummary(s.messages, s.gaps, transfers, s.annotations)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
@@ -398,6 +432,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Rules:         append([]Rule(nil), s.rules...),
 		Transfers:     transfers,
 		Quality:       quality,
+		Annotations:   append([]Annotation(nil), s.annotations...),
 	}, nil
 }
 
@@ -507,6 +542,15 @@ func (s *Store) messagesLocked(conversationID string) []Message {
 		}
 	}
 	return items
+}
+
+func (s *Store) messageExistsLocked(messageID string) bool {
+	for _, message := range s.messages {
+		if message.ID == messageID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) touchConversationLocked(conversationID, content string, evidence []KnowledgeArticle, gap *KnowledgeGap) Conversation {
@@ -714,7 +758,44 @@ func transferWaitMinutes(ticket TransferTicket, now time.Time) int {
 	return minutes
 }
 
-func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferTicket) QualitySummary {
+func newAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string, createdAt string) Annotation {
+	annotation := Annotation{
+		ID:         fmt.Sprintf("ann_%d", time.Now().UnixNano()),
+		MessageID:  messageID,
+		Reviewer:   fallback(reviewer, "operator"),
+		Verdict:    fallback(verdict, "PASS"),
+		Note:       fallback(note, "人工复核通过"),
+		Dimensions: normalizeAnnotationDimensions(dimensions),
+		Tags:       normalizeTags(tags, verdict),
+		CreatedAt:  createdAt,
+	}
+	annotation.Score = annotationScore(annotation.Dimensions)
+	return annotation
+}
+
+func normalizeAnnotationDimensions(dimensions AnnotationDimensions) AnnotationDimensions {
+	return AnnotationDimensions{
+		Groundedness: clampScore(dimensions.Groundedness),
+		Safety:       clampScore(dimensions.Safety),
+		Helpfulness:  clampScore(dimensions.Helpfulness),
+	}
+}
+
+func clampScore(value int) int {
+	if value < 1 {
+		return 1
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
+}
+
+func annotationScore(dimensions AnnotationDimensions) int {
+	return (dimensions.Groundedness + dimensions.Safety + dimensions.Helpfulness) * 100 / 15
+}
+
+func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferTicket, annotations []Annotation) QualitySummary {
 	summary := QualitySummary{}
 	for _, message := range messages {
 		if message.Role != "assistant" {
@@ -738,8 +819,18 @@ func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferT
 			summary.Score += 20
 		}
 	}
+	for _, annotation := range annotations {
+		summary.AnnotationCount++
+		summary.AverageReview += annotation.Score
+	}
+	if summary.AnnotationCount > 0 {
+		summary.AverageReview = summary.AverageReview / summary.AnnotationCount
+	}
 	if summary.ReviewedMessages > 0 {
 		summary.Score = summary.Score / summary.ReviewedMessages
+	}
+	if summary.AverageReview > 0 {
+		summary.Score = (summary.Score + summary.AverageReview) / 2
 	}
 	if summary.Score > 100 {
 		summary.Score = 100
@@ -751,6 +842,7 @@ func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferT
 		fmt.Sprintf("%d open knowledge gaps", openGapCount(gaps)),
 		fmt.Sprintf("%d open transfer tickets", openTransferCount(tickets)),
 		fmt.Sprintf("%d escalated transfer tickets", escalatedTransferCount(tickets)),
+		fmt.Sprintf("%d human annotations", summary.AnnotationCount),
 	}
 	return summary
 }

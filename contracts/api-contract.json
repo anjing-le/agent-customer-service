@@ -96,6 +96,14 @@
       "path": "/api/ops/transfers/resolve",
       "request": { "body": "ResolveTransferRequest" },
       "response": { "status": 200, "schema": "TransferTicket" }
+    },
+    {
+      "id": "submitAnnotation",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/annotations/submit",
+      "request": { "body": "SubmitAnnotationRequest" },
+      "response": { "status": 201, "schema": "Annotation" }
     }
   ],
   "schemas": {
@@ -172,6 +180,17 @@
         "id": "string",
         "assignee": "string",
         "note": "string"
+      }
+    },
+    "SubmitAnnotationRequest": {
+      "required": ["messageId"],
+      "fields": {
+        "messageId": "string",
+        "reviewer": "string",
+        "verdict": "PASS|REVIEW|FAIL",
+        "note": "string",
+        "dimensions": "AnnotationDimensions",
+        "tags": "string[]"
       }
     },
     "Conversation": {
@@ -292,6 +311,28 @@
         "createdAt": "RFC3339 string"
       }
     },
+    "Annotation": {
+      "required": ["id", "messageId", "reviewer", "verdict", "note", "dimensions", "tags", "score", "createdAt"],
+      "fields": {
+        "id": "string",
+        "messageId": "string",
+        "reviewer": "string",
+        "verdict": "PASS|REVIEW|FAIL",
+        "note": "string",
+        "dimensions": "AnnotationDimensions",
+        "tags": "string[]",
+        "score": "number",
+        "createdAt": "RFC3339 string"
+      }
+    },
+    "AnnotationDimensions": {
+      "required": ["groundedness", "safety", "helpfulness"],
+      "fields": {
+        "groundedness": "number",
+        "safety": "number",
+        "helpfulness": "number"
+      }
+    },
     "Metric": {
       "required": ["label", "value", "note"],
       "fields": {
@@ -301,24 +342,27 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "quality"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "quality", "annotations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
         "knowledgeGaps": "KnowledgeGap[]",
         "rules": "Rule[]",
         "transfers": "TransferTicket[]",
-        "quality": "QualitySummary"
+        "quality": "QualitySummary",
+        "annotations": "Annotation[]"
       }
     },
     "QualitySummary": {
-      "required": ["score", "reviewedMessages", "evidenceAnswers", "safeFallbacks", "humanTransfers", "notes"],
+      "required": ["score", "reviewedMessages", "evidenceAnswers", "safeFallbacks", "humanTransfers", "annotationCount", "averageReview", "notes"],
       "fields": {
         "score": "number",
         "reviewedMessages": "number",
         "evidenceAnswers": "number",
         "safeFallbacks": "number",
         "humanTransfers": "number",
+        "annotationCount": "number",
+        "averageReview": "number",
         "notes": "string[]"
       }
     },

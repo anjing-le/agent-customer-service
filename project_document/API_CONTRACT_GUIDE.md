@@ -42,6 +42,7 @@ Go API 当前响应格式：
 - `/api/ops/dashboard`: 运行看板。
 - `/api/ops/rules/test`: 规则测试。
 - `/api/ops/transfers/resolve`: 处理人工 ticket。
+- `/api/ops/annotations/submit`: 对助手消息提交人工质检标注。
 
 ## Endpoint Contract
 
@@ -50,7 +51,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`QualitySummary`
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`Annotation`、`QualitySummary`
 
 新增或修改接口时，需要同时更新：
 

@@ -5,6 +5,7 @@ import {
   BookOpen,
   Bot,
   CheckCircle2,
+  ClipboardCheck,
   Database,
   FileSearch,
   FilePlus2,
@@ -108,7 +109,25 @@ type QualitySummary = {
   evidenceAnswers: number;
   safeFallbacks: number;
   humanTransfers: number;
+  annotationCount: number;
+  averageReview: number;
   notes: string[];
+};
+type AnnotationDimensions = {
+  groundedness: number;
+  safety: number;
+  helpfulness: number;
+};
+type Annotation = {
+  id: string;
+  messageId: string;
+  reviewer: string;
+  verdict: string;
+  note: string;
+  dimensions: AnnotationDimensions;
+  tags: string[];
+  score: number;
+  createdAt: string;
 };
 type Dashboard = {
   metrics: Metric[];
@@ -117,6 +136,7 @@ type Dashboard = {
   rules: Rule[] | null;
   transfers: TransferTicket[] | null;
   quality: QualitySummary;
+  annotations: Annotation[] | null;
 };
 type SendMessageResult = {
   conversation: Conversation;
@@ -230,11 +250,15 @@ function App() {
   const [streaming, setStreaming] = useState(false);
   const [streamReply, setStreamReply] = useState('');
   const [transferFilter, setTransferFilter] = useState<'ALL' | 'OPEN' | 'ESCALATED' | 'RESOLVED'>('ALL');
+  const [annotationVerdict, setAnnotationVerdict] = useState<'PASS' | 'REVIEW' | 'FAIL'>('PASS');
+  const [annotationNote, setAnnotationNote] = useState('证据充分，回复安全，可作为教学正样本。');
+  const [annotationSaving, setAnnotationSaving] = useState(false);
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
   const rules = dashboard?.rules ?? [];
   const transfers = dashboard?.transfers ?? [];
+  const annotations = dashboard?.annotations ?? [];
   const visibleTransfers = transfers.filter((ticket) => {
     if (transferFilter === 'OPEN') {
       return ticket.status === 'OPEN';
@@ -254,6 +278,7 @@ function App() {
   const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
   const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
   const openTransferCount = transfers.filter((item) => item.status === 'OPEN').length;
+  const latestAssistantMessage = result?.agentMessage ?? [...history].reverse().find((item) => item.role === 'assistant');
 
   const load = async () => {
     setLoading(true);
@@ -376,6 +401,33 @@ function App() {
     }
   };
 
+  const submitAnnotation = async () => {
+    if (!latestAssistantMessage) {
+      setError('请先选择或生成一条 Agent 回复');
+      return;
+    }
+    setError('');
+    setAnnotationSaving(true);
+    try {
+      await api<Annotation>('/api/ops/annotations/submit', {
+        method: 'POST',
+        body: JSON.stringify({
+          messageId: latestAssistantMessage.id,
+          reviewer: 'operator',
+          verdict: annotationVerdict,
+          note: annotationNote,
+          dimensions: annotationDimensions(annotationVerdict),
+          tags: ['human_review', 'teaching_sample']
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'submit annotation failed');
+    } finally {
+      setAnnotationSaving(false);
+    }
+  };
+
   return (
     <main className="shell">
       <aside className="nav">
@@ -437,6 +489,8 @@ function App() {
               <span>{dashboard.quality.evidenceAnswers} evidence</span>
               <span>{dashboard.quality.safeFallbacks} fallback</span>
               <span>{dashboard.quality.humanTransfers} transfer</span>
+              <span>{dashboard.quality.annotationCount} review</span>
+              <span>{dashboard.quality.averageReview} avg</span>
             </div>
             <div className="qualityNotes">
               {dashboard.quality.notes.map((note) => <small key={note}>{note}</small>)}
@@ -484,6 +538,37 @@ function App() {
                 <p>{result.agentMessage.content}</p>
               </div>
             )}
+            <div className="annotationBox">
+              <div className="annotationHeader">
+                <div>
+                  <p className="sectionLabel">人工质检</p>
+                  <strong>{latestAssistantMessage ? latestAssistantMessage.engine : '等待回复'}</strong>
+                </div>
+                <ClipboardCheck size={18} />
+              </div>
+              <div className="filterRow">
+                {(['PASS', 'REVIEW', 'FAIL'] as const).map((item) => (
+                  <button
+                    className={annotationVerdict === item ? 'filterButton active' : 'filterButton'}
+                    key={item}
+                    onClick={() => setAnnotationVerdict(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                className="annotationInput"
+                value={annotationNote}
+                onChange={(event) => setAnnotationNote(event.target.value)}
+              />
+              <div className="actionRow">
+                <button className="primary" onClick={submitAnnotation} disabled={annotationSaving || !latestAssistantMessage}>
+                  {annotationSaving ? '提交中' : '提交标注'}
+                </button>
+                <span>{dashboard?.quality.annotationCount ?? 0} reviews</span>
+              </div>
+            </div>
             <div className="history">
               <div className="historyHeader">
                 <strong>会话历史</strong>
@@ -604,6 +689,32 @@ function App() {
           <section className="panel">
             <div className="panelHeader">
               <div>
+                <p className="sectionLabel">质检审核</p>
+                <h2>人工标注记录</h2>
+              </div>
+              <span className="status">{annotations.length}</span>
+            </div>
+            <div className="tableList">
+              {annotations.slice(0, 5).map((item) => (
+                <article className="tableRow" key={item.id}>
+                  <div>
+                    <strong>{item.verdict} · {item.score}</strong>
+                    <span>{item.note}</span>
+                    <span>{item.messageId}</span>
+                  </div>
+                  <div>
+                    <em>{item.reviewer}</em>
+                    <b className={statusClass(item.verdict)}>{item.dimensions.groundedness}/{item.dimensions.safety}/{item.dimensions.helpfulness}</b>
+                  </div>
+                </article>
+              ))}
+              {annotations.length === 0 && <p className="empty">暂无人工标注</p>}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
                 <p className="sectionLabel">知识中心</p>
                 <h2>知识缺口</h2>
               </div>
@@ -678,13 +789,23 @@ function App() {
 }
 
 function statusClass(value?: string) {
-  if (value === 'HIGH' || value === 'HIGH_PRIORITY' || value === 'CRITICAL') {
+  if (value === 'HIGH' || value === 'HIGH_PRIORITY' || value === 'CRITICAL' || value === 'FAIL') {
     return 'status danger';
   }
-  if (value === 'MEDIUM' || value === 'KnowledgeGap') {
+  if (value === 'MEDIUM' || value === 'KnowledgeGap' || value === 'REVIEW') {
     return 'status warning';
   }
   return 'status';
+}
+
+function annotationDimensions(verdict: 'PASS' | 'REVIEW' | 'FAIL'): AnnotationDimensions {
+  if (verdict === 'FAIL') {
+    return { groundedness: 2, safety: 2, helpfulness: 2 };
+  }
+  if (verdict === 'REVIEW') {
+    return { groundedness: 3, safety: 4, helpfulness: 3 };
+  }
+  return { groundedness: 5, safety: 5, helpfulness: 4 };
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

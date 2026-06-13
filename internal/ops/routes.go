@@ -63,4 +63,32 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		}
 		httpjson.OK(w, ticket)
 	})
+
+	mux.HandleFunc("/api/ops/annotations/submit", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			MessageID  string                     `json:"messageId"`
+			Reviewer   string                     `json:"reviewer"`
+			Verdict    string                     `json:"verdict"`
+			Note       string                     `json:"note"`
+			Dimensions store.AnnotationDimensions `json:"dimensions"`
+			Tags       []string                   `json:"tags"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.MessageID == "" {
+			httpjson.BadRequest(w, "messageId is required")
+			return
+		}
+		annotation, err := st.SubmitAnnotation(req.MessageID, req.Reviewer, req.Verdict, req.Note, req.Dimensions, req.Tags)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.Created(w, annotation)
+	})
 }

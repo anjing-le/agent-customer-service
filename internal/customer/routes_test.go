@@ -52,6 +52,10 @@ func (f failingRuntime) ResolveTransferTicket(string, string, string) (store.Tra
 	return store.TransferTicket{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) SubmitAnnotation(string, string, string, string, store.AnnotationDimensions, []string) (store.Annotation, error) {
+	return store.Annotation{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) Dashboard() (store.Dashboard, error) {
 	return store.Dashboard{}, errors.New("database unavailable")
 }

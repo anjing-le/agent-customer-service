@@ -27,6 +27,7 @@
 | 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
 | 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
+| 人工质检 | Runtime connected | 支持对助手消息提交人工标注，记录 groundedness/safety/helpfulness 维度并汇总到 Dashboard 质量摘要 |
 
 ## 迁移原则
 
@@ -37,5 +38,5 @@
 
 ## 下一步
 
-1. 增加更细的人工标注维度和质检审核流。
-2. 补多渠道会话来源和渠道级策略。
+1. 补多渠道会话来源和渠道级策略。
+2. 增加标注复盘面板和低分样本再训练导出。
