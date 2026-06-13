@@ -20,7 +20,7 @@
 | 本地数据库 | Ready | `infra/local/docker-compose.yml`、`pnpm db:*` 脚本和可选 Postgres 集成测试已接入 |
 | 知识运营闭环 | Runtime connected | 缺口支持关闭，支持由缺口生成可信知识条目并回写为已处理 |
 | 规则测试 | Runtime connected | 场景配置区可输入问题测试转人工、无证据兜底和可回答边界 |
-| 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看、处理工单，并展示创建/解决事件时间线 |
+| 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看、筛选、处理工单，并展示 SLA、升级状态和事件时间线 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
 | 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
@@ -37,5 +37,5 @@
 
 ## 下一步
 
-1. 补坐席处理 SLA、优先级升级和工单筛选。
-2. 增加更细的人工标注维度和质检审核流。
+1. 增加更细的人工标注维度和质检审核流。
+2. 补多渠道会话来源和渠道级策略。

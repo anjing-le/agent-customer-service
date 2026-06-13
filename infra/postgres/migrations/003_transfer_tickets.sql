@@ -13,12 +13,13 @@ CREATE TABLE IF NOT EXISTS transfer_tickets (
 
 CREATE INDEX IF NOT EXISTS idx_transfer_tickets_status ON transfer_tickets (status, priority, created_at DESC);
 
-INSERT INTO transfer_tickets (id, conversation_id, question, reason, priority, status)
+INSERT INTO transfer_tickets (id, conversation_id, question, reason, priority, status, created_at)
 VALUES
-  ('ticket_demo_transfer', 'conv_demo_transfer', '我已经催了三次，必须马上找人工处理。', 'TRANSFER_THRESHOLD', 'HIGH', 'OPEN')
+  ('ticket_demo_transfer', 'conv_demo_transfer', '我已经催了三次，必须马上找人工处理。', 'TRANSFER_THRESHOLD', 'HIGH', 'OPEN', now() - interval '45 minutes')
 ON CONFLICT (id) DO UPDATE
 SET
   question = EXCLUDED.question,
   reason = EXCLUDED.reason,
   priority = EXCLUDED.priority,
-  status = EXCLUDED.status;
+  status = EXCLUDED.status,
+  created_at = EXCLUDED.created_at;

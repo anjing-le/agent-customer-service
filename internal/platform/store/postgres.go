@@ -371,6 +371,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
+	transfers = withTransferSLAs(transfers, time.Now().UTC())
 
 	return Dashboard{
 		Metrics: []Metric{
@@ -378,6 +379,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			{Label: "Knowledge items", Value: fmt.Sprintf("%d", len(knowledge)), Note: "trusted articles in PostgreSQL"},
 			{Label: "Open gaps", Value: fmt.Sprintf("%d", openGaps), Note: "created by no-evidence fallback"},
 			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
+			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(rules)), Note: "guardrail and transfer policies"},
 		},
 		Conversations: conversations,

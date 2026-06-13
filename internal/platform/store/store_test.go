@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 type fakeReplyGenerator struct {
@@ -173,6 +174,9 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 	if len(dashboard.Transfers) == 0 || dashboard.Transfers[0].Status != "OPEN" {
 		t.Fatalf("expected open transfer ticket, got %#v", dashboard.Transfers)
 	}
+	if dashboard.Transfers[0].Escalated {
+		t.Fatalf("new transfer ticket should not be escalated immediately, got %#v", dashboard.Transfers[0])
+	}
 	if len(dashboard.Transfers[0].Events) != 1 || dashboard.Transfers[0].Events[0].Type != "CREATED" {
 		t.Fatalf("expected created event, got %#v", dashboard.Transfers[0].Events)
 	}
@@ -186,6 +190,21 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 	}
 	if len(resolved.Events) != 2 || resolved.Events[1].Type != "RESOLVED" || resolved.Events[1].Note != "已电话回访" {
 		t.Fatalf("expected resolved event timeline, got %#v", resolved.Events)
+	}
+}
+
+func TestTransferTicketSLAEscalatesOpenTicket(t *testing.T) {
+	createdAt := time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339)
+	ticket := withTransferSLA(demoTransferTicket("ticket_sla", "conv_sla", "必须人工处理", createdAt), time.Now().UTC())
+
+	if !ticket.Escalated {
+		t.Fatalf("expected escalated ticket, got %#v", ticket)
+	}
+	if ticket.Priority != "CRITICAL" || ticket.SLAStatus != "BREACHED" {
+		t.Fatalf("expected critical breached ticket, got %#v", ticket)
+	}
+	if ticket.WaitMinutes < ticket.SLAMinutes {
+		t.Fatalf("expected wait minutes past SLA, got %#v", ticket)
 	}
 }
 

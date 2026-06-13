@@ -56,6 +56,10 @@ type TransferTicket = {
   reason: string;
   priority: string;
   status: string;
+  slaMinutes: number;
+  waitMinutes: number;
+  slaStatus: string;
+  escalated: boolean;
   assignee?: string;
   resolutionNote?: string;
   createdAt: string;
@@ -225,11 +229,24 @@ function App() {
   const [error, setError] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [streamReply, setStreamReply] = useState('');
+  const [transferFilter, setTransferFilter] = useState<'ALL' | 'OPEN' | 'ESCALATED' | 'RESOLVED'>('ALL');
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
   const rules = dashboard?.rules ?? [];
   const transfers = dashboard?.transfers ?? [];
+  const visibleTransfers = transfers.filter((ticket) => {
+    if (transferFilter === 'OPEN') {
+      return ticket.status === 'OPEN';
+    }
+    if (transferFilter === 'ESCALATED') {
+      return ticket.escalated;
+    }
+    if (transferFilter === 'RESOLVED') {
+      return ticket.status === 'RESOLVED';
+    }
+    return true;
+  });
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === selectedConversationId) ?? conversations[0],
     [conversations, selectedConversationId]
@@ -520,12 +537,24 @@ function App() {
               </div>
               <span className="status">{openTransferCount}</span>
             </div>
+            <div className="filterRow">
+              {(['ALL', 'OPEN', 'ESCALATED', 'RESOLVED'] as const).map((item) => (
+                <button
+                  className={transferFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => setTransferFilter(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
             <div className="tableList">
-              {transfers.map((ticket) => (
+              {visibleTransfers.map((ticket) => (
                 <article className="tableRow" key={ticket.id}>
                   <div>
                     <strong>{ticket.question}</strong>
                     <span>{ticket.reason} · {ticket.conversationId}</span>
+                    <span>{ticket.slaStatus} · {ticket.waitMinutes}m / {ticket.slaMinutes}m SLA</span>
                     {ticket.assignee && <span>{ticket.assignee} · {ticket.resolutionNote}</span>}
                     <div className="timeline">
                       {(ticket.events ?? []).map((event) => (
@@ -536,7 +565,7 @@ function App() {
                     </div>
                   </div>
                   <div className="gapActions">
-                    <b className={statusClass(ticket.priority)}>{ticket.status}</b>
+                    <b className={statusClass(ticket.priority)}>{ticket.escalated ? 'ESCALATED' : ticket.status}</b>
                     {ticket.status === 'OPEN' && (
                       <span>
                         <button className="tinyButton" onClick={() => resolveTransfer(ticket)} title="处理工单">
@@ -547,7 +576,7 @@ function App() {
                   </div>
                 </article>
               ))}
-              {transfers.length === 0 && <p className="empty">暂无人工工单</p>}
+              {visibleTransfers.length === 0 && <p className="empty">暂无匹配工单</p>}
             </div>
           </section>
 
@@ -649,7 +678,7 @@ function App() {
 }
 
 function statusClass(value?: string) {
-  if (value === 'HIGH' || value === 'HIGH_PRIORITY') {
+  if (value === 'HIGH' || value === 'HIGH_PRIORITY' || value === 'CRITICAL') {
     return 'status danger';
   }
   if (value === 'MEDIUM' || value === 'KnowledgeGap') {

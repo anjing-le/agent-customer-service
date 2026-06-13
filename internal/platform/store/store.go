@@ -140,6 +140,10 @@ type TransferTicket struct {
 	Reason         string          `json:"reason"`
 	Priority       string          `json:"priority"`
 	Status         string          `json:"status"`
+	SLAMinutes     int             `json:"slaMinutes"`
+	WaitMinutes    int             `json:"waitMinutes"`
+	SLAStatus      string          `json:"slaStatus"`
+	Escalated      bool            `json:"escalated"`
 	Assignee       string          `json:"assignee,omitempty"`
 	ResolutionNote string          `json:"resolutionNote,omitempty"`
 	CreatedAt      string          `json:"createdAt"`
@@ -215,8 +219,9 @@ func NewSeedStore(options ...Option) *Store {
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
 		{ID: "msg_demo_2", ConversationID: "conv_demo_refund", Role: "assistant", Content: "根据售后知识库，签收 7 天内可申请无理由退货；非质量问题寄回运费通常由用户承担，质量问题由商家承担。", Engine: "rag+rule", Safe: true, EvidenceIDs: []string{"kb_refund_7d"}, CreatedAt: now},
 	}
+	oldTransferAt := time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339)
 	st.tickets = []TransferTicket{
-		demoTransferTicket("ticket_demo_transfer", "conv_demo_transfer", "我已经催了三次，必须马上找人工处理。", now),
+		demoTransferTicket("ticket_demo_transfer", "conv_demo_transfer", "我已经催了三次，必须马上找人工处理。", oldTransferAt),
 	}
 	for _, option := range options {
 		option(st)
@@ -356,7 +361,7 @@ func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket
 			s.tickets[idx].ResolutionNote = fallback(note, "人工已处理")
 			s.tickets[idx].ResolvedAt = time.Now().UTC().Format(time.RFC3339)
 			s.tickets[idx].Events = transferEvents(s.tickets[idx])
-			return s.tickets[idx], nil
+			return withTransferSLA(s.tickets[idx], time.Now().UTC()), nil
 		}
 	}
 	return TransferTicket{}, fmt.Errorf("transfer ticket %s not found", id)
@@ -377,19 +382,21 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			openTransfers++
 		}
 	}
-	quality := qualitySummary(s.messages, s.gaps, s.tickets)
+	transfers := withTransferSLAs(s.tickets, time.Now().UTC())
+	quality := qualitySummary(s.messages, s.gaps, transfers)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
 			{Label: "Knowledge items", Value: fmt.Sprintf("%d", len(s.knowledge)), Note: "seeded trusted articles"},
 			{Label: "Open gaps", Value: fmt.Sprintf("%d", openGaps), Note: "created by no-evidence fallback"},
 			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
+			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(s.rules)), Note: "guardrail and transfer policies"},
 		},
 		Conversations: append([]Conversation(nil), s.conversations...),
 		KnowledgeGaps: append([]KnowledgeGap(nil), s.gaps...),
 		Rules:         append([]Rule(nil), s.rules...),
-		Transfers:     append([]TransferTicket(nil), s.tickets...),
+		Transfers:     transfers,
 		Quality:       quality,
 	}, nil
 }
@@ -642,7 +649,7 @@ func demoTransferTicket(id, conversationID, question, createdAt string) Transfer
 		CreatedAt:      createdAt,
 	}
 	ticket.Events = transferEvents(ticket)
-	return ticket
+	return withTransferSLA(ticket, time.Now().UTC())
 }
 
 func transferEvents(ticket TransferTicket) []TransferEvent {
@@ -661,6 +668,50 @@ func transferEvents(ticket TransferTicket) []TransferEvent {
 		})
 	}
 	return events
+}
+
+func withTransferSLAs(tickets []TransferTicket, now time.Time) []TransferTicket {
+	items := make([]TransferTicket, 0, len(tickets))
+	for _, ticket := range tickets {
+		items = append(items, withTransferSLA(ticket, now))
+	}
+	return items
+}
+
+func withTransferSLA(ticket TransferTicket, now time.Time) TransferTicket {
+	const slaMinutes = 30
+	ticket.SLAMinutes = slaMinutes
+	ticket.WaitMinutes = transferWaitMinutes(ticket, now)
+	if ticket.Status == "RESOLVED" {
+		ticket.SLAStatus = "RESOLVED"
+		return ticket
+	}
+	if ticket.WaitMinutes >= slaMinutes {
+		ticket.SLAStatus = "BREACHED"
+		ticket.Escalated = true
+		ticket.Priority = "CRITICAL"
+		return ticket
+	}
+	ticket.SLAStatus = "ON_TRACK"
+	return ticket
+}
+
+func transferWaitMinutes(ticket TransferTicket, now time.Time) int {
+	startedAt, err := time.Parse(time.RFC3339, ticket.CreatedAt)
+	if err != nil {
+		return 0
+	}
+	endedAt := now
+	if ticket.ResolvedAt != "" {
+		if parsed, err := time.Parse(time.RFC3339, ticket.ResolvedAt); err == nil {
+			endedAt = parsed
+		}
+	}
+	minutes := int(endedAt.Sub(startedAt).Minutes())
+	if minutes < 0 {
+		return 0
+	}
+	return minutes
 }
 
 func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferTicket) QualitySummary {
@@ -699,6 +750,7 @@ func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferT
 		fmt.Sprintf("%d human transfer decisions", summary.HumanTransfers),
 		fmt.Sprintf("%d open knowledge gaps", openGapCount(gaps)),
 		fmt.Sprintf("%d open transfer tickets", openTransferCount(tickets)),
+		fmt.Sprintf("%d escalated transfer tickets", escalatedTransferCount(tickets)),
 	}
 	return summary
 }
@@ -717,6 +769,16 @@ func openTransferCount(tickets []TransferTicket) int {
 	count := 0
 	for _, ticket := range tickets {
 		if ticket.Status == "OPEN" {
+			count++
+		}
+	}
+	return count
+}
+
+func escalatedTransferCount(tickets []TransferTicket) int {
+	count := 0
+	for _, ticket := range tickets {
+		if ticket.Escalated {
 			count++
 		}
 	}

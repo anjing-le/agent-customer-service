@@ -486,6 +486,31 @@ textarea {
   white-space: normal;
 }
 
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 10px;
+}
+
+.filterButton {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d9e3de;
+  border-radius: 6px;
+  color: #426153;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.filterButton.active {
+  color: #ffffff;
+  border-color: #1f6f52;
+  background: #1f6f52;
+}
+
 .tableRow strong,
 .evidence strong,
 .rule strong {

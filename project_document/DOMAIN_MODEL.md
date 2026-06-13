@@ -13,7 +13,7 @@
 | `KnowledgeGap` | 无可靠证据时沉淀的知识缺口 | `NO_EVIDENCE_FALLBACK` |
 | `Rule` | 规则兜底或转人工策略 | seed store 或 PostgreSQL |
 | `RuleTestResult` | 对单句用户输入的规则测试结果 | `/api/ops/rules/test` |
-| `TransferTicket` | 转人工工单，包含创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
+| `TransferTicket` | 转人工工单，包含 SLA、升级状态、创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `QualitySummary` | 质量评估摘要，统计证据回答、安全兜底、转人工和人工复核备注 | `/api/ops/dashboard` |
 | `Dashboard` | 会话、知识、规则、缺口和人工队列的运营聚合 | `/api/ops/dashboard` |
