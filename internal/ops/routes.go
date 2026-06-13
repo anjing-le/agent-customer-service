@@ -40,6 +40,25 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, result)
 	})
 
+	mux.HandleFunc("/api/ops/rules/compare", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Content string `json:"content"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		result, err := st.CompareRuleVersions(req.Content)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, result)
+	})
+
 	mux.HandleFunc("/api/ops/transfers/resolve", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

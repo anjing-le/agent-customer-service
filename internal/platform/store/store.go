@@ -53,6 +53,7 @@ type Runtime interface {
 	ResolveKnowledgeGap(id string) (KnowledgeGap, error)
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
+	CompareRuleVersions(content string) (RuleComparison, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
 	AssignReviewTask(id, assignee string) (ReviewTask, error)
 	CompleteReviewTask(id string) (ReviewTask, error)
@@ -136,12 +137,16 @@ type KnowledgeGap struct {
 }
 
 type Rule struct {
-	ID      string `json:"id"`
-	Code    string `json:"code"`
-	Name    string `json:"name"`
-	Trigger string `json:"trigger"`
-	Action  string `json:"action"`
-	Enabled bool   `json:"enabled"`
+	ID        string `json:"id"`
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	Trigger   string `json:"trigger"`
+	Action    string `json:"action"`
+	Enabled   bool   `json:"enabled"`
+	Version   string `json:"version"`
+	Stage     string `json:"stage"`
+	HitCount  int    `json:"hitCount"`
+	LastHitAt string `json:"lastHitAt,omitempty"`
 }
 
 type RuleTestResult struct {
@@ -153,6 +158,14 @@ type RuleTestResult struct {
 	Fallback    bool   `json:"fallback"`
 	Reason      string `json:"reason"`
 	Recommended string `json:"recommended"`
+}
+
+type RuleComparison struct {
+	Input          string         `json:"input"`
+	Current        RuleTestResult `json:"current"`
+	Canary         RuleTestResult `json:"canary"`
+	Changed        bool           `json:"changed"`
+	Recommendation string         `json:"recommendation"`
 }
 
 type TransferTicket struct {
@@ -354,8 +367,9 @@ func NewSeedStore(options ...Option) *Store {
 			{ID: "kb_vip_transfer", Title: "高风险投诉转人工", Category: "服务规则", Content: "出现强烈投诉、法律风险、连续催办等信号时，Agent 应停止自由生成并转人工。", Tags: []string{"投诉", "人工", "风险"}, TrustLevel: "HIGH", UpdatedAt: now},
 		},
 		rules: []Rule{
-			{ID: "rule_low_evidence", Code: "NO_EVIDENCE_FALLBACK", Name: "无可靠证据兜底", Trigger: "knowledge evidence empty", Action: "safe_fallback_and_create_gap", Enabled: true},
-			{ID: "rule_human_transfer", Code: "TRANSFER_THRESHOLD", Name: "转人工阈值", Trigger: "投诉/催办/法律风险", Action: "recommend_human_transfer", Enabled: true},
+			{ID: "rule_low_evidence", Code: "NO_EVIDENCE_FALLBACK", Name: "无可靠证据兜底", Trigger: "knowledge evidence empty", Action: "safe_fallback_and_create_gap", Enabled: true, Version: "2026-06-active", Stage: "active"},
+			{ID: "rule_human_transfer", Code: "TRANSFER_THRESHOLD", Name: "转人工阈值", Trigger: "投诉/催办/法律风险", Action: "recommend_human_transfer", Enabled: true, Version: "2026-06-active", Stage: "active"},
+			{ID: "rule_cancel_canary", Code: "CANCEL_RISK_TRANSFER", Name: "取消/退订灰度转人工", Trigger: "取消订单/退订服务/退款争议", Action: "recommend_human_transfer", Enabled: true, Version: "2026-06-canary", Stage: "canary"},
 		},
 		channelPolicies: defaultChannelPolicies(),
 		integrations:    defaultChannelIntegrations(now),
@@ -570,9 +584,20 @@ func (s *Store) CreateArticleFromGap(gapID, title, category, content string, tag
 }
 
 func (s *Store) TestRule(content string) (RuleTestResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := evaluateRules(content, s.searchLocked(content), rulesByStage(s.rules, "active"))
+	s.recordRuleHitLocked(result.RuleCode, time.Now().UTC().Format(time.RFC3339))
+	return result, nil
+}
+
+func (s *Store) CompareRuleVersions(content string) (RuleComparison, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return evaluateRules(content, s.searchLocked(content), s.rules), nil
+	evidence := s.searchLocked(content)
+	current := evaluateRules(content, evidence, rulesByStage(s.rules, "active"))
+	canary := evaluateRules(content, evidence, rulesForComparison(s.rules))
+	return compareRuleResults(content, current, canary), nil
 }
 
 func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket, error) {
@@ -887,7 +912,7 @@ func shouldTransfer(content string) bool {
 func enabledRules(rules []Rule) int {
 	total := 0
 	for _, rule := range rules {
-		if rule.Enabled {
+		if rule.Enabled && fallback(rule.Stage, "active") == "active" {
 			total++
 		}
 	}
@@ -948,6 +973,16 @@ func evaluateRules(content string, evidence []KnowledgeArticle, rules []Rule) Ru
 		result.Recommended = "停止自由生成，保留上下文并转人工处理。"
 		return result
 	}
+	if shouldCancelTransfer(content) && ruleEnabled(rules, "CANCEL_RISK_TRANSFER") {
+		result.Matched = true
+		result.RuleCode = "CANCEL_RISK_TRANSFER"
+		result.Action = "recommend_human_transfer"
+		result.RiskLevel = "MEDIUM"
+		result.Fallback = true
+		result.Reason = "灰度规则认为取消、退订或退款争议需要人工确认边界。"
+		result.Recommended = "进入人工复核或继续观察灰度命中率后再发布。"
+		return result
+	}
 	if len(evidence) == 0 && ruleEnabled(rules, "NO_EVIDENCE_FALLBACK") {
 		result.Matched = true
 		result.RuleCode = "NO_EVIDENCE_FALLBACK"
@@ -961,6 +996,11 @@ func evaluateRules(content string, evidence []KnowledgeArticle, rules []Rule) Ru
 	return result
 }
 
+func shouldCancelTransfer(content string) bool {
+	text := strings.ToLower(content)
+	return strings.Contains(text, "取消订单") || strings.Contains(text, "退订") || strings.Contains(text, "退款争议") || strings.Contains(text, "取消服务")
+}
+
 func ruleEnabled(rules []Rule, code string) bool {
 	for _, rule := range rules {
 		if rule.Code == code && rule.Enabled {
@@ -968,6 +1008,56 @@ func ruleEnabled(rules []Rule, code string) bool {
 		}
 	}
 	return false
+}
+
+func rulesByStage(rules []Rule, stage string) []Rule {
+	stage = fallback(stage, "active")
+	filtered := make([]Rule, 0, len(rules))
+	for _, rule := range rules {
+		if fallback(rule.Stage, "active") == stage {
+			filtered = append(filtered, rule)
+		}
+	}
+	return filtered
+}
+
+func rulesForComparison(rules []Rule) []Rule {
+	filtered := make([]Rule, 0, len(rules))
+	for _, rule := range rules {
+		stage := fallback(rule.Stage, "active")
+		if stage == "active" || stage == "canary" {
+			filtered = append(filtered, rule)
+		}
+	}
+	return filtered
+}
+
+func compareRuleResults(content string, current, canary RuleTestResult) RuleComparison {
+	changed := current.RuleCode != canary.RuleCode || current.Action != canary.Action || current.RiskLevel != canary.RiskLevel || current.Fallback != canary.Fallback
+	recommendation := "灰度规则与当前规则一致，可以继续观察命中率。"
+	if changed {
+		recommendation = "灰度规则改变了处置结果，发布前需要复核样本和人工队列压力。"
+	}
+	return RuleComparison{
+		Input:          content,
+		Current:        current,
+		Canary:         canary,
+		Changed:        changed,
+		Recommendation: recommendation,
+	}
+}
+
+func (s *Store) recordRuleHitLocked(code, hitAt string) {
+	if strings.TrimSpace(code) == "" {
+		return
+	}
+	for idx := range s.rules {
+		if s.rules[idx].Code == code && fallback(s.rules[idx].Stage, "active") == "active" {
+			s.rules[idx].HitCount++
+			s.rules[idx].LastHitAt = hitAt
+			return
+		}
+	}
 }
 
 func newTransferTicket(conversationID, channel, question, createdAt string) TransferTicket {

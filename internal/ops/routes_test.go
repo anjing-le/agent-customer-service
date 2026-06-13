@@ -50,6 +50,24 @@ func TestSubmitAnnotationRouteRequiresMessageID(t *testing.T) {
 	}
 }
 
+func TestCompareRulesRouteReturnsCanaryResult(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/rules/compare", strings.NewReader(`{"content":"我想取消订单，7 天无理由退货怎么处理"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"changed":true`, `"current"`, `"canary"`, `"ruleCode":"CANCEL_RISK_TRANSFER"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
 func TestReviewTaskRoutesAssignAndCompleteTask(t *testing.T) {
 	st := store.NewSeedStore()
 	dashboard, err := st.Dashboard()

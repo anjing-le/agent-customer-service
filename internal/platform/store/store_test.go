@@ -382,3 +382,31 @@ func TestRuleTestDetectsTransferAndNoEvidenceBoundaries(t *testing.T) {
 		t.Fatalf("expected allowed answer, got %#v", evidenceOK)
 	}
 }
+
+func TestRuleComparisonShowsCanaryDecisionChange(t *testing.T) {
+	st := NewSeedStore()
+
+	comparison, err := st.CompareRuleVersions("我想取消订单，7 天无理由退货怎么处理")
+	if err != nil {
+		t.Fatalf("compare rule versions: %v", err)
+	}
+	if !comparison.Changed {
+		t.Fatalf("expected canary to change decision, got %#v", comparison)
+	}
+	if comparison.Current.Action != "allow_answer" || comparison.Canary.RuleCode != "CANCEL_RISK_TRANSFER" {
+		t.Fatalf("expected current allow and canary transfer, got %#v", comparison)
+	}
+
+	if _, err := st.TestRule("我已经投诉很多次了，现在必须转人工"); err != nil {
+		t.Fatalf("test rule: %v", err)
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	for _, rule := range dashboard.Rules {
+		if rule.Code == "TRANSFER_THRESHOLD" && rule.HitCount == 0 {
+			t.Fatalf("expected active rule hit count, got %#v", rule)
+		}
+	}
+}

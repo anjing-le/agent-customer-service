@@ -14,8 +14,9 @@
 | `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
 | `KnowledgeArticle` | 可引用的可信知识 | seed store 或 PostgreSQL |
 | `KnowledgeGap` | 无可靠证据时沉淀的知识缺口 | `NO_EVIDENCE_FALLBACK` |
-| `Rule` | 规则兜底或转人工策略 | seed store 或 PostgreSQL |
-| `RuleTestResult` | 对单句用户输入的规则测试结果 | `/api/ops/rules/test` |
+| `Rule` | 规则兜底或转人工策略，包含版本、阶段、命中次数和最后命中时间 | seed store 或 PostgreSQL |
+| `RuleTestResult` | 对单句用户输入的当前规则测试结果 | `/api/ops/rules/test` |
+| `RuleComparison` | 当前 active 规则与 canary 规则的处置结果对比 | `/api/ops/rules/compare` |
 | `TransferTicket` | 转人工工单，包含 SLA、升级状态、创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
 | `ChannelPolicy` | 渠道级客服策略，定义语气、风险加权、转人工 SLA 和升级说明 | seed store 或 PostgreSQL |
 | `ChannelIntegration` | 渠道接入配置的非敏感视图，记录 active/next secret ref、allowed origins、rate limit、签名窗口和 replay 开关 | seed store 或 PostgreSQL |
@@ -50,7 +51,8 @@ user message
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
-| 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
+| 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
+| 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |
 | 质检任务 | 每条助手回复生成 `ReviewTask`，运营可领取/完成；提交 `Annotation` 会自动完成对应任务 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
 | 复盘导出 | 对低分、`FAIL` 或 `REVIEW` 标注生成 `TrainingSample`，用于运营复盘和后续训练数据整理 |
@@ -69,6 +71,7 @@ user message
 | `ResolveKnowledgeGap` | 关闭知识缺口 |
 | `CreateArticleFromGap` | 由缺口生成可信知识 |
 | `TestRule` | 规则兜底测试 |
+| `CompareRuleVersions` | 对比 active 与 canary 规则处置结果 |
 | `ResolveTransferTicket` | 人工工单处理 |
 | `AssignReviewTask` / `CompleteReviewTask` | 质检任务领取和完成 |
 | `SubmitAnnotation` | 人工质检标注回写 |

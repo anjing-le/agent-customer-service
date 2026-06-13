@@ -43,7 +43,18 @@ type KnowledgeGap = {
   status: string;
   priority: string;
 };
-type Rule = { id: string; code: string; name: string; trigger: string; action: string; enabled: boolean };
+type Rule = {
+  id: string;
+  code: string;
+  name: string;
+  trigger: string;
+  action: string;
+  enabled: boolean;
+  version: string;
+  stage: string;
+  hitCount: number;
+  lastHitAt?: string;
+};
 type RuleTestResult = {
   input: string;
   matched: boolean;
@@ -53,6 +64,13 @@ type RuleTestResult = {
   fallback: boolean;
   reason: string;
   recommended: string;
+};
+type RuleComparison = {
+  input: string;
+  current: RuleTestResult;
+  canary: RuleTestResult;
+  changed: boolean;
+  recommendation: string;
 };
 type TransferTicket = {
   id: string;
@@ -444,6 +462,7 @@ function App() {
   const [message, setMessage] = useState('7 天无理由退货的运费怎么计算？');
   const [ruleInput, setRuleInput] = useState('我已经投诉很多次了，现在必须转人工');
   const [ruleResult, setRuleResult] = useState<RuleTestResult | null>(null);
+  const [ruleComparison, setRuleComparison] = useState<RuleComparison | null>(null);
   const [result, setResult] = useState<SendMessageResult | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [history, setHistory] = useState<Message[]>([]);
@@ -606,6 +625,18 @@ function App() {
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'test rule failed');
+    }
+  };
+
+  const compareRules = async () => {
+    setError('');
+    try {
+      setRuleComparison(await api<RuleComparison>('/api/ops/rules/compare', {
+        method: 'POST',
+        body: JSON.stringify({ content: ruleInput })
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'compare rules failed');
     }
   };
 
@@ -1378,6 +1409,9 @@ function App() {
             <textarea className="compactInput" value={ruleInput} onChange={(event) => setRuleInput(event.target.value)} />
             <div className="actionRow">
               <button className="primary" onClick={testRule}>测试规则</button>
+              <button className="tinyButton" onClick={compareRules} title="灰度对比">
+                <FileSearch size={14} />
+              </button>
               <span>{ruleResult?.riskLevel ?? 'Ready'}</span>
             </div>
             {ruleResult && (
@@ -1390,6 +1424,20 @@ function App() {
                 <strong>{ruleResult.recommended}</strong>
               </div>
             )}
+            {ruleComparison && (
+              <div className="ruleCompare">
+                <div>
+                  <b className={statusClass(ruleComparison.current.riskLevel)}>{ruleComparison.current.ruleCode ?? 'ALLOW'}</b>
+                  <span>current · {ruleComparison.current.action}</span>
+                </div>
+                <div>
+                  <b className={statusClass(ruleComparison.canary.riskLevel)}>{ruleComparison.canary.ruleCode ?? 'ALLOW'}</b>
+                  <span>canary · {ruleComparison.canary.action}</span>
+                </div>
+                <strong className={ruleComparison.changed ? 'status warning' : 'status'}>{ruleComparison.changed ? 'CHANGED' : 'SAME'}</strong>
+                <p>{ruleComparison.recommendation}</p>
+              </div>
+            )}
             <div className="ruleGrid">
               {rules.map((item) => (
                 <article className="rule" key={item.id}>
@@ -1398,6 +1446,8 @@ function App() {
                     <strong>{item.name}</strong>
                   </div>
                   <span>{item.code}</span>
+                  <span>{item.version} · {item.stage}</span>
+                  <span>{item.hitCount} hits{item.lastHitAt ? ` · ${item.lastHitAt.slice(11, 19)}` : ''}</span>
                   <p>{item.trigger}</p>
                 </article>
               ))}

@@ -128,6 +128,14 @@
       "response": { "status": 200, "schema": "RuleTestResult" }
     },
     {
+      "id": "compareRuleVersions",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/rules/compare",
+      "request": { "body": "TestRuleRequest" },
+      "response": { "status": 200, "schema": "RuleComparison" }
+    },
+    {
       "id": "resolveTransfer",
       "boundary": "ops",
       "method": "POST",
@@ -384,14 +392,18 @@
       }
     },
     "Rule": {
-      "required": ["id", "code", "name", "trigger", "action", "enabled"],
+      "required": ["id", "code", "name", "trigger", "action", "enabled", "version", "stage", "hitCount"],
       "fields": {
         "id": "string",
-        "code": "NO_EVIDENCE_FALLBACK|TRANSFER_THRESHOLD",
+        "code": "NO_EVIDENCE_FALLBACK|TRANSFER_THRESHOLD|CANCEL_RISK_TRANSFER",
         "name": "string",
         "trigger": "string",
         "action": "string",
-        "enabled": "boolean"
+        "enabled": "boolean",
+        "version": "string",
+        "stage": "active|canary",
+        "hitCount": "number",
+        "lastHitAt": "RFC3339 string"
       }
     },
     "RuleTestResult": {
@@ -405,6 +417,16 @@
         "fallback": "boolean",
         "reason": "string",
         "recommended": "string"
+      }
+    },
+    "RuleComparison": {
+      "required": ["input", "current", "canary", "changed", "recommendation"],
+      "fields": {
+        "input": "string",
+        "current": "RuleTestResult",
+        "canary": "RuleTestResult",
+        "changed": "boolean",
+        "recommendation": "string"
       }
     },
     "TransferTicket": {

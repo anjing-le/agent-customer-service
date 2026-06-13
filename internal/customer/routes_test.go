@@ -69,6 +69,10 @@ func (f failingRuntime) TestRule(string) (store.RuleTestResult, error) {
 	return store.RuleTestResult{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) CompareRuleVersions(string) (store.RuleComparison, error) {
+	return store.RuleComparison{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) ResolveTransferTicket(string, string, string) (store.TransferTicket, error) {
 	return store.TransferTicket{}, errors.New("database unavailable")
 }

@@ -429,7 +429,27 @@ func (s *PostgresStore) TestRule(content string) (RuleTestResult, error) {
 	if err != nil {
 		return RuleTestResult{}, err
 	}
-	return evaluateRules(content, evidence, rules), nil
+	result := evaluateRules(content, evidence, rulesByStage(rules, "active"))
+	if strings.TrimSpace(result.RuleCode) != "" {
+		if err := s.recordRuleHit(result.RuleCode); err != nil {
+			return RuleTestResult{}, err
+		}
+	}
+	return result, nil
+}
+
+func (s *PostgresStore) CompareRuleVersions(content string) (RuleComparison, error) {
+	evidence, err := s.SearchKnowledge(content)
+	if err != nil {
+		return RuleComparison{}, err
+	}
+	rules, err := s.listRules()
+	if err != nil {
+		return RuleComparison{}, err
+	}
+	current := evaluateRules(content, evidence, rulesByStage(rules, "active"))
+	canary := evaluateRules(content, evidence, rulesForComparison(rules))
+	return compareRuleResults(content, current, canary), nil
 }
 
 func (s *PostgresStore) ResolveTransferTicket(id, assignee, note string) (TransferTicket, error) {
@@ -736,9 +756,9 @@ func (s *PostgresStore) listGaps() ([]KnowledgeGap, error) {
 
 func (s *PostgresStore) listRules() ([]Rule, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, code, name, trigger_expr, action, enabled
+		select id, code, name, trigger_expr, action, enabled, version, stage, hit_count, last_hit_at
 		from agent_rules
-		order by code
+		order by stage, code
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("list agent rules: %w", err)
@@ -748,8 +768,15 @@ func (s *PostgresStore) listRules() ([]Rule, error) {
 	rules := make([]Rule, 0)
 	for rows.Next() {
 		var item Rule
-		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Trigger, &item.Action, &item.Enabled); err != nil {
+		var lastHitAt *time.Time
+		if err := rows.Scan(
+			&item.ID, &item.Code, &item.Name, &item.Trigger, &item.Action, &item.Enabled,
+			&item.Version, &item.Stage, &item.HitCount, &lastHitAt,
+		); err != nil {
 			return nil, err
+		}
+		if lastHitAt != nil {
+			item.LastHitAt = lastHitAt.UTC().Format(time.RFC3339)
 		}
 		rules = append(rules, item)
 	}
@@ -757,6 +784,20 @@ func (s *PostgresStore) listRules() ([]Rule, error) {
 		return nil, err
 	}
 	return rules, nil
+}
+
+func (s *PostgresStore) recordRuleHit(code string) error {
+	if _, err := s.pool.Exec(context.Background(), `
+		update agent_rules
+		set hit_count = hit_count + 1,
+		    last_hit_at = now(),
+		    updated_at = now()
+		where code = $1
+		  and stage = 'active'
+	`, code); err != nil {
+		return fmt.Errorf("record rule hit: %w", err)
+	}
+	return nil
 }
 
 func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {

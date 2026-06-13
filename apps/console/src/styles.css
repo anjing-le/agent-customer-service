@@ -744,7 +744,8 @@ textarea {
   background: #fbfdfc;
 }
 
-.ruleResult {
+.ruleResult,
+.ruleCompare {
   display: grid;
   gap: 8px;
   margin: 12px 0;
@@ -754,20 +755,33 @@ textarea {
   background: #eef7f2;
 }
 
-.ruleResult div {
+.ruleCompare {
+  border-left-color: #356d9d;
+  background: #eef5fb;
+}
+
+.ruleResult div,
+.ruleCompare div {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.ruleResult span {
+.ruleResult span,
+.ruleCompare span {
   color: #64786d;
   font-size: 13px;
 }
 
-.ruleResult strong {
+.ruleResult strong,
+.ruleCompare strong {
   line-height: 1.45;
+}
+
+.ruleCompare p {
+  color: #394c43;
+  line-height: 1.55;
 }
 
 .rule div {
