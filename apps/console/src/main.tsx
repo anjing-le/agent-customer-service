@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Database,
   FileSearch,
+  FilePlus2,
   MessageSquareText,
   RefreshCcw,
   ShieldCheck,
@@ -118,6 +119,38 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'send failed');
+    }
+  };
+
+  const resolveGap = async (gap: KnowledgeGap) => {
+    setError('');
+    try {
+      await api<KnowledgeGap>('/api/knowledge/gaps/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ id: gap.id })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'resolve gap failed');
+    }
+  };
+
+  const createArticleFromGap = async (gap: KnowledgeGap) => {
+    setError('');
+    try {
+      await api<KnowledgeArticle>('/api/knowledge/gaps/create-article', {
+        method: 'POST',
+        body: JSON.stringify({
+          gapId: gap.id,
+          title: gap.question,
+          category: '运营补充',
+          content: `${gap.question}：请按最新客服政策补充标准答案。`,
+          tags: [gap.reason, '运营补充']
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'create article failed');
     }
   };
 
@@ -255,7 +288,19 @@ function App() {
                     <strong>{item.question}</strong>
                     <span>{item.reason}</span>
                   </div>
-                  <b className={statusClass(item.priority)}>{item.priority}</b>
+                  <div className="gapActions">
+                    <b className={statusClass(item.priority)}>{item.status}</b>
+                    {item.status === 'OPEN' && (
+                      <span>
+                        <button className="tinyButton" onClick={() => createArticleFromGap(item)} title="生成知识">
+                          <FilePlus2 size={14} />
+                        </button>
+                        <button className="tinyButton" onClick={() => resolveGap(item)} title="关闭缺口">
+                          <CheckCircle2 size={14} />
+                        </button>
+                      </span>
+                    )}
+                  </div>
                 </article>
               ))}
               {gaps.length === 0 && <p className="empty">暂无开放缺口</p>}

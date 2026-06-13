@@ -182,6 +182,65 @@ func (s *PostgresStore) SearchKnowledge(query string) ([]KnowledgeArticle, error
 	return matches, nil
 }
 
+func (s *PostgresStore) ResolveKnowledgeGap(id string) (KnowledgeGap, error) {
+	var item KnowledgeGap
+	var createdAt time.Time
+	err := s.pool.QueryRow(context.Background(), `
+		update knowledge_gaps
+		set status = 'RESOLVED'
+		where id = $1
+		returning id, conversation_id, question, reason, status, priority, created_at
+	`, id).Scan(&item.ID, &item.ConversationID, &item.Question, &item.Reason, &item.Status, &item.Priority, &createdAt)
+	if err != nil {
+		return KnowledgeGap{}, fmt.Errorf("resolve knowledge gap: %w", err)
+	}
+	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	return item, nil
+}
+
+func (s *PostgresStore) CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error) {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return KnowledgeArticle{}, fmt.Errorf("begin create article from gap: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var gap KnowledgeGap
+	var gapCreatedAt time.Time
+	if err := tx.QueryRow(ctx, `
+		select id, conversation_id, question, reason, status, priority, created_at
+		from knowledge_gaps
+		where id = $1
+	`, gapID).Scan(&gap.ID, &gap.ConversationID, &gap.Question, &gap.Reason, &gap.Status, &gap.Priority, &gapCreatedAt); err != nil {
+		return KnowledgeArticle{}, fmt.Errorf("find knowledge gap: %w", err)
+	}
+
+	now := time.Now().UTC()
+	article := KnowledgeArticle{
+		ID:         fmt.Sprintf("kb_%d", now.UnixNano()),
+		Title:      fallback(title, gap.Question),
+		Category:   fallback(category, "运营补充"),
+		Content:    fallback(content, gap.Question),
+		Tags:       normalizeTags(tags, gap.Question),
+		TrustLevel: "HIGH",
+		UpdatedAt:  now.Format(time.RFC3339),
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into knowledge_articles (id, title, category, content, tags, trust_level, updated_at)
+		values ($1, $2, $3, $4, $5, $6, $7)
+	`, article.ID, article.Title, article.Category, article.Content, article.Tags, article.TrustLevel, now); err != nil {
+		return KnowledgeArticle{}, fmt.Errorf("insert knowledge article: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "update knowledge_gaps set status = 'RESOLVED' where id = $1", gapID); err != nil {
+		return KnowledgeArticle{}, fmt.Errorf("resolve knowledge gap: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return KnowledgeArticle{}, fmt.Errorf("commit create article from gap: %w", err)
+	}
+	return article, nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	conversations, err := s.ListConversations()
 	if err != nil {

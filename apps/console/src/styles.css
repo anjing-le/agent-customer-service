@@ -118,7 +118,8 @@ h2 {
 }
 
 .iconButton,
-.primary {
+.primary,
+.tinyButton {
   border: 0;
   border-radius: 6px;
   cursor: pointer;
@@ -139,6 +140,15 @@ h2 {
   color: #ffffff;
   background: #1f6f52;
   font-weight: 800;
+}
+
+.tinyButton {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #1f6f52;
+  background: #dff1e8;
 }
 
 .notice {
@@ -317,6 +327,18 @@ textarea {
   display: grid;
   min-width: 0;
   gap: 4px;
+}
+
+.tableRow .gapActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gapActions span {
+  display: flex;
+  gap: 6px;
 }
 
 .tableRow strong,

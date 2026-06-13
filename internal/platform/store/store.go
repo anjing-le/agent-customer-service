@@ -13,6 +13,8 @@ type Runtime interface {
 	SendMessage(conversationID, content string) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
+	ResolveKnowledgeGap(id string) (KnowledgeGap, error)
+	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -184,6 +186,46 @@ func (s *Store) SearchKnowledge(query string) ([]KnowledgeArticle, error) {
 	return s.searchLocked(query), nil
 }
 
+func (s *Store) ResolveKnowledgeGap(id string) (KnowledgeGap, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx := range s.gaps {
+		if s.gaps[idx].ID == id {
+			s.gaps[idx].Status = "RESOLVED"
+			return s.gaps[idx], nil
+		}
+	}
+	return KnowledgeGap{}, fmt.Errorf("knowledge gap %s not found", id)
+}
+
+func (s *Store) CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	gapIndex := -1
+	for idx := range s.gaps {
+		if s.gaps[idx].ID == gapID {
+			gapIndex = idx
+			break
+		}
+	}
+	if gapIndex < 0 {
+		return KnowledgeArticle{}, fmt.Errorf("knowledge gap %s not found", gapID)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	article := KnowledgeArticle{
+		ID:         fmt.Sprintf("kb_%d", time.Now().UnixNano()),
+		Title:      fallback(title, s.gaps[gapIndex].Question),
+		Category:   fallback(category, "运营补充"),
+		Content:    fallback(content, s.gaps[gapIndex].Question),
+		Tags:       normalizeTags(tags, s.gaps[gapIndex].Question),
+		TrustLevel: "HIGH",
+		UpdatedAt:  now,
+	}
+	s.knowledge = append([]KnowledgeArticle{article}, s.knowledge...)
+	s.gaps[gapIndex].Status = "RESOLVED"
+	return article, nil
+}
+
 func (s *Store) Dashboard() (Dashboard, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -321,4 +363,21 @@ func fallback(value, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func normalizeTags(tags []string, fallbackTag string) []string {
+	result := make([]string, 0, len(tags)+1)
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		result = append(result, tag)
+	}
+	if len(result) == 0 {
+		result = append(result, fallbackTag)
+	}
+	return result
 }

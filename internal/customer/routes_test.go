@@ -32,6 +32,14 @@ func (f failingRuntime) SearchKnowledge(string) ([]store.KnowledgeArticle, error
 	return nil, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ResolveKnowledgeGap(string) (store.KnowledgeGap, error) {
+	return store.KnowledgeGap{}, errors.New("database unavailable")
+}
+
+func (f failingRuntime) CreateArticleFromGap(string, string, string, string, []string) (store.KnowledgeArticle, error) {
+	return store.KnowledgeArticle{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) Dashboard() (store.Dashboard, error) {
 	return store.Dashboard{}, errors.New("database unavailable")
 }
