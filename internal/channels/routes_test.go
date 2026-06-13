@@ -117,6 +117,53 @@ func TestInboundRouteSkipsReplayWhenIntegrationDisablesIt(t *testing.T) {
 	}
 }
 
+func TestInboundRouteUsesExternalMessageIDForReplay(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	content := "这个商品能不能开发票？"
+	firstTimestamp := "2026-06-14T02:10:00Z"
+	firstSignature := ChannelSignature("WeChat", "wx-open-message-id", firstTimestamp, content)
+	firstBody := `{"channel":"WeChat","externalConversationId":"wx-open-message-id","externalMessageId":"wechat-msg-1","customer":"微信客户","content":"` + content + `","timestamp":"` + firstTimestamp + `","signature":"` + firstSignature + `"}`
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", strings.NewReader(firstBody))
+	firstRec := httptest.NewRecorder()
+	mux.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first message id request 200, got %d: %s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondTimestamp := "2026-06-14T02:10:10Z"
+	secondSignature := ChannelSignature("WeChat", "wx-open-message-id", secondTimestamp, content)
+	secondBody := `{"channel":"WeChat","externalConversationId":"wx-open-message-id","externalMessageId":"wechat-msg-1","customer":"微信客户","content":"` + content + `","timestamp":"` + secondTimestamp + `","signature":"` + secondSignature + `"}`
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", strings.NewReader(secondBody))
+	secondRec := httptest.NewRecorder()
+	mux.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusConflict {
+		t.Fatalf("expected duplicate message id request 409, got %d: %s", secondRec.Code, secondRec.Body.String())
+	}
+	if !strings.Contains(secondRec.Body.String(), `"code":"duplicate_inbound"`) {
+		t.Fatalf("expected duplicate inbound error, got %s", secondRec.Body.String())
+	}
+}
+
+func TestInboundRouteScopesExternalMessageIDByChannel(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	for _, channel := range []string{"WeChat", "App"} {
+		signature := ChannelSignature(channel, channel+"-conversation", timestamp, content)
+		body := `{"channel":"` + channel + `","externalConversationId":"` + channel + `-conversation","externalMessageId":"shared-message-id","customer":"渠道客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected channel %s to accept scoped message id, got %d: %s", channel, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestInboundRouteAcceptsConfiguredChannelSecret(t *testing.T) {
 	mux := http.NewServeMux()
 	cfg := testConfig()

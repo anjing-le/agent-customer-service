@@ -17,6 +17,7 @@ import (
 type inboundRequest struct {
 	Channel                string `json:"channel"`
 	ExternalConversationID string `json:"externalConversationId"`
+	ExternalMessageID      string `json:"externalMessageId"`
 	Customer               string `json:"customer"`
 	Content                string `json:"content"`
 	Timestamp              string `json:"timestamp"`
@@ -155,6 +156,7 @@ func channelInboundReceipt(req inboundRequest) store.ChannelInboundReceipt {
 		ReplayKey:              replayKey(req),
 		Channel:                strings.TrimSpace(req.Channel),
 		ExternalConversationID: strings.TrimSpace(req.ExternalConversationID),
+		ExternalMessageID:      strings.TrimSpace(req.ExternalMessageID),
 		Timestamp:              strings.TrimSpace(req.Timestamp),
 		Signature:              strings.TrimSpace(req.Signature),
 		ContentHash:            contentHash(req.Content),
@@ -182,8 +184,16 @@ func canonicalPayload(channel, externalConversationID, timestamp, content string
 }
 
 func replayKey(req inboundRequest) string {
+	if messageID := strings.TrimSpace(req.ExternalMessageID); messageID != "" {
+		sum := sha256.Sum256([]byte(canonicalMessageID(req.Channel, messageID)))
+		return hex.EncodeToString(sum[:])
+	}
 	sum := sha256.Sum256([]byte(canonicalPayload(req.Channel, req.ExternalConversationID, req.Timestamp, strings.TrimSpace(req.Signature))))
 	return hex.EncodeToString(sum[:])
+}
+
+func canonicalMessageID(channel, externalMessageID string) string {
+	return fmt.Sprintf("%s\n%s", strings.TrimSpace(channel), strings.TrimSpace(externalMessageID))
 }
 
 func contentHash(content string) string {

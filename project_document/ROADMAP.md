@@ -37,7 +37,8 @@
 - 已支持渠道 inbound 适配器，外部渠道消息通过 env 密钥、HMAC-SHA256 签名、timestamp 时间窗和 replay 记录后进入统一会话链路。
 - 已支持渠道集成治理视图，展示 secret ref、签名窗口、replay 开关和轮换提示，但不暴露密钥值。
 - 已支持 webhook 校验读取 `ChannelIntegration`，将 enabled、secret ref、签名窗口和 replay 开关接入运行时。
-- 下一步补真实渠道 message id、回调协议差异和密钥轮换。
+- 已支持 `externalMessageId` 对账，真实渠道可用官方消息 ID 做幂等，缺省时退回签名载荷 replay key。
+- 下一步补真实渠道回调协议差异和密钥轮换。
 
 ## V3: 生产化扩展
 

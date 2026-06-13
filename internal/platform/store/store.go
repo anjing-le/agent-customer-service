@@ -280,6 +280,7 @@ type ChannelInboundReceipt struct {
 	ReplayKey              string `json:"replayKey"`
 	Channel                string `json:"channel"`
 	ExternalConversationID string `json:"externalConversationId"`
+	ExternalMessageID      string `json:"externalMessageId"`
 	Timestamp              string `json:"timestamp"`
 	Signature              string `json:"signature"`
 	ContentHash            string `json:"contentHash"`

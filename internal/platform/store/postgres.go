@@ -208,11 +208,11 @@ func (s *PostgresStore) ReceiveChannelMessage(message ChannelInboundMessage) (Se
 func (s *PostgresStore) RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error) {
 	tag, err := s.pool.Exec(context.Background(), `
 		insert into channel_inbound_events (
-			replay_key, channel, external_conversation_id, payload_timestamp, signature, content_hash
+			replay_key, channel, external_conversation_id, external_message_id, payload_timestamp, signature, content_hash
 		)
-		values ($1, $2, $3, $4, $5, $6)
+		values ($1, $2, $3, $4, $5, $6, $7)
 		on conflict (replay_key) do nothing
-	`, receipt.ReplayKey, receipt.Channel, receipt.ExternalConversationID, receipt.Timestamp, receipt.Signature, receipt.ContentHash)
+	`, receipt.ReplayKey, receipt.Channel, receipt.ExternalConversationID, receipt.ExternalMessageID, receipt.Timestamp, receipt.Signature, receipt.ContentHash)
 	if err != nil {
 		return false, fmt.Errorf("record channel inbound: %w", err)
 	}

@@ -152,10 +152,11 @@
       "fields": {
         "channel": "Web|WeChat|App|Marketplace",
         "externalConversationId": "string",
+        "externalMessageId": "string",
         "customer": "string",
         "content": "string",
         "timestamp": "RFC3339 string within ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS",
-        "signature": "HMAC-SHA256 hex using ChannelIntegration secretRef/env fallback; duplicate signed payload returns duplicate_inbound when replayProtection is enabled"
+        "signature": "HMAC-SHA256 hex using ChannelIntegration secretRef/env fallback; duplicate externalMessageId or signed payload returns duplicate_inbound when replayProtection is enabled"
       }
     },
     "MessageStreamEvent": {

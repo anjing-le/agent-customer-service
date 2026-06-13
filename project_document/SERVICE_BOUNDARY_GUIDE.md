@@ -25,6 +25,7 @@
 
 - 用户消息进入 `/api/customer-service/messages`。
 - 外部渠道消息进入 `/api/channels/inbound`，读取 `ChannelIntegration` 后再做 HMAC-SHA256 签名、timestamp 时间窗和 replay 记录校验，并映射为内部会话。
+- 真实渠道带 `externalMessageId` 时优先用 `channel + externalMessageId` 做幂等对账；没有消息 ID 时退回签名载荷 replay key。
 - 控制台可以使用 `/api/customer-service/messages/stream` 获取 SSE 流式输出。
 - 有可信知识时返回 RAG 证据回复；配置模型客户端后可生成 `llm+rag`。
 - 无可信知识时返回安全兜底，并创建知识缺口。
