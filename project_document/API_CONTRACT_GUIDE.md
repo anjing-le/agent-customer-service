@@ -35,7 +35,7 @@ Go API 当前响应格式：
 - `GET /api/customer-service/messages?conversationId=...`: 读取指定会话历史消息。
 - `POST /api/customer-service/messages`: 发送用户消息，触发 RAG、兜底、缺口和人工 ticket。
 - `POST /api/customer-service/messages/stream`: 发送用户消息并以 SSE 返回 `meta`、`delta`、`done` 事件。
-- `POST /api/channels/inbound`: 外部渠道消息入口，要求 `channel`、`externalConversationId`、RFC3339 `timestamp` 和 HMAC-SHA256 `signature`；可选 `externalMessageId` 用于真实渠道消息对账。校验会读取 `ChannelIntegration` 的 enabled、secretRef、签名时间窗和 replay 开关，重复 `externalMessageId` 或签名载荷返回 `409 duplicate_inbound`。
+- `POST /api/channels/inbound`: 外部渠道消息入口，要求 `channel`、`externalConversationId`、RFC3339 `timestamp` 和 HMAC-SHA256 `signature`；可选 `externalMessageId` 用于真实渠道消息对账。校验会读取 `ChannelIntegration` 的 enabled、secretRef、allowed origins、rate limit、签名时间窗和 replay 开关，重复 `externalMessageId` 或签名载荷返回 `409 duplicate_inbound`，超过频率限制返回 `429 channel_rate_limited`。
 - `POST /api/channels/wechat/inbound`: 微信协议 adapter，将 `openId`、`msgId`、`text` 归一为标准 inbound 请求。
 - `POST /api/channels/app/inbound`: App 协议 adapter，将 `deviceId`、`messageId`、`body` 归一为标准 inbound 请求。
 - `POST /api/channels/marketplace/inbound`: 平台店铺协议 adapter，将 `buyerId`、`eventId`、`message` 归一为标准 inbound 请求。
@@ -56,7 +56,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`Annotation`、`TrainingSample`、`QualitySummary`；`ChannelIntegration` 只暴露 active/next secret ref 和 allowed origins，不暴露密钥值。
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`Annotation`、`TrainingSample`、`QualitySummary`；`ChannelIntegration` 只暴露 active/next secret ref、allowed origins 和 rate limit，不暴露密钥值。
 
 新增或修改接口时，需要同时更新：
 

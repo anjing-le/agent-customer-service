@@ -224,7 +224,7 @@ func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, 
 	var updatedAt time.Time
 	var rotatesAt *time.Time
 	err := s.pool.QueryRow(context.Background(), `
-		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, allowed_origins, rotation_hint, rotates_at, updated_at
+		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, allowed_origins, rate_limit_per_minute, rotation_hint, rotates_at, updated_at
 		from channel_integrations
 		where lower(channel) = lower($1)
 	`, channel).Scan(
@@ -237,6 +237,7 @@ func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, 
 		&item.SignatureWindowSeconds,
 		&item.ReplayProtection,
 		&item.AllowedOrigins,
+		&item.RateLimitPerMinute,
 		&item.RotationHint,
 		&rotatesAt,
 		&updatedAt,
@@ -252,6 +253,30 @@ func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, 
 		return channelIntegrationFor(defaultChannelIntegrations(time.Now().UTC().Format(time.RFC3339)), channel), nil
 	}
 	return ChannelIntegration{}, fmt.Errorf("load channel integration: %w", err)
+}
+
+func (s *PostgresStore) RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error) {
+	if limit <= 0 {
+		return true, 0, nil
+	}
+	var count int
+	err := s.pool.QueryRow(context.Background(), `
+		insert into channel_rate_limit_windows (channel, window_start, request_count)
+		values ($1, $2, 1)
+		on conflict (channel, window_start)
+		do update set
+			request_count = channel_rate_limit_windows.request_count + 1,
+			updated_at = now()
+		where channel_rate_limit_windows.request_count < $3
+		returning request_count
+	`, channel, windowStart.UTC(), limit).Scan(&count)
+	if err == nil {
+		return true, count, nil
+	}
+	if err == pgx.ErrNoRows {
+		return false, limit, nil
+	}
+	return false, 0, fmt.Errorf("record channel rate limit: %w", err)
 }
 
 func (s *PostgresStore) ListKnowledge() ([]KnowledgeArticle, error) {
@@ -705,7 +730,7 @@ func (s *PostgresStore) listChannelPolicies() ([]ChannelPolicy, error) {
 
 func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, allowed_origins, rotation_hint, rotates_at, updated_at
+		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, allowed_origins, rate_limit_per_minute, rotation_hint, rotates_at, updated_at
 		from channel_integrations
 		order by channel asc
 	`)
@@ -729,6 +754,7 @@ func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) 
 			&item.SignatureWindowSeconds,
 			&item.ReplayProtection,
 			&item.AllowedOrigins,
+			&item.RateLimitPerMinute,
 			&item.RotationHint,
 			&rotatesAt,
 			&updatedAt,

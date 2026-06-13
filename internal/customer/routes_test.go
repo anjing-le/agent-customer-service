@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
 )
@@ -30,6 +31,10 @@ func (f failingRuntime) SendMessage(string, string) (store.SendMessageResult, er
 
 func (f failingRuntime) ChannelIntegration(string) (store.ChannelIntegration, error) {
 	return store.ChannelIntegration{}, errors.New("database unavailable")
+}
+
+func (f failingRuntime) RecordChannelRateLimit(string, time.Time, int) (bool, int, error) {
+	return false, 0, errors.New("database unavailable")
 }
 
 func (f failingRuntime) RecordChannelInbound(store.ChannelInboundReceipt) (bool, error) {

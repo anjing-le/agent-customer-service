@@ -167,6 +167,7 @@ type ChannelIntegration = {
   signatureWindowSeconds: number;
   replayProtection: boolean;
   allowedOrigins: string[];
+  rateLimitPerMinute: number;
   rotationHint: string;
   rotatesAt?: string;
   updatedAt: string;
@@ -779,6 +780,7 @@ function App() {
                     <span>{item.secretSource} · {item.secretRef}</span>
                     {item.nextSecretRef && <span>next · {item.nextSecretRef}</span>}
                     {item.allowedOrigins.length > 0 && <span>origins · {item.allowedOrigins.length}</span>}
+                    <span>limit · {item.rateLimitPerMinute}/min</span>
                     <span>{item.rotationHint}</span>
                   </div>
                   <div>

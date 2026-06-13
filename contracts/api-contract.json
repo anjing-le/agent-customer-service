@@ -53,7 +53,8 @@
       "errorResponses": [
         { "status": 401, "code": "invalid_signature|invalid_timestamp|stale_signature" },
         { "status": 403, "code": "channel_disabled|channel_origin_denied" },
-        { "status": 409, "code": "duplicate_inbound" }
+        { "status": 409, "code": "duplicate_inbound" },
+        { "status": 429, "code": "channel_rate_limited" }
       ]
     },
     {
@@ -180,7 +181,7 @@
         "customer": "string",
         "content": "string",
         "timestamp": "RFC3339 string within ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS",
-        "signature": "HMAC-SHA256 hex using ChannelIntegration secretRef/env fallback; duplicate externalMessageId or signed payload returns duplicate_inbound when replayProtection is enabled"
+        "signature": "HMAC-SHA256 hex using ChannelIntegration secretRef/env fallback; duplicate externalMessageId or signed payload returns duplicate_inbound when replayProtection is enabled; excess channel traffic returns channel_rate_limited"
       }
     },
     "WeChatInboundRequest": {
@@ -484,7 +485,7 @@
       }
     },
     "ChannelIntegration": {
-      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "nextSecretRef", "signatureWindowSeconds", "replayProtection", "allowedOrigins", "rotationHint", "updatedAt"],
+      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "nextSecretRef", "signatureWindowSeconds", "replayProtection", "allowedOrigins", "rateLimitPerMinute", "rotationHint", "updatedAt"],
       "fields": {
         "channel": "string",
         "displayName": "string",
@@ -495,6 +496,7 @@
         "signatureWindowSeconds": "number",
         "replayProtection": "boolean",
         "allowedOrigins": "string[]",
+        "rateLimitPerMinute": "number",
         "rotationHint": "string",
         "rotatesAt": "RFC3339 string",
         "updatedAt": "RFC3339 string"

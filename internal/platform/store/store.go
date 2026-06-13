@@ -44,6 +44,7 @@ type Runtime interface {
 	ListMessages(conversationID string) ([]Message, error)
 	SendMessage(conversationID, content string) (SendMessageResult, error)
 	ChannelIntegration(channel string) (ChannelIntegration, error)
+	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
@@ -70,6 +71,7 @@ type Store struct {
 	integrations    []ChannelIntegration
 	annotations     []Annotation
 	inboundReplay   map[string]ChannelInboundReceipt
+	rateWindows     map[string]int
 	generator       ReplyGenerator
 }
 
@@ -187,6 +189,7 @@ type ChannelIntegration struct {
 	SignatureWindowSeconds int      `json:"signatureWindowSeconds"`
 	ReplayProtection       bool     `json:"replayProtection"`
 	AllowedOrigins         []string `json:"allowedOrigins"`
+	RateLimitPerMinute     int      `json:"rateLimitPerMinute"`
 	RotationHint           string   `json:"rotationHint"`
 	RotatesAt              string   `json:"rotatesAt,omitempty"`
 	UpdatedAt              string   `json:"updatedAt"`
@@ -293,6 +296,7 @@ func NewSeedStore(options ...Option) *Store {
 	now := time.Now().UTC().Format(time.RFC3339)
 	st := &Store{
 		inboundReplay: make(map[string]ChannelInboundReceipt),
+		rateWindows:   make(map[string]int),
 		conversations: []Conversation{
 			{
 				ID: "conv_demo_refund", Customer: "林夏", Channel: "Web", Intent: "退款规则",
@@ -413,6 +417,21 @@ func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return channelIntegrationFor(s.integrations, channel), nil
+}
+
+func (s *Store) RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error) {
+	if limit <= 0 {
+		return true, 0, nil
+	}
+	key := strings.ToLower(strings.TrimSpace(channel)) + ":" + windowStart.UTC().Format(time.RFC3339)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := s.rateWindows[key] + 1
+	if next > limit {
+		return false, s.rateWindows[key], nil
+	}
+	s.rateWindows[key] = next
+	return true, next, nil
 }
 
 func (s *Store) ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error) {
@@ -924,10 +943,10 @@ func defaultChannelPolicies() []ChannelPolicy {
 
 func defaultChannelIntegrations(now string) []ChannelIntegration {
 	return []ChannelIntegration{
-		{Channel: "Web", DisplayName: "Web 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WEB_SECRET", NextSecretRef: "ANJING_CHANNEL_WEB_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://console.example.com"}, RotationHint: "按演示环境手动轮换 env secret", UpdatedAt: now},
-		{Channel: "WeChat", DisplayName: "微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECHAT_SECRET", NextSecretRef: "ANJING_CHANNEL_WECHAT_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://wechat.example.com"}, RotationHint: "生产接入时对齐微信回调 message id", UpdatedAt: now},
-		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", NextSecretRef: "ANJING_CHANNEL_APP_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"app://agent-customer-service"}, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
-		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", NextSecretRef: "ANJING_CHANNEL_MARKETPLACE_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://marketplace.example.com"}, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
+		{Channel: "Web", DisplayName: "Web 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WEB_SECRET", NextSecretRef: "ANJING_CHANNEL_WEB_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://console.example.com"}, RateLimitPerMinute: 120, RotationHint: "按演示环境手动轮换 env secret", UpdatedAt: now},
+		{Channel: "WeChat", DisplayName: "微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECHAT_SECRET", NextSecretRef: "ANJING_CHANNEL_WECHAT_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://wechat.example.com"}, RateLimitPerMinute: 60, RotationHint: "生产接入时对齐微信回调 message id", UpdatedAt: now},
+		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", NextSecretRef: "ANJING_CHANNEL_APP_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"app://agent-customer-service"}, RateLimitPerMinute: 90, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
+		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", NextSecretRef: "ANJING_CHANNEL_MARKETPLACE_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://marketplace.example.com"}, RateLimitPerMinute: 45, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
 	}
 }
 

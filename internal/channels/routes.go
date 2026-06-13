@@ -150,6 +150,15 @@ func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg
 		httpjson.Fail(w, http.StatusForbidden, "channel_origin_denied", "channel origin is not allowed")
 		return
 	}
+	rateAllowed, err := recordRateLimit(st, cfg, integration)
+	if err != nil {
+		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	if !rateAllowed {
+		httpjson.Fail(w, http.StatusTooManyRequests, "channel_rate_limited", "channel rate limit exceeded")
+		return
+	}
 	ok, code, message := cfg.validSignature(req, integration)
 	if !ok {
 		httpjson.Fail(w, http.StatusUnauthorized, code, message)
@@ -196,6 +205,15 @@ func originAllowed(r *http.Request, integration store.ChannelIntegration) bool {
 		}
 	}
 	return false
+}
+
+func recordRateLimit(st store.Runtime, cfg Config, integration store.ChannelIntegration) (bool, error) {
+	if integration.RateLimitPerMinute <= 0 {
+		return true, nil
+	}
+	windowStart := cfg.Now().UTC().Truncate(time.Minute)
+	accepted, _, err := st.RecordChannelRateLimit(integration.Channel, windowStart, integration.RateLimitPerMinute)
+	return accepted, err
 }
 
 func (req wechatInboundRequest) toInbound() inboundRequest {

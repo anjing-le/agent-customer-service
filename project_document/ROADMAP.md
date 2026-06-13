@@ -41,7 +41,8 @@
 - 已支持 WeChat/App/Marketplace adapter，将真实渠道字段归一到标准 inbound 链路。
 - 已支持 active/next secret ref 双密钥轮换窗口，控制台不暴露密钥值。
 - 已支持渠道来源白名单，声明 `Origin` 或 `X-Channel-Origin` 时必须命中 `allowedOrigins`。
-- 下一步补渠道频率限制和更细的真实平台回调协议差异。
+- 已支持渠道每分钟频率限制，超过 `rateLimitPerMinute` 返回 `channel_rate_limited`。
+- 下一步补更细的真实平台回调协议差异和渠道验签样例集。
 
 ## V3: 生产化扩展
 

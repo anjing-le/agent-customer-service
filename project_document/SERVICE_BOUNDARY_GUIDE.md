@@ -24,7 +24,7 @@
 ## Runtime Truth
 
 - 用户消息进入 `/api/customer-service/messages`。
-- 外部渠道消息进入 `/api/channels/inbound`，读取 `ChannelIntegration` 后再做 HMAC-SHA256 签名、timestamp 时间窗和 replay 记录校验，并映射为内部会话。
+- 外部渠道消息进入 `/api/channels/inbound`，读取 `ChannelIntegration` 后再做来源白名单、频率限制、HMAC-SHA256 签名、timestamp 时间窗和 replay 记录校验，并映射为内部会话。
 - 真实渠道带 `externalMessageId` 时优先用 `channel + externalMessageId` 做幂等对账；没有消息 ID 时退回签名载荷 replay key。
 - 微信、App、平台店铺 adapter 只做字段归一，统一复用标准 inbound 的验签、幂等和客服 Agent 链路。
 - 控制台可以使用 `/api/customer-service/messages/stream` 获取 SSE 流式输出。
@@ -36,6 +36,7 @@
 - 渠道策略会影响转人工 SLA，控制台可按 Web、WeChat、App、Marketplace 筛选会话和工单。
 - 渠道集成配置只暴露 active/next secret ref、allowed origins、签名窗口和 replay 开关，不把密钥值返回给控制台；运行时用 secret ref 解析 env secret，并允许双密钥轮换窗口。
 - 渠道请求如果声明 `Origin` 或 `X-Channel-Origin`，必须命中 `allowedOrigins`，否则返回 `channel_origin_denied`。
+- 渠道请求超过 `rateLimitPerMinute` 时返回 `channel_rate_limited`，不继续进入 Agent 回复链路。
 - 人工质检可对助手消息提交标注，按证据贴合、安全性和帮助性回写质量摘要。
 - 低分或待复核标注可导出为复盘样本，保留 prompt、answer、证据、评分和备注。
 - 每条助手消息通过 `trace` 暴露策略、证据、历史和模型回退观测。

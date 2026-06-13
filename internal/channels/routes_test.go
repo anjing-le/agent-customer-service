@@ -338,6 +338,55 @@ func TestInboundRouteRejectsDeniedOrigin(t *testing.T) {
 	}
 }
 
+func TestInboundRouteRejectsRateLimitedChannel(t *testing.T) {
+	mux := http.NewServeMux()
+	integration := testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 300, false)
+	integration.RateLimitPerMinute = 1
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	for idx, externalID := range []string{"wx-open-rate-1", "wx-open-rate-2"} {
+		signature := ChannelSignature("WeChat", externalID, timestamp, content)
+		body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"` + externalID + `","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if idx == 0 && rec.Code != http.StatusOK {
+			t.Fatalf("expected first request 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		if idx == 1 {
+			if rec.Code != http.StatusTooManyRequests {
+				t.Fatalf("expected second request 429, got %d: %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"code":"channel_rate_limited"`) {
+				t.Fatalf("expected rate limited error, got %s", rec.Body.String())
+			}
+		}
+	}
+}
+
+func TestInboundRouteSkipsRateLimitWhenDisabled(t *testing.T) {
+	mux := http.NewServeMux()
+	integration := testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 300, false)
+	integration.RateLimitPerMinute = 0
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	for _, externalID := range []string{"wx-open-rate-off-1", "wx-open-rate-off-2"} {
+		signature := ChannelSignature("WeChat", externalID, timestamp, content)
+		body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"` + externalID + `","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected disabled rate limit request 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestInboundRouteRejectsDisabledIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{
@@ -401,5 +450,6 @@ func testIntegration(channel string, enabled bool, secretRef string, windowSecon
 		SecretRef:              secretRef,
 		SignatureWindowSeconds: windowSeconds,
 		ReplayProtection:       replayProtection,
+		RateLimitPerMinute:     60,
 	}
 }
