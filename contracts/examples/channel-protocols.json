@@ -124,20 +124,42 @@
   "errorExamples": [
     {
       "id": "denied-origin",
+      "exampleId": "wechat-standard-inbound",
       "status": 403,
       "code": "channel_origin_denied",
+      "mutation": "origin",
       "reason": "Origin or X-Channel-Origin is declared but not listed in ChannelIntegration.allowedOrigins"
     },
     {
+      "id": "invalid-signature",
+      "exampleId": "wechat-standard-inbound",
+      "status": 401,
+      "code": "invalid_signature",
+      "mutation": "signature",
+      "reason": "Signature does not match the canonical payload and channel secret"
+    },
+    {
+      "id": "stale-signature",
+      "exampleId": "wechat-standard-inbound",
+      "status": 401,
+      "code": "stale_signature",
+      "mutation": "timestamp",
+      "reason": "Timestamp is outside ChannelIntegration.signatureWindowSeconds"
+    },
+    {
       "id": "rate-limited",
+      "exampleId": "wechat-standard-inbound",
       "status": 429,
       "code": "channel_rate_limited",
+      "mutation": "volume",
       "reason": "Channel traffic exceeds ChannelIntegration.rateLimitPerMinute in the current minute"
     },
     {
       "id": "duplicate-inbound",
+      "exampleId": "wechat-standard-inbound",
       "status": 409,
       "code": "duplicate_inbound",
+      "mutation": "duplicate",
       "reason": "externalMessageId or canonical signed payload was already accepted"
     }
   ]

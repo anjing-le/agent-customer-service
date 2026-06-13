@@ -209,6 +209,14 @@ type ChannelProtocolMatrixRow = {
   rateLimit: string;
   errors: string[];
 };
+type ChannelErrorExample = {
+  id: string;
+  exampleId: string;
+  status: number;
+  code: string;
+  mutation: 'origin' | 'signature' | 'timestamp' | 'volume' | 'duplicate';
+  reason: string;
+};
 type ChannelDemoResult = {
   exampleId: string;
   status: number;
@@ -217,6 +225,12 @@ type ChannelDemoResult = {
   evidenceTitles: string[];
   fallbackReason?: string;
   trace?: AgentTrace;
+};
+type ChannelFailureResult = {
+  exampleId: string;
+  status: number;
+  code: string;
+  reason: string;
 };
 type Dashboard = {
   metrics: Metric[];
@@ -378,6 +392,29 @@ const signedDemoRequest = async (example: ChannelProtocolExample) => {
   return request;
 };
 
+const errorHeaders = (example: ChannelProtocolExample, error: ChannelErrorExample) => {
+  if (error.mutation === 'origin') {
+    return { ...example.headers, 'X-Channel-Origin': 'https://evil.example.com' };
+  }
+  return example.headers;
+};
+
+const staleTimestamp = () => new Date(Date.now() - 10 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+const failedDemoRequest = async (example: ChannelProtocolExample, error: ChannelErrorExample) => {
+  const request = await signedDemoRequest(example);
+  if (error.mutation === 'signature') {
+    request.signature = 'bad-signature';
+  }
+  if (error.mutation === 'timestamp') {
+    const stale = staleTimestamp();
+    request.timestamp = stale;
+    const payload = [request.channel, request.externalConversationId, stale, request.content].map((item) => item.trim()).join('\n');
+    request.signature = await hmacSHA256Hex(example.demoSecret, payload);
+  }
+  return request;
+};
+
 function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
@@ -399,6 +436,8 @@ function App() {
   const [trainingSamples, setTrainingSamples] = useState<TrainingSample[]>([]);
   const [channelDemoSending, setChannelDemoSending] = useState('');
   const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
+  const [channelFailureSending, setChannelFailureSending] = useState('');
+  const [channelFailureResult, setChannelFailureResult] = useState<ChannelFailureResult | null>(null);
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
@@ -408,6 +447,7 @@ function App() {
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
+  const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
@@ -617,6 +657,68 @@ function App() {
       setError(err instanceof Error ? err.message : 'channel demo failed');
     } finally {
       setChannelDemoSending('');
+    }
+  };
+
+  const sendChannelFailureDemo = async (errorExample: ChannelErrorExample) => {
+    const example = protocolExamples.find((item) => item.id === errorExample.exampleId);
+    if (!example) {
+      setError(`missing channel example ${errorExample.exampleId}`);
+      return;
+    }
+    setError('');
+    setChannelFailureSending(errorExample.id);
+    setChannelFailureResult(null);
+    try {
+      const headers = errorHeaders(example, errorExample);
+      let response: Response | null = null;
+      let payload = {} as ApiResponse<unknown>;
+      if (errorExample.mutation === 'volume') {
+        for (let idx = 0; idx < 70; idx += 1) {
+          const volumeRequest = await signedDemoRequest(example);
+          response = await fetch(endpointPath(example.endpoint), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(volumeRequest)
+          });
+          payload = (await response.json()) as ApiResponse<unknown>;
+          if (response.status === errorExample.status) {
+            break;
+          }
+        }
+      } else {
+        const request = await failedDemoRequest(example, errorExample);
+        if (errorExample.mutation === 'duplicate') {
+          await fetch(endpointPath(example.endpoint), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(request)
+          });
+        }
+        response = await fetch(endpointPath(example.endpoint), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(request)
+        });
+        payload = (await response.json()) as ApiResponse<unknown>;
+      }
+      if (!response) {
+        throw new Error('channel failure demo did not receive a response');
+      }
+      const code = payload.error?.code ?? `http_${response.status}`;
+      if (response.status !== errorExample.status || code !== errorExample.code) {
+        throw new Error(`expected ${errorExample.status} ${errorExample.code}, got ${response.status} ${code}`);
+      }
+      setChannelFailureResult({
+        exampleId: errorExample.id,
+        status: response.status,
+        code,
+        reason: errorExample.reason
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'channel failure demo failed');
+    } finally {
+      setChannelFailureSending('');
     }
   };
 
@@ -1002,6 +1104,33 @@ function App() {
                     <span>{row.customerField} to customer</span>
                     <span>{row.errors.slice(0, 3).join(' / ')}</span>
                   </div>
+                </article>
+              ))}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">失败演示</p>
+                <h2>拒绝边界</h2>
+              </div>
+              <span className="status warning">{errorExamples.length}</span>
+            </div>
+            <div className="failureList">
+              {errorExamples.map((item) => (
+                <article className="failureExample" key={item.id}>
+                  <div>
+                    <strong>{item.code}</strong>
+                    <span>{item.mutation} · {item.reason}</span>
+                    {channelFailureResult?.exampleId === item.id && <small>{channelFailureResult.status} · {channelFailureResult.code}</small>}
+                  </div>
+                  <button
+                    className="tinyButton"
+                    onClick={() => sendChannelFailureDemo(item)}
+                    title="发送失败演示"
+                    disabled={channelFailureSending === item.id}
+                  >
+                    <Send size={14} />
+                  </button>
                 </article>
               ))}
             </div>

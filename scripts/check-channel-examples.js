@@ -63,6 +63,12 @@ for (const error of examples.errorExamples || []) {
   if (!knownErrorCodes.has(error.code)) {
     fail(`${error.id} references unknown error code ${error.code}`);
   }
+  if (error.exampleId && !exampleIDs.has(error.exampleId)) {
+    fail(`${error.id} references unknown example ${error.exampleId}`);
+  }
+  if (!['origin', 'signature', 'timestamp', 'volume', 'duplicate'].includes(error.mutation)) {
+    fail(`${error.id} uses unsupported mutation ${error.mutation}`);
+  }
 }
 
 if (JSON.stringify(matrix.signaturePayload) !== JSON.stringify(expectedPayload)) {
