@@ -1,0 +1,144 @@
+{
+  "version": "0.2.0",
+  "signatureAlgorithm": "HMAC-SHA256",
+  "canonicalPayload": ["channel", "externalConversationId", "timestamp", "content"],
+  "examples": [
+    {
+      "id": "wechat-standard-inbound",
+      "channel": "WeChat",
+      "endpoint": "POST /api/channels/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "https://wechat.example.com"
+      },
+      "secretRef": "ANJING_CHANNEL_WECHAT_SECRET",
+      "demoSecret": "wechat-demo-secret",
+      "signatureInput": {
+        "channel": "WeChat",
+        "externalConversationId": "wx-open-example",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "这个商品能不能开发票？"
+      },
+      "request": {
+        "channel": "WeChat",
+        "externalConversationId": "wx-open-example",
+        "externalMessageId": "wechat-msg-example-1",
+        "customer": "微信客户",
+        "content": "这个商品能不能开发票？",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "signature": "f1243e26503d1e94cfa4b355eb7abd8958e34b7ae51243cb547654c3d1a9e676"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    },
+    {
+      "id": "wechat-adapter-inbound",
+      "channel": "WeChat",
+      "endpoint": "POST /api/channels/wechat/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "https://wechat.example.com"
+      },
+      "secretRef": "ANJING_CHANNEL_WECHAT_SECRET",
+      "demoSecret": "wechat-demo-secret",
+      "signatureInput": {
+        "channel": "WeChat",
+        "externalConversationId": "wx-open-adapter-example",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "这个商品能不能开发票？"
+      },
+      "request": {
+        "openId": "wx-open-adapter-example",
+        "msgId": "wechat-adapter-msg-example-1",
+        "nickname": "微信客户",
+        "text": "这个商品能不能开发票？",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "signature": "ce5d61a047bfcc8f7206579104c85e85750c500f01aa35b2a136cd2cfab2140d"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    },
+    {
+      "id": "app-adapter-inbound",
+      "channel": "App",
+      "endpoint": "POST /api/channels/app/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "app://agent-customer-service"
+      },
+      "secretRef": "ANJING_CHANNEL_APP_SECRET",
+      "demoSecret": "app-demo-secret",
+      "signatureInput": {
+        "channel": "App",
+        "externalConversationId": "device-example-1",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "订单状态在哪里看？"
+      },
+      "request": {
+        "deviceId": "device-example-1",
+        "messageId": "app-msg-example-1",
+        "userName": "App 客户",
+        "body": "订单状态在哪里看？",
+        "sentAt": "2026-06-14T03:10:00Z",
+        "signature": "7d3aa2303fc1856febfe8f018850a59f3985fed6759dfec072333125cdd773a6"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    },
+    {
+      "id": "marketplace-adapter-inbound",
+      "channel": "Marketplace",
+      "endpoint": "POST /api/channels/marketplace/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "https://marketplace.example.com"
+      },
+      "secretRef": "ANJING_CHANNEL_MARKETPLACE_SECRET",
+      "demoSecret": "marketplace-demo-secret",
+      "signatureInput": {
+        "channel": "Marketplace",
+        "externalConversationId": "buyer-example-1",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "可以修改收货地址吗？"
+      },
+      "request": {
+        "buyerId": "buyer-example-1",
+        "eventId": "market-event-example-1",
+        "buyerName": "平台买家",
+        "message": "可以修改收货地址吗？",
+        "occurredAt": "2026-06-14T03:10:00Z",
+        "signature": "25cd6c47d4c73b54e6a04bb7bdedf2c121de4ae2151ebafe69aa0f1bcc1e25d3"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    }
+  ],
+  "errorExamples": [
+    {
+      "id": "denied-origin",
+      "status": 403,
+      "code": "channel_origin_denied",
+      "reason": "Origin or X-Channel-Origin is declared but not listed in ChannelIntegration.allowedOrigins"
+    },
+    {
+      "id": "rate-limited",
+      "status": 429,
+      "code": "channel_rate_limited",
+      "reason": "Channel traffic exceeds ChannelIntegration.rateLimitPerMinute in the current minute"
+    },
+    {
+      "id": "duplicate-inbound",
+      "status": 409,
+      "code": "duplicate_inbound",
+      "reason": "externalMessageId or canonical signed payload was already accepted"
+    }
+  ]
+}

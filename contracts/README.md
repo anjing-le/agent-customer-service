@@ -5,11 +5,13 @@
 - `platform-contract.json`: 平台级 API、响应、分页、请求上下文、时间、语言和错误码契约。
 - `service-boundaries.json`: 当前 Go runtime 的服务/模块边界。
 - `api-contract.json`: 当前 HTTP endpoint、request、response 和领域对象字段契约。
+- `examples/channel-protocols.json`: 渠道 inbound 与真实 adapter 的签名、来源和错误码样例。
 
 当前真实运行路径以 `service-boundaries.json` 为准：
 
 - `/api/customer-service`
 - `/api/knowledge`
 - `/api/ops`
+- `/api/channels`
 
 新增接口需要先更新本目录，再同步 Go handler 和 React 控制台调用点。

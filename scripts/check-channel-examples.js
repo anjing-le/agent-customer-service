@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+const root = path.resolve(__dirname, '..');
+const examplesPath = path.join(root, 'contracts/examples/channel-protocols.json');
+const contractPath = path.join(root, 'contracts/api-contract.json');
+
+const examples = JSON.parse(fs.readFileSync(examplesPath, 'utf8'));
+const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
+const endpointKeys = new Set((contract.endpoints || []).map((endpoint) => `${endpoint.method} ${endpoint.path}`));
+const knownErrorCodes = new Set();
+
+for (const endpoint of contract.endpoints || []) {
+  for (const error of endpoint.errorResponses || []) {
+    for (const code of String(error.code || '').split('|')) {
+      knownErrorCodes.add(code);
+    }
+  }
+}
+
+function fail(message) {
+  console.error(`check-channel-examples: ${message}`);
+  process.exitCode = 1;
+}
+
+if (examples.signatureAlgorithm !== 'HMAC-SHA256') {
+  fail('signatureAlgorithm must be HMAC-SHA256');
+}
+
+const expectedPayload = ['channel', 'externalConversationId', 'timestamp', 'content'];
+if (JSON.stringify(examples.canonicalPayload) !== JSON.stringify(expectedPayload)) {
+  fail(`canonicalPayload must be ${expectedPayload.join(', ')}`);
+}
+
+for (const item of examples.examples || []) {
+  if (!endpointKeys.has(item.endpoint)) {
+    fail(`${item.id} references unknown endpoint ${item.endpoint}`);
+  }
+  if (!item.headers || item.headers['Content-Type'] !== 'application/json') {
+    fail(`${item.id} must declare application/json content type`);
+  }
+  if (!item.headers['X-Channel-Origin']) {
+    fail(`${item.id} must declare X-Channel-Origin`);
+  }
+  const input = item.signatureInput || {};
+  const payload = [input.channel, input.externalConversationId, input.timestamp, input.content]
+    .map((value) => String(value || '').trim())
+    .join('\n');
+  const expected = crypto.createHmac('sha256', item.demoSecret || '').update(payload).digest('hex');
+  const actual = item.request?.signature;
+  if (actual !== expected) {
+    fail(`${item.id} signature mismatch: expected ${expected}, got ${actual}`);
+  }
+}
+
+for (const error of examples.errorExamples || []) {
+  if (!knownErrorCodes.has(error.code)) {
+    fail(`${error.id} references unknown error code ${error.code}`);
+  }
+}
+
+if (!process.exitCode) {
+  console.log('check-channel-examples: ok');
+}

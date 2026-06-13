@@ -5,6 +5,7 @@
 - `contracts/platform-contract.json`
 - `contracts/service-boundaries.json`
 - `contracts/api-contract.json`
+- `contracts/examples/channel-protocols.json`
 
 ## Response Envelope
 
@@ -64,6 +65,18 @@ Go API 当前响应格式：
 2. React console 调用点
 3. `contracts/service-boundaries.json`
 4. `contracts/api-contract.json`
+
+## Channel Protocol Examples
+
+`contracts/examples/channel-protocols.json` 固化了标准 inbound、WeChat、App 和 Marketplace adapter 的请求样例。每个样例都包含：
+
+- endpoint 和请求头
+- demo secret 与 secret ref
+- 参与签名的 canonical payload 字段
+- HMAC-SHA256 signature
+- 关键错误码样例，例如 `channel_origin_denied`、`channel_rate_limited`、`duplicate_inbound`
+
+`scripts/check-channel-examples.js` 会在质量门禁里重新计算签名，并确认样例 endpoint 和错误码仍存在于 API contract。
 
 ## Pagination
 
