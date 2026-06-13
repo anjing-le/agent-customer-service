@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Database,
+  Send,
   FileSearch,
   FilePlus2,
   MessageSquareText,
@@ -179,16 +180,24 @@ type ChannelProtocolExample = {
   endpoint: string;
   headers: Record<string, string>;
   secretRef: string;
+  demoSecret: string;
   signatureInput: {
     channel: string;
     externalConversationId: string;
     timestamp: string;
     content: string;
   };
+  request: Record<string, string>;
   expectedSuccess: {
     status: number;
     envelope: string;
   };
+};
+type ChannelDemoResult = {
+  exampleId: string;
+  status: number;
+  conversationId: string;
+  reply: string;
 };
 type Dashboard = {
   metrics: Metric[];
@@ -299,6 +308,57 @@ const postMessageStream = async (
   return finalResult;
 };
 
+const hmacSHA256Hex = async (secret: string, payload: string) => {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  return Array.from(new Uint8Array(signature))
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+const endpointPath = (endpoint: string) => endpoint.split(/\s+/)[1] ?? endpoint;
+
+const cloneRecord = (value: Record<string, string>) => JSON.parse(JSON.stringify(value)) as Record<string, string>;
+
+const signedDemoRequest = async (example: ChannelProtocolExample) => {
+  const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const unique = `${Date.now()}`;
+  const request = cloneRecord(example.request);
+  const signatureInput = { ...example.signatureInput, timestamp };
+
+  if (example.endpoint.endsWith('/api/channels/inbound')) {
+    request.externalConversationId = `${request.externalConversationId}-${unique}`;
+    request.externalMessageId = `${request.externalMessageId}-${unique}`;
+    request.timestamp = timestamp;
+    signatureInput.externalConversationId = request.externalConversationId;
+  } else if (example.endpoint.endsWith('/api/channels/wechat/inbound')) {
+    request.openId = `${request.openId}-${unique}`;
+    request.msgId = `${request.msgId}-${unique}`;
+    request.timestamp = timestamp;
+    signatureInput.externalConversationId = request.openId;
+  } else if (example.endpoint.endsWith('/api/channels/app/inbound')) {
+    request.deviceId = `${request.deviceId}-${unique}`;
+    request.messageId = `${request.messageId}-${unique}`;
+    request.sentAt = timestamp;
+    signatureInput.externalConversationId = request.deviceId;
+  } else if (example.endpoint.endsWith('/api/channels/marketplace/inbound')) {
+    request.buyerId = `${request.buyerId}-${unique}`;
+    request.eventId = `${request.eventId}-${unique}`;
+    request.occurredAt = timestamp;
+    signatureInput.externalConversationId = request.buyerId;
+  }
+
+  const payload = [
+    signatureInput.channel,
+    signatureInput.externalConversationId,
+    signatureInput.timestamp,
+    signatureInput.content
+  ].map((item) => item.trim()).join('\n');
+  request.signature = await hmacSHA256Hex(example.demoSecret, payload);
+  return request;
+};
+
 function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
@@ -318,6 +378,8 @@ function App() {
   const [annotationNote, setAnnotationNote] = useState('证据充分，回复安全，可作为教学正样本。');
   const [annotationSaving, setAnnotationSaving] = useState(false);
   const [trainingSamples, setTrainingSamples] = useState<TrainingSample[]>([]);
+  const [channelDemoSending, setChannelDemoSending] = useState('');
+  const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
@@ -326,7 +388,7 @@ function App() {
   const annotations = dashboard?.annotations ?? [];
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
-  const protocolExamples = channelProtocolExamples.examples as ChannelProtocolExample[];
+  const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
     if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
@@ -499,6 +561,39 @@ function App() {
       setError(err instanceof Error ? err.message : 'submit annotation failed');
     } finally {
       setAnnotationSaving(false);
+    }
+  };
+
+  const sendChannelDemo = async (example: ChannelProtocolExample) => {
+    setError('');
+    setChannelDemoSending(example.id);
+    setChannelDemoResult(null);
+    try {
+      const request = await signedDemoRequest(example);
+      const response = await fetch(endpointPath(example.endpoint), {
+        method: 'POST',
+        headers: example.headers,
+        body: JSON.stringify(request)
+      });
+      const payload = (await response.json()) as ApiResponse<SendMessageResult>;
+      if (!payload.success || !payload.data) {
+        throw new Error(payload.error?.message ?? `channel demo failed: ${response.status}`);
+      }
+      setResult(payload.data);
+      setSelectedConversationId(payload.data.conversation.id);
+      setChannelFilter(example.channel);
+      setChannelDemoResult({
+        exampleId: example.id,
+        status: response.status,
+        conversationId: payload.data.conversation.id,
+        reply: payload.data.agentMessage.content
+      });
+      await load();
+      await loadMessages(payload.data.conversation.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'channel demo failed');
+    } finally {
+      setChannelDemoSending('');
     }
   };
 
@@ -825,11 +920,22 @@ function App() {
                     <strong>{example.channel}</strong>
                     <span>{example.endpoint}</span>
                     <span>{example.headers['X-Channel-Origin']}</span>
+                    {channelDemoResult?.exampleId === example.id && <small>{channelDemoResult.reply}</small>}
                   </div>
                   <div className="protocolMeta">
                     <span>{example.secretRef}</span>
                     <span>{example.signatureInput.externalConversationId}</span>
-                    <b className="status">{example.expectedSuccess.status}</b>
+                    <div className="protocolActions">
+                      <button
+                        className="tinyButton"
+                        onClick={() => sendChannelDemo(example)}
+                        title="发送演示请求"
+                        disabled={channelDemoSending === example.id}
+                      >
+                        <Send size={14} />
+                      </button>
+                      <b className="status">{channelDemoResult?.exampleId === example.id ? channelDemoResult.status : example.expectedSuccess.status}</b>
+                    </div>
                   </div>
                 </article>
               ))}

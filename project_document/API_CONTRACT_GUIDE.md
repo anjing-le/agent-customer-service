@@ -80,7 +80,7 @@ Go API 当前响应格式：
 
 本地服务启动后，可以执行 `./scripts/demo-channel-inbound.sh`，脚本会读取同一份样例，动态刷新 timestamp、消息 ID 和签名，并把请求发送到运行中的渠道入口。
 
-React 控制台的渠道接入区域也直接读取这份样例，展示 endpoint、来源头、secret ref、签名外部会话 ID 和预期状态码，便于课堂解释不同渠道如何归一到同一条 Agent 链路。
+React 控制台的渠道接入区域也直接读取这份样例，展示 endpoint、来源头、secret ref、签名外部会话 ID 和预期状态码，并可用 demo secret 发送演示请求，便于课堂解释不同渠道如何归一到同一条 Agent 链路。
 
 ## Pagination
 

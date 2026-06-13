@@ -160,6 +160,12 @@ h2 {
   background: #dff1e8;
 }
 
+.tinyButton:disabled {
+  cursor: progress;
+  color: #6f8f7f;
+  background: #edf4f0;
+}
+
 .notice {
   gap: 8px;
   margin-bottom: 16px;
@@ -592,8 +598,21 @@ textarea {
   white-space: nowrap;
 }
 
+.protocolSummary small {
+  color: #314c40;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .protocolMeta {
   justify-items: end;
+}
+
+.protocolActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .evidence {
