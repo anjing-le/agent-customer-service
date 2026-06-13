@@ -68,6 +68,13 @@ curl -X POST http://localhost:10002/api/ops/rules/test \
 ## Quality Checks
 
 ```bash
+./scripts/quality-gate.sh
+```
+
+常用拆分命令：
+
+```bash
+./scripts/check-agent-regression.sh
 go test ./...
 pnpm build:console
 ```

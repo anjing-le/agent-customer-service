@@ -1,0 +1,65 @@
+[
+  {
+    "name": "invoice evidence answer",
+    "content": "这个商品能不能开发票？",
+    "expectEngine": "rag+rule",
+    "expectFallbackReason": "",
+    "expectEvidenceIds": ["kb_invoice"],
+    "expectTraceEvidenceCount": 1,
+    "expectGap": false,
+    "expectTraceStrategy": "evidence_answer",
+    "expectModelAttempted": false,
+    "expectModelFallback": false
+  },
+  {
+    "name": "unknown policy creates knowledge gap",
+    "content": "完全没有资料的新品保价规则是什么？",
+    "expectEngine": "rule",
+    "expectFallbackReason": "NO_EVIDENCE",
+    "expectEvidenceIds": [],
+    "expectTraceEvidenceCount": 0,
+    "expectGap": true,
+    "expectTraceStrategy": "no_evidence_fallback",
+    "expectModelAttempted": false,
+    "expectModelFallback": false
+  },
+  {
+    "name": "complaint transfers to human",
+    "content": "我已经投诉很多次了，现在必须转人工",
+    "expectEngine": "rule",
+    "expectFallbackReason": "TRANSFER_THRESHOLD",
+    "expectEvidenceIds": [],
+    "expectTraceEvidenceCount": 1,
+    "expectGap": false,
+    "expectTraceStrategy": "human_transfer",
+    "expectModelAttempted": false,
+    "expectModelFallback": false
+  },
+  {
+    "name": "model generates only with evidence",
+    "content": "这个商品能不能开发票？",
+    "generator": "success",
+    "expectEngine": "llm+rag",
+    "expectFallbackReason": "",
+    "expectEvidenceIds": ["kb_invoice"],
+    "expectTraceEvidenceCount": 1,
+    "expectGap": false,
+    "expectTraceStrategy": "evidence_answer",
+    "expectModelAttempted": true,
+    "expectModelFallback": false,
+    "expectModel": "regression-model"
+  },
+  {
+    "name": "model failure falls back to rule rag",
+    "content": "这个商品能不能开发票？",
+    "generator": "failure",
+    "expectEngine": "rag+rule",
+    "expectFallbackReason": "",
+    "expectEvidenceIds": ["kb_invoice"],
+    "expectTraceEvidenceCount": 1,
+    "expectGap": false,
+    "expectTraceStrategy": "evidence_answer",
+    "expectModelAttempted": true,
+    "expectModelFallback": true
+  }
+]

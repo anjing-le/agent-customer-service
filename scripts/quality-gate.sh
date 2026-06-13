@@ -11,6 +11,9 @@ echo "quality-gate: template and contract checks"
 echo "quality-gate: backend package"
 go test ./...
 
+echo "quality-gate: agent regression"
+./scripts/check-agent-regression.sh
+
 echo "quality-gate: frontend build"
 pnpm build:console
 

@@ -15,7 +15,8 @@
     "preview:console": "pnpm --filter @agent-customer-service/console preview",
     "build:go": "go build ./cmd/...",
     "test:go": "go test ./...",
-    "verify": "pnpm build:console && go test ./..."
+    "test:agent-regression": "./scripts/check-agent-regression.sh",
+    "verify": "./scripts/quality-gate.sh"
   },
   "workspaces": [
     "apps/*"

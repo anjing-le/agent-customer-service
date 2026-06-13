@@ -24,6 +24,7 @@
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
 | 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
+| 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
 
 ## 迁移原则
 
@@ -35,4 +36,4 @@
 ## 下一步
 
 1. 增加 SSE 流式回复。
-2. 建立批量回归问题集，验证知识命中、无证据兜底和转人工边界。
+2. 补更完整的人工接管记录和处理备注流转。
