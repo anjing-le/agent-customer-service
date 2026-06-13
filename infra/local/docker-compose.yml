@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agent-customer-service-postgres
+    environment:
+      POSTGRES_DB: agent_customer_service
+      POSTGRES_USER: anjing
+      POSTGRES_PASSWORD: anjing
+    ports:
+      - "54330:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anjing -d agent_customer_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:

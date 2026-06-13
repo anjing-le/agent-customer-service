@@ -4,6 +4,12 @@
   "private": true,
   "packageManager": "pnpm@10.2.0",
   "scripts": {
+    "db:up": "docker compose -f infra/local/docker-compose.yml up -d",
+    "db:down": "docker compose -f infra/local/docker-compose.yml down",
+    "db:logs": "docker compose -f infra/local/docker-compose.yml logs -f postgres",
+    "db:psql": "docker compose -f infra/local/docker-compose.yml exec postgres psql -U anjing -d agent_customer_service",
+    "db:migrate": "ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable' go run ./cmd/migrate-db",
+    "test:postgres": "ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable' go test ./internal/platform/store -run TestPostgresStoreRuntime -count=1",
     "dev:console": "pnpm --filter @agent-customer-service/console dev",
     "build:console": "pnpm --filter @agent-customer-service/console build",
     "preview:console": "pnpm --filter @agent-customer-service/console preview",

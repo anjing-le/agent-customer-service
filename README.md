@@ -44,8 +44,9 @@ go run ./cmd/platform-all
 PostgreSQL 模式：
 
 ```bash
-export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:5432/agent_customer_service?sslmode=disable'
-go run ./cmd/migrate-db
+pnpm db:up
+pnpm db:migrate
+export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable'
 go run ./cmd/platform-all
 ```
 
@@ -54,6 +55,13 @@ go run ./cmd/platform-all
 ```bash
 go test ./...
 pnpm build:console
+```
+
+PostgreSQL 集成测试：
+
+```bash
+pnpm db:up
+ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable' go test ./internal/platform/store -run TestPostgresStoreRuntime -count=1
 ```
 
 ## 文档
