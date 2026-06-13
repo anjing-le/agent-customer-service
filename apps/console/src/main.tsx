@@ -15,6 +15,7 @@ import {
   Download,
   UserRoundCheck
 } from 'lucide-react';
+import channelProtocolExamples from '../../../contracts/examples/channel-protocols.json';
 import './styles.css';
 
 type ApiResponse<T> = {
@@ -172,6 +173,23 @@ type ChannelIntegration = {
   rotatesAt?: string;
   updatedAt: string;
 };
+type ChannelProtocolExample = {
+  id: string;
+  channel: string;
+  endpoint: string;
+  headers: Record<string, string>;
+  secretRef: string;
+  signatureInput: {
+    channel: string;
+    externalConversationId: string;
+    timestamp: string;
+    content: string;
+  };
+  expectedSuccess: {
+    status: number;
+    envelope: string;
+  };
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
@@ -308,6 +326,7 @@ function App() {
   const annotations = dashboard?.annotations ?? [];
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
+  const protocolExamples = channelProtocolExamples.examples as ChannelProtocolExample[];
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
     if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
@@ -790,6 +809,30 @@ function App() {
                 </article>
               ))}
               {integrations.length === 0 && <p className="empty">暂无渠道接入配置</p>}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">协议样例</p>
+                <h2>真实渠道入口</h2>
+              </div>
+              <span className="status">{protocolExamples.length}</span>
+            </div>
+            <div className="protocolList">
+              {protocolExamples.map((example) => (
+                <article className="protocolExample" key={example.id}>
+                  <div className="protocolSummary">
+                    <strong>{example.channel}</strong>
+                    <span>{example.endpoint}</span>
+                    <span>{example.headers['X-Channel-Origin']}</span>
+                  </div>
+                  <div className="protocolMeta">
+                    <span>{example.secretRef}</span>
+                    <span>{example.signatureInput.externalConversationId}</span>
+                    <b className="status">{example.expectedSuccess.status}</b>
+                  </div>
+                </article>
+              ))}
             </div>
           </section>
 
