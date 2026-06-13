@@ -1,0 +1,17 @@
+{
+  "name": "agent-customer-service",
+  "version": "0.2.0",
+  "private": true,
+  "packageManager": "pnpm@10.2.0",
+  "scripts": {
+    "dev:console": "pnpm --filter @agent-customer-service/console dev",
+    "build:console": "pnpm --filter @agent-customer-service/console build",
+    "preview:console": "pnpm --filter @agent-customer-service/console preview",
+    "build:go": "go build ./cmd/...",
+    "test:go": "go test ./...",
+    "verify": "pnpm build:console && go test ./..."
+  },
+  "workspaces": [
+    "apps/*"
+  ]
+}

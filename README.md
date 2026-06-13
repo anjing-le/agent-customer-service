@@ -1,73 +1,56 @@
 # agent-customer-service
 
-可靠智能客服教学项目，从 `infra-dev-scaffolding` 生长出来，聚焦多轮对话、RAG 检索增强、规则兜底、防幻觉、会话管理和历史记录。
+可靠智能客服教学项目，按安静 DVSkyFolding 脚手架口径重构：Go 后端、React + TypeScript + Vite 前端、PostgreSQL 数据底座、单镜像多 command 交付。
 
-底层技术栈、工程结构、契约和质量门禁沿用脚手架；本项目只新增客服 Agent 的业务设计。
-
-## 当前边界
-
-- 对话中心：`/api/chat/**`，会话、消息、多轮上下文、LLM/规则回复、推理过程。
-- 知识中心：`/api/knowledge/**`，商品、活动、FAQ 参与当前对话检索。
-- 场景配置：`/api/scene/**`，Intent/Prompt/Rule 管理、Prompt 测试，并轻量接入 Agent Runtime。
-
-机器可读契约见 [contracts/service-boundaries.json](./contracts/service-boundaries.json)。
-
-## 生长关系
-
-```text
-infra-dev-scaffolding
-  ├─ contracts / scripts / project_document
-  ├─ Vue + TypeScript + Vite
-  └─ Spring Boot + Java 17
-
-agent-customer-service
-  ├─ chat: 会话与 Agent Runtime
-  ├─ knowledge: 客服知识
-  ├─ scene: 意图、提示词、规则
-  └─ agent: 可靠性领域模型与编排
-```
+项目关注的业务边界是多轮会话、RAG 知识检索、规则兜底、防幻觉、会话管理、历史记录和运营质检。
 
 ## 技术栈
 
-- Frontend: Vue 3.5 + TypeScript + Vite 7 + Element Plus
-- Backend: Spring Boot 3.4.5 + Java 17 + JPA
-- Storage: MySQL 8；Redis/Redisson 可选
-- LLM: OneRouter / OpenAI-compatible Chat Completions
+- Frontend: React + TypeScript + Vite
+- Backend: Go + `net/http` / `ServeMux`
+- Database: PostgreSQL + `pgx/v5` + SQL
+- Logging: `log/slog` JSON
+- Config: env first
+- Delivery: one image, multiple Go commands
+
+## 新工程结构
+
+```text
+apps/console        React 控制台
+cmd/platform-all    本地一体化启动
+cmd/customer-service-api
+cmd/ops-api
+cmd/console-web
+cmd/migrate-db
+internal/platform   配置、HTTP JSON、日志、DB、seed store
+internal/customer   会话与 Agent Runtime API
+internal/knowledge  知识检索 API
+internal/ops        运营看板 API
+infra/postgres      PostgreSQL migrations
+```
+
+旧 `backend/` 与 `frontend/` 暂作为迁移参考保留，后续会按模块迁移完成后退场。
 
 ## 快速开始
 
 ```bash
-cd backend
-mvn spring-boot:run
-```
-
-```bash
-cd frontend
 pnpm install
-pnpm dev
+pnpm build:console
+go run ./cmd/platform-all
 ```
 
-后端默认端口 `10002`，前端默认端口 `20002`。本地敏感配置放在 `backend/src/main/resources/application-local.yml`，该文件已被 ignore，不应提交。
+默认端口：后端和静态控制台 `10002`。
 
-## 质量门禁
+## 校验
 
 ```bash
-./scripts/check-template.sh
-./scripts/check-contracts.sh
-./scripts/quality-gate.sh
+go test ./...
+pnpm build:console
 ```
 
 ## 文档
 
-- [项目约束](./project_document/PROJECT_CONSTRAINTS.md)
-- [API 契约](./project_document/API_CONTRACT_GUIDE.md)
-- [服务边界](./project_document/SERVICE_BOUNDARY_GUIDE.md)
-- [脚手架继承](./project_document/SCAFFOLD_INHERITANCE.md)
+- [项目状态](./project_document/STATUS.md)
 - [领域模型](./project_document/DOMAIN_MODEL.md)
+- [服务边界](./project_document/SERVICE_BOUNDARY_GUIDE.md)
 - [路线图](./project_document/ROADMAP.md)
-- [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)
-- [教学文档](./docs/teaching/00-环境准备与运行.md)
-
-## License
-
-MIT

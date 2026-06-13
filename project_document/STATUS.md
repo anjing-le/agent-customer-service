@@ -1,54 +1,32 @@
 # Status
 
-更新时间：2026-06-12
+更新时间：2026-06-13
 
 ## 当前状态
 
+项目已从旧 `infra-dev-scaffolding` Java/Vue 方向切换到安静 DVSkyFolding 技术基线，第一版新骨架已经落地。
+
 | 领域 | 状态 | 说明 |
 |---|---|---|
-| 脚手架继承 | Ready | 技术栈、结构、契约、脚本、质量门禁沿用 `infra-dev-scaffolding`，业务只扩展客服 Agent |
-| 对话中心 | Runtime observable | 会话/消息持久化仍在 `ChatService`，分析、检索、护栏、回复生成已由 `AgentRuntime` 编排；已补会话运行概览和单轮回复审计 |
-| 知识中心 | In progress | Product/Activity/FAQ 参与当前对话检索；Industry/Solution 为预留 |
-| 知识缺口池 | Runtime observable | 无可靠证据触发防幻觉边界时自动沉淀缺口，支持补充 FAQ、标记已处理、运营统计、Top 缺口分析和回归验证 |
-| 场景配置 | Runtime connected | 启用 Intent 参与关键词识别；启用 SYSTEM Prompt 由 PromptRuntime 渲染后注入 LLM 上下文；启用 Rule 由 RuleEngine 执行 |
-| 工程契约 | Ready for V1 | 已接入 contracts、scripts、project_document；前端 API 路径已集中到 `ApiPaths` |
-| 响应 envelope | Ready for V1 | Chat/Knowledge/Scene Controller 已迁移到 `APIResponse<T>`；前端 HTTP 层兼容字符串成功码 `"0"` |
-| Agent 领域模型 | In runtime | `ConversationTurn`、`KnowledgeRecall`、`GuardrailDecision`、`AgentReply` 已接入对话主链路 |
-| RuleEngine | Lightweight runtime | 支持内置规则码和轻量 JSON 条件表达式；命中后返回来源、原因和动作，并累加触发次数 |
-| Rule 配置 | Runtime editable | 前端支持规则新增/编辑、条件/动作 JSON 格式化、表达式测试和校验；后端 create/update 拦截非法 JSON |
-| PromptRuntime | Lightweight runtime | 支持 SYSTEM Prompt 场景过滤、基础变量渲染、使用次数累加，并返回渲染结果 |
-| Prompt 配置 | Runtime editable | 前端支持 Prompt 新增/编辑、变量 schema、运行时变量快捷填充和测试；后端校验变量名、重复项和必填占位符 |
-| Scene 运行概览 | Runtime observable | 展示启用意图、启用 SYSTEM Prompt、启用规则、规则命中、Prompt 使用、Top 项和运行洞察 |
-| Chat 运行概览 | Runtime observable | 展示总会话、活跃会话、今日会话、今日消息、Agent 回复、安全回复、兜底回复、最近审计、7 日趋势和最近快照 |
-| Agent 审计 | Runtime observable | 每轮助手回复沉淀意图、回复引擎、兜底原因、召回数、规则命中数和 Prompt 渲染数 |
-| 会话质检摘要 | Runtime observable | 基于单轮审计聚合会话可靠性评分、风险等级、兜底率、不安全率、主要兜底原因和质检明细 |
-| Runtime Snapshot | Runtime observable | 支持手动采样和可配置定时采样，沉淀 Chat 运行质量历史快照 |
-| Scene 运行趋势 | Runtime observable | 基于 Agent 审计聚合近 7 日场景、规则命中和 Prompt 消费趋势 |
-| 转人工流程 | Runtime observable | 低置信度、安全拦截或转人工规则命中时自动入队，支持模拟人工接管和结果回写 |
-| 转人工统计 | Runtime observable | 展示待处理、今日新增、今日解决、高优先级待处理和平均解决耗时 |
-| 知识证据解释 | Runtime observable | 召回证据返回命中原因、可信度等级和是否可引用，前端知识召回区可见 |
-| 知识负样本兜底 | Runtime observable | 无可靠证据时返回无答案原因，护栏阻止自由生成并进入规则兜底 |
-| 可靠性可观测 | In progress | 对话响应已返回回复引擎、兜底原因、护栏标签、命中规则和渲染提示词；前端 Agent 工作区已展示可靠性 Tab |
-| OpenAPI typed client | Pending | 后续接入 `/v3/api-docs` 和前端 operation 类型 |
-| 测试与质量门禁 | Ready for V1 | `./scripts/quality-gate.sh` 已通过；后续补单元测试和运行探针 |
+| 技术基线 | In migration | 新增 Go module、React/Vite console、PostgreSQL migration，后续逐步退场旧 `backend/` 和 `frontend/` |
+| Go 后端 | Skeleton ready | 使用 `net/http` / `ServeMux`、`log/slog`、统一 JSON envelope、env 配置 |
+| 服务命令 | Skeleton ready | `platform-all`、`customer-service-api`、`ops-api`、`console-web`、`migrate-db` |
+| 客服 API | V1 seed runtime | 会话列表、创建会话、发送消息、RAG seed 检索、无证据兜底、转人工兜底 |
+| 知识 API | V1 seed runtime | 知识列表和关键词检索，后续接 PostgreSQL repository |
+| 运营 API | V1 seed runtime | 运营指标、会话队列、知识缺口、规则清单 |
+| 前端控制台 | V1 shell | React/Vite 控制台已展示会话、Agent 工作区、知识缺口、兜底规则 |
+| 数据底座 | Schema ready | `infra/postgres/migrations/001_agent_customer_service.sql` 定义核心表 |
 
-## 当前保护边界
+## 迁移原则
 
-- 保留用户已有 README 收敛、OneRouter 地址更新和教学素材。
-- 不读取或改动 ignored 的 `backend/src/main/resources/application-local.yml`。
-- V2 第一阶段保持 API/前端 VO 不变，只替换后端内部编排结构。
-- 业务运行链路优先收口，模板遗留接口后续按模块逐步清理。
-- Scene 已补运行洞察和近 7 日趋势；Chat 已沉淀 Agent 单轮审计事实、知识证据解释、知识负样本兜底、知识缺口池、会话质检摘要、质检明细、转人工队列、人工回写、转人工统计、7 日趋势和运行快照。
+- 脚手架能力来自 DVSkyFolding：Go、React/Vite、PostgreSQL、SQL、env、JSON log、单镜像多 command。
+- 客服 Agent 只新增业务设计，不重新发明底层工程习惯。
+- 旧 Java/Vue 代码暂作历史参考，避免一次性删除导致教学材料断裂；后续每迁完一个边界就删除对应旧模块。
+- 每个可验证增量都 commit/push。
 
-## 验证入口
+## 下一步
 
-```bash
-./scripts/check-template.sh
-./scripts/check-contracts.sh
-```
-
-完整构建验证：
-
-```bash
-./scripts/quality-gate.sh
-```
+1. 为 Go seed runtime 补单元测试和 API contract 文档。
+2. 把 `Store` 拆成领域 repository 接口，并接入 PostgreSQL 实现。
+3. 将旧 Vue 页面信息架构迁移到 React 控制台。
+4. 删除旧 Java/Vue 运行入口，更新教学文档为 DVSkyFolding 口径。
