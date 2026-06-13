@@ -73,6 +73,14 @@ func (f failingRuntime) CompareRuleVersions(string) (store.RuleComparison, error
 	return store.RuleComparison{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) PublishCanaryRule(string, string, string) (store.RuleReleaseEvent, error) {
+	return store.RuleReleaseEvent{}, errors.New("database unavailable")
+}
+
+func (f failingRuntime) RollbackRule(string, string, string) (store.RuleReleaseEvent, error) {
+	return store.RuleReleaseEvent{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) ResolveTransferTicket(string, string, string) (store.TransferTicket, error) {
 	return store.TransferTicket{}, errors.New("database unavailable")
 }

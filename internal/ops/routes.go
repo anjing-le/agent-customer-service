@@ -59,6 +59,56 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, result)
 	})
 
+	mux.HandleFunc("/api/ops/rules/publish-canary", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Code  string `json:"code"`
+			Actor string `json:"actor"`
+			Note  string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.Code == "" {
+			httpjson.BadRequest(w, "code is required")
+			return
+		}
+		event, err := st.PublishCanaryRule(req.Code, req.Actor, req.Note)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, event)
+	})
+
+	mux.HandleFunc("/api/ops/rules/rollback", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Code  string `json:"code"`
+			Actor string `json:"actor"`
+			Note  string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.Code == "" {
+			httpjson.BadRequest(w, "code is required")
+			return
+		}
+		event, err := st.RollbackRule(req.Code, req.Actor, req.Note)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, event)
+	})
+
 	mux.HandleFunc("/api/ops/transfers/resolve", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

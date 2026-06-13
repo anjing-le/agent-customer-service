@@ -72,6 +72,15 @@ type RuleComparison = {
   changed: boolean;
   recommendation: string;
 };
+type RuleReleaseEvent = {
+  id: string;
+  ruleCode: string;
+  version: string;
+  action: string;
+  actor: string;
+  note: string;
+  createdAt: string;
+};
 type TransferTicket = {
   id: string;
   conversationId: string;
@@ -275,6 +284,7 @@ type Dashboard = {
   conversations: Conversation[] | null;
   knowledgeGaps: KnowledgeGap[] | null;
   rules: Rule[] | null;
+  ruleEvents: RuleReleaseEvent[] | null;
   transfers: TransferTicket[] | null;
   channelPolicies: ChannelPolicy[] | null;
   integrations: ChannelIntegration[] | null;
@@ -483,6 +493,7 @@ function App() {
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
   const rules = dashboard?.rules ?? [];
+  const ruleEvents = dashboard?.ruleEvents ?? [];
   const transfers = dashboard?.transfers ?? [];
   const annotations = dashboard?.annotations ?? [];
   const reviewTasks = dashboard?.reviewTasks ?? [];
@@ -637,6 +648,32 @@ function App() {
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'compare rules failed');
+    }
+  };
+
+  const publishCanaryRule = async (rule: Rule) => {
+    setError('');
+    try {
+      await api<RuleReleaseEvent>('/api/ops/rules/publish-canary', {
+        method: 'POST',
+        body: JSON.stringify({ code: rule.code, actor: 'qa-lead', note: '灰度对比通过，发布为 active 规则' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'publish rule failed');
+    }
+  };
+
+  const rollbackRule = async (rule: Rule) => {
+    setError('');
+    try {
+      await api<RuleReleaseEvent>('/api/ops/rules/rollback', {
+        method: 'POST',
+        body: JSON.stringify({ code: rule.code, actor: 'qa-lead', note: '发布后观测异常，回滚规则' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'rollback rule failed');
     }
   };
 
@@ -1449,9 +1486,35 @@ function App() {
                   <span>{item.version} · {item.stage}</span>
                   <span>{item.hitCount} hits{item.lastHitAt ? ` · ${item.lastHitAt.slice(11, 19)}` : ''}</span>
                   <p>{item.trigger}</p>
+                  <div className="ruleActions">
+                    {item.stage === 'canary' && item.enabled && (
+                      <button className="tinyButton" onClick={() => publishCanaryRule(item)} title="发布灰度规则">
+                        <CheckCircle2 size={14} />
+                      </button>
+                    )}
+                    {item.stage === 'active' && item.code === 'CANCEL_RISK_TRANSFER' && (
+                      <button className="tinyButton" onClick={() => rollbackRule(item)} title="回滚规则">
+                        <RefreshCcw size={14} />
+                      </button>
+                    )}
+                  </div>
                 </article>
               ))}
             </div>
+            {ruleEvents.length > 0 && (
+              <div className="ruleEvents">
+                {ruleEvents.slice(0, 4).map((event) => (
+                  <article className="eventRow" key={event.id}>
+                    <div>
+                      <strong>{event.action} · {event.ruleCode}</strong>
+                      <span>{event.version} · {event.actor}</span>
+                      <span>{event.note}</span>
+                    </div>
+                    <b className={statusClass(event.action === 'ROLLBACK' ? 'REVIEW' : 'LOW')}>{event.createdAt.slice(11, 19)}</b>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         </section>
       </section>

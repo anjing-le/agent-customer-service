@@ -136,6 +136,22 @@
       "response": { "status": 200, "schema": "RuleComparison" }
     },
     {
+      "id": "publishCanaryRule",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/rules/publish-canary",
+      "request": { "body": "RuleReleaseRequest" },
+      "response": { "status": 200, "schema": "RuleReleaseEvent" }
+    },
+    {
+      "id": "rollbackRule",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/rules/rollback",
+      "request": { "body": "RuleReleaseRequest" },
+      "response": { "status": 200, "schema": "RuleReleaseEvent" }
+    },
+    {
       "id": "resolveTransfer",
       "boundary": "ops",
       "method": "POST",
@@ -289,6 +305,14 @@
         "content": "string"
       }
     },
+    "RuleReleaseRequest": {
+      "required": ["code"],
+      "fields": {
+        "code": "string",
+        "actor": "string",
+        "note": "string"
+      }
+    },
     "ResolveTransferRequest": {
       "required": ["id"],
       "fields": {
@@ -401,7 +425,7 @@
         "action": "string",
         "enabled": "boolean",
         "version": "string",
-        "stage": "active|canary",
+        "stage": "active|canary|archived",
         "hitCount": "number",
         "lastHitAt": "RFC3339 string"
       }
@@ -427,6 +451,18 @@
         "canary": "RuleTestResult",
         "changed": "boolean",
         "recommendation": "string"
+      }
+    },
+    "RuleReleaseEvent": {
+      "required": ["id", "ruleCode", "version", "action", "actor", "note", "createdAt"],
+      "fields": {
+        "id": "string",
+        "ruleCode": "string",
+        "version": "string",
+        "action": "PUBLISH|ROLLBACK",
+        "actor": "string",
+        "note": "string",
+        "createdAt": "RFC3339 string"
       }
     },
     "TransferTicket": {
@@ -525,7 +561,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations", "reviewTasks"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations", "reviewTasks", "ruleEvents"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -537,7 +573,8 @@
         "channelAlerts": "ChannelAlert[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]",
-        "reviewTasks": "ReviewTask[]"
+        "reviewTasks": "ReviewTask[]",
+        "ruleEvents": "RuleReleaseEvent[]"
       }
     },
     "ChannelAlert": {

@@ -68,6 +68,35 @@ func TestCompareRulesRouteReturnsCanaryResult(t *testing.T) {
 	}
 }
 
+func TestRuleReleaseRoutesPublishAndRollback(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	publishReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/publish-canary", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","actor":"qa-lead","note":"发布灰度规则"}`))
+	publishRec := httptest.NewRecorder()
+	mux.ServeHTTP(publishRec, publishReq)
+
+	if publishRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", publishRec.Code, publishRec.Body.String())
+	}
+	for _, expected := range []string{`"ruleCode":"CANCEL_RISK_TRANSFER"`, `"action":"PUBLISH"`, `"actor":"qa-lead"`} {
+		if !strings.Contains(publishRec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, publishRec.Body.String())
+		}
+	}
+
+	rollbackReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/rollback", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","actor":"qa-lead","note":"回滚灰度规则"}`))
+	rollbackRec := httptest.NewRecorder()
+	mux.ServeHTTP(rollbackRec, rollbackReq)
+
+	if rollbackRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rollbackRec.Code, rollbackRec.Body.String())
+	}
+	if !strings.Contains(rollbackRec.Body.String(), `"action":"ROLLBACK"`) {
+		t.Fatalf("expected rollback event, got %s", rollbackRec.Body.String())
+	}
+}
+
 func TestReviewTaskRoutesAssignAndCompleteTask(t *testing.T) {
 	st := store.NewSeedStore()
 	dashboard, err := st.Dashboard()

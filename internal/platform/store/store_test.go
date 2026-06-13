@@ -410,3 +410,38 @@ func TestRuleComparisonShowsCanaryDecisionChange(t *testing.T) {
 		}
 	}
 }
+
+func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
+	st := NewSeedStore()
+
+	published, err := st.PublishCanaryRule("CANCEL_RISK_TRANSFER", "qa-lead", "灰度样本通过，发布规则")
+	if err != nil {
+		t.Fatalf("publish canary rule: %v", err)
+	}
+	if published.Action != "PUBLISH" || published.Actor != "qa-lead" {
+		t.Fatalf("expected publish event, got %#v", published)
+	}
+
+	result, err := st.TestRule("我想取消订单，7 天无理由退货怎么处理")
+	if err != nil {
+		t.Fatalf("test published rule: %v", err)
+	}
+	if result.RuleCode != "CANCEL_RISK_TRANSFER" {
+		t.Fatalf("expected published rule to become active, got %#v", result)
+	}
+
+	rolledBack, err := st.RollbackRule("CANCEL_RISK_TRANSFER", "qa-lead", "发布后人工压力过高，回滚")
+	if err != nil {
+		t.Fatalf("rollback rule: %v", err)
+	}
+	if rolledBack.Action != "ROLLBACK" {
+		t.Fatalf("expected rollback event, got %#v", rolledBack)
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.RuleEvents) != 2 {
+		t.Fatalf("expected two rule events, got %#v", dashboard.RuleEvents)
+	}
+}

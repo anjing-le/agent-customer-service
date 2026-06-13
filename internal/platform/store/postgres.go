@@ -452,6 +452,93 @@ func (s *PostgresStore) CompareRuleVersions(content string) (RuleComparison, err
 	return compareRuleResults(content, current, canary), nil
 }
 
+func (s *PostgresStore) PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error) {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("begin publish canary rule: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var version string
+	if err := tx.QueryRow(ctx, `
+		select version
+		from agent_rules
+		where code = $1
+		  and stage = 'canary'
+		  and enabled = true
+	`, code).Scan(&version); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("load canary rule: %w", err)
+	}
+	publishedVersion := nextPublishedVersion(version)
+	if _, err := tx.Exec(ctx, `
+		update agent_rules
+		set stage = 'archived',
+		    enabled = false,
+		    updated_at = now()
+		where code = $1
+		  and stage = 'active'
+	`, code); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("archive active rule: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		update agent_rules
+		set stage = 'active',
+		    version = $2,
+		    enabled = true,
+		    updated_at = now()
+		where code = $1
+		  and stage = 'canary'
+	`, code, publishedVersion); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("publish canary rule: %w", err)
+	}
+	event := newRuleReleaseEvent(code, publishedVersion, "PUBLISH", actor, note, time.Now().UTC().Format(time.RFC3339))
+	if err := insertRuleEvent(ctx, tx, event); err != nil {
+		return RuleReleaseEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("commit publish canary rule: %w", err)
+	}
+	return event, nil
+}
+
+func (s *PostgresStore) RollbackRule(code, actor, note string) (RuleReleaseEvent, error) {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("begin rollback rule: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var version string
+	if err := tx.QueryRow(ctx, `
+		select version
+		from agent_rules
+		where code = $1
+		  and stage = 'active'
+	`, code).Scan(&version); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("load active rule: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		update agent_rules
+		set stage = 'canary',
+		    enabled = false,
+		    updated_at = now()
+		where code = $1
+		  and stage = 'active'
+	`, code); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("rollback active rule: %w", err)
+	}
+	event := newRuleReleaseEvent(code, version, "ROLLBACK", actor, note, time.Now().UTC().Format(time.RFC3339))
+	if err := insertRuleEvent(ctx, tx, event); err != nil {
+		return RuleReleaseEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("commit rollback rule: %w", err)
+	}
+	return event, nil
+}
+
 func (s *PostgresStore) ResolveTransferTicket(id, assignee, note string) (TransferTicket, error) {
 	var item TransferTicket
 	var createdAt time.Time
@@ -636,6 +723,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	ruleEvents, err := s.listRuleEvents()
+	if err != nil {
+		return Dashboard{}, err
+	}
 	transfers, err := s.listTransferTickets()
 	if err != nil {
 		return Dashboard{}, err
@@ -707,6 +798,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
 		ReviewTasks:     reviewTasks,
+		RuleEvents:      ruleEvents,
 	}, nil
 }
 
@@ -798,6 +890,48 @@ func (s *PostgresStore) recordRuleHit(code string) error {
 		return fmt.Errorf("record rule hit: %w", err)
 	}
 	return nil
+}
+
+func insertRuleEvent(ctx context.Context, tx pgx.Tx, event RuleReleaseEvent) error {
+	createdAt, err := time.Parse(time.RFC3339, event.CreatedAt)
+	if err != nil {
+		createdAt = time.Now().UTC()
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into rule_release_events (id, rule_code, version, action, actor, note, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7)
+	`, event.ID, event.RuleCode, event.Version, event.Action, event.Actor, event.Note, createdAt); err != nil {
+		return fmt.Errorf("insert rule release event: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) listRuleEvents() ([]RuleReleaseEvent, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, rule_code, version, action, actor, note, created_at
+		from rule_release_events
+		order by created_at desc, id desc
+		limit 20
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list rule release events: %w", err)
+	}
+	defer rows.Close()
+
+	events := make([]RuleReleaseEvent, 0)
+	for rows.Next() {
+		var item RuleReleaseEvent
+		var createdAt time.Time
+		if err := rows.Scan(&item.ID, &item.RuleCode, &item.Version, &item.Action, &item.Actor, &item.Note, &createdAt); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		events = append(events, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {

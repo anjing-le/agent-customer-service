@@ -793,6 +793,44 @@ textarea {
   flex: 0 0 auto;
 }
 
+.ruleActions {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.ruleEvents {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #edf2ef;
+}
+
+.eventRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.eventRow div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.eventRow span {
+  overflow: hidden;
+  color: #64786d;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty {
   color: #6d7d74;
   line-height: 1.7;

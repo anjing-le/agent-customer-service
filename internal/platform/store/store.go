@@ -54,6 +54,8 @@ type Runtime interface {
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
 	CompareRuleVersions(content string) (RuleComparison, error)
+	PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error)
+	RollbackRule(code, actor, note string) (RuleReleaseEvent, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
 	AssignReviewTask(id, assignee string) (ReviewTask, error)
 	CompleteReviewTask(id string) (ReviewTask, error)
@@ -73,6 +75,7 @@ type Store struct {
 	tickets         []TransferTicket
 	channelPolicies []ChannelPolicy
 	integrations    []ChannelIntegration
+	ruleEvents      []RuleReleaseEvent
 	annotations     []Annotation
 	reviewTasks     []ReviewTask
 	inboundReplay   map[string]ChannelInboundReceipt
@@ -166,6 +169,16 @@ type RuleComparison struct {
 	Canary         RuleTestResult `json:"canary"`
 	Changed        bool           `json:"changed"`
 	Recommendation string         `json:"recommendation"`
+}
+
+type RuleReleaseEvent struct {
+	ID        string `json:"id"`
+	RuleCode  string `json:"ruleCode"`
+	Version   string `json:"version"`
+	Action    string `json:"action"`
+	Actor     string `json:"actor"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type TransferTicket struct {
@@ -281,6 +294,7 @@ type Dashboard struct {
 	Quality         QualitySummary       `json:"quality"`
 	Annotations     []Annotation         `json:"annotations"`
 	ReviewTasks     []ReviewTask         `json:"reviewTasks"`
+	RuleEvents      []RuleReleaseEvent   `json:"ruleEvents"`
 }
 
 type Metric struct {
@@ -600,6 +614,42 @@ func (s *Store) CompareRuleVersions(content string) (RuleComparison, error) {
 	return compareRuleResults(content, current, canary), nil
 }
 
+func (s *Store) PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	canaryIndex := s.ruleIndexLocked(code, "canary")
+	if canaryIndex < 0 {
+		return RuleReleaseEvent{}, fmt.Errorf("canary rule %s not found", code)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	for idx := range s.rules {
+		if s.rules[idx].Code == code && fallback(s.rules[idx].Stage, "active") == "active" {
+			s.rules[idx].Stage = "archived"
+			s.rules[idx].Enabled = false
+		}
+	}
+	s.rules[canaryIndex].Stage = "active"
+	s.rules[canaryIndex].Version = nextPublishedVersion(s.rules[canaryIndex].Version)
+	event := newRuleReleaseEvent(code, s.rules[canaryIndex].Version, "PUBLISH", actor, note, now)
+	s.ruleEvents = append([]RuleReleaseEvent{event}, s.ruleEvents...)
+	return event, nil
+}
+
+func (s *Store) RollbackRule(code, actor, note string) (RuleReleaseEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	activeIndex := s.ruleIndexLocked(code, "active")
+	if activeIndex < 0 {
+		return RuleReleaseEvent{}, fmt.Errorf("active rule %s not found", code)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	s.rules[activeIndex].Enabled = false
+	s.rules[activeIndex].Stage = "canary"
+	event := newRuleReleaseEvent(code, s.rules[activeIndex].Version, "ROLLBACK", actor, note, now)
+	s.ruleEvents = append([]RuleReleaseEvent{event}, s.ruleEvents...)
+	return event, nil
+}
+
 func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -711,6 +761,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
 		ReviewTasks:     append([]ReviewTask(nil), s.reviewTasks...),
+		RuleEvents:      append([]RuleReleaseEvent(nil), s.ruleEvents...),
 	}, nil
 }
 
@@ -1045,6 +1096,35 @@ func compareRuleResults(content string, current, canary RuleTestResult) RuleComp
 		Changed:        changed,
 		Recommendation: recommendation,
 	}
+}
+
+func newRuleReleaseEvent(code, version, action, actor, note, createdAt string) RuleReleaseEvent {
+	return RuleReleaseEvent{
+		ID:        fmt.Sprintf("rule_event_%d", time.Now().UnixNano()),
+		RuleCode:  code,
+		Version:   fallback(version, "2026-06-active"),
+		Action:    action,
+		Actor:     fallback(actor, "operator"),
+		Note:      fallback(note, "规则发布动作已记录"),
+		CreatedAt: createdAt,
+	}
+}
+
+func nextPublishedVersion(version string) string {
+	version = fallback(version, "2026-06-canary")
+	if strings.Contains(version, "active") {
+		return version
+	}
+	return strings.Replace(version, "canary", "active", 1)
+}
+
+func (s *Store) ruleIndexLocked(code, stage string) int {
+	for idx := range s.rules {
+		if s.rules[idx].Code == code && fallback(s.rules[idx].Stage, "active") == stage {
+			return idx
+		}
+	}
+	return -1
 }
 
 func (s *Store) recordRuleHitLocked(code, hitAt string) {
