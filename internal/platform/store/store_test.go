@@ -94,6 +94,22 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 	if result.Gap != nil {
 		t.Fatalf("expected no knowledge gap for transfer, got %#v", result.Gap)
 	}
+
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.Transfers) == 0 || dashboard.Transfers[0].Status != "OPEN" {
+		t.Fatalf("expected open transfer ticket, got %#v", dashboard.Transfers)
+	}
+
+	resolved, err := st.ResolveTransferTicket(dashboard.Transfers[0].ID, "agent-a", "已电话回访")
+	if err != nil {
+		t.Fatalf("resolve transfer ticket: %v", err)
+	}
+	if resolved.Status != "RESOLVED" || resolved.Assignee != "agent-a" {
+		t.Fatalf("expected resolved ticket, got %#v", resolved)
+	}
 }
 
 func TestRuleTestDetectsTransferAndNoEvidenceBoundaries(t *testing.T) {

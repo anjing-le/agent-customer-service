@@ -102,6 +102,15 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 	`, agentMessage.ID, agentMessage.ConversationID, agentMessage.Role, agentMessage.Content, agentMessage.Engine, agentMessage.Safe, agentMessage.FallbackReason, agentMessage.EvidenceIDs, now); err != nil {
 		return SendMessageResult{}, fmt.Errorf("insert agent message: %w", err)
 	}
+	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
+		ticket := newTransferTicket(conversationID, content, now.Format(time.RFC3339))
+		if _, err := tx.Exec(ctx, `
+			insert into transfer_tickets (id, conversation_id, question, reason, priority, status, created_at)
+			values ($1, $2, $3, $4, $5, $6, $7)
+		`, ticket.ID, ticket.ConversationID, ticket.Question, ticket.Reason, ticket.Priority, ticket.Status, now); err != nil {
+			return SendMessageResult{}, fmt.Errorf("insert transfer ticket: %w", err)
+		}
+	}
 	if gap != nil {
 		if _, err := tx.Exec(ctx, `
 			insert into knowledge_gaps (id, conversation_id, question, reason, status, priority, created_at)
@@ -253,6 +262,32 @@ func (s *PostgresStore) TestRule(content string) (RuleTestResult, error) {
 	return evaluateRules(content, evidence, rules), nil
 }
 
+func (s *PostgresStore) ResolveTransferTicket(id, assignee, note string) (TransferTicket, error) {
+	var item TransferTicket
+	var createdAt time.Time
+	var resolvedAt *time.Time
+	err := s.pool.QueryRow(context.Background(), `
+		update transfer_tickets
+		set status = 'RESOLVED',
+		    assignee = $2,
+		    resolution_note = $3,
+		    resolved_at = now()
+		where id = $1
+		returning id, conversation_id, question, reason, priority, status, assignee, resolution_note, created_at, resolved_at
+	`, id, fallback(assignee, "operator"), fallback(note, "人工已处理")).Scan(
+		&item.ID, &item.ConversationID, &item.Question, &item.Reason, &item.Priority, &item.Status,
+		&item.Assignee, &item.ResolutionNote, &createdAt, &resolvedAt,
+	)
+	if err != nil {
+		return TransferTicket{}, fmt.Errorf("resolve transfer ticket: %w", err)
+	}
+	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	if resolvedAt != nil {
+		item.ResolvedAt = resolvedAt.UTC().Format(time.RFC3339)
+	}
+	return item, nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	conversations, err := s.ListConversations()
 	if err != nil {
@@ -270,11 +305,21 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	transfers, err := s.listTransferTickets()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
 		if gap.Status == "OPEN" {
 			openGaps++
+		}
+	}
+	openTransfers := 0
+	for _, ticket := range transfers {
+		if ticket.Status == "OPEN" {
+			openTransfers++
 		}
 	}
 
@@ -283,11 +328,13 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(conversations)), Note: "PostgreSQL runtime"},
 			{Label: "Knowledge items", Value: fmt.Sprintf("%d", len(knowledge)), Note: "trusted articles in PostgreSQL"},
 			{Label: "Open gaps", Value: fmt.Sprintf("%d", openGaps), Note: "created by no-evidence fallback"},
+			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(rules)), Note: "guardrail and transfer policies"},
 		},
 		Conversations: conversations,
 		KnowledgeGaps: gaps,
 		Rules:         rules,
+		Transfers:     transfers,
 	}, nil
 }
 
@@ -350,6 +397,41 @@ func (s *PostgresStore) listRules() ([]Rule, error) {
 		return nil, err
 	}
 	return rules, nil
+}
+
+func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, conversation_id, question, reason, priority, status, assignee, resolution_note, created_at, resolved_at
+		from transfer_tickets
+		order by created_at desc
+		limit 50
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list transfer tickets: %w", err)
+	}
+	defer rows.Close()
+
+	tickets := make([]TransferTicket, 0)
+	for rows.Next() {
+		var item TransferTicket
+		var createdAt time.Time
+		var resolvedAt *time.Time
+		if err := rows.Scan(
+			&item.ID, &item.ConversationID, &item.Question, &item.Reason, &item.Priority, &item.Status,
+			&item.Assignee, &item.ResolutionNote, &createdAt, &resolvedAt,
+		); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		if resolvedAt != nil {
+			item.ResolvedAt = resolvedAt.UTC().Format(time.RFC3339)
+		}
+		tickets = append(tickets, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return tickets, nil
 }
 
 func scanConversations(rows pgx.Rows) ([]Conversation, error) {

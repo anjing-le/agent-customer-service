@@ -42,11 +42,22 @@ func TestPostgresStoreRuntime(t *testing.T) {
 		t.Fatalf("expected no evidence gap, got %#v", result)
 	}
 
+	transfer, err := st.SendMessage("conv_integration_transfer", "我已经投诉很多次了，必须转人工")
+	if err != nil {
+		t.Fatalf("send transfer message: %v", err)
+	}
+	if transfer.AgentMessage.FallbackReason != "TRANSFER_THRESHOLD" {
+		t.Fatalf("expected transfer fallback, got %#v", transfer)
+	}
+
 	dashboard, err := st.Dashboard()
 	if err != nil {
 		t.Fatalf("dashboard: %v", err)
 	}
 	if len(dashboard.KnowledgeGaps) == 0 {
 		t.Fatalf("expected persisted knowledge gap, got %#v", dashboard)
+	}
+	if len(dashboard.Transfers) == 0 {
+		t.Fatalf("expected persisted transfer ticket, got %#v", dashboard)
 	}
 }

@@ -163,7 +163,7 @@ h2 {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -232,6 +232,16 @@ h2 {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.compactHeader {
+  margin-top: 14px;
+}
+
+.panelDivider {
+  height: 1px;
+  margin: 14px 0 0;
+  background: #edf2ef;
 }
 
 .status {

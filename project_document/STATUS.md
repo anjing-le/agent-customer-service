@@ -20,6 +20,7 @@
 | 本地数据库 | Ready | `infra/local/docker-compose.yml`、`pnpm db:*` 脚本和可选 Postgres 集成测试已接入 |
 | 知识运营闭环 | Runtime connected | 缺口支持关闭，支持由缺口生成可信知识条目并回写为已处理 |
 | 规则测试 | Runtime connected | 场景配置区可输入问题测试转人工、无证据兜底和可回答边界 |
+| 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看并处理工单 |
 
 ## 迁移原则
 
@@ -31,5 +32,4 @@
 ## 下一步
 
 1. 为 Go API contract 补机器可读文档。
-2. 继续补齐 React 控制台的人工队列操作。
-3. 删除旧 Java/Vue 运行入口，更新教学文档为 DVSkyFolding 口径。
+2. 删除旧 Java/Vue 运行入口，更新教学文档为 DVSkyFolding 口径。

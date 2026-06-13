@@ -16,6 +16,7 @@ type Runtime interface {
 	ResolveKnowledgeGap(id string) (KnowledgeGap, error)
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
+	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -27,6 +28,7 @@ type Store struct {
 	knowledge     []KnowledgeArticle
 	gaps          []KnowledgeGap
 	rules         []Rule
+	tickets       []TransferTicket
 }
 
 type Conversation struct {
@@ -92,11 +94,25 @@ type RuleTestResult struct {
 	Recommended string `json:"recommended"`
 }
 
+type TransferTicket struct {
+	ID             string `json:"id"`
+	ConversationID string `json:"conversationId"`
+	Question       string `json:"question"`
+	Reason         string `json:"reason"`
+	Priority       string `json:"priority"`
+	Status         string `json:"status"`
+	Assignee       string `json:"assignee,omitempty"`
+	ResolutionNote string `json:"resolutionNote,omitempty"`
+	CreatedAt      string `json:"createdAt"`
+	ResolvedAt     string `json:"resolvedAt,omitempty"`
+}
+
 type Dashboard struct {
-	Metrics       []Metric       `json:"metrics"`
-	Conversations []Conversation `json:"conversations"`
-	KnowledgeGaps []KnowledgeGap `json:"knowledgeGaps"`
-	Rules         []Rule         `json:"rules"`
+	Metrics       []Metric         `json:"metrics"`
+	Conversations []Conversation   `json:"conversations"`
+	KnowledgeGaps []KnowledgeGap   `json:"knowledgeGaps"`
+	Rules         []Rule           `json:"rules"`
+	Transfers     []TransferTicket `json:"transfers"`
 }
 
 type Metric struct {
@@ -142,6 +158,9 @@ func NewSeedStore() *Store {
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
 		{ID: "msg_demo_2", ConversationID: "conv_demo_refund", Role: "assistant", Content: "根据售后知识库，签收 7 天内可申请无理由退货；非质量问题寄回运费通常由用户承担，质量问题由商家承担。", Engine: "rule+rAG", Safe: true, EvidenceIDs: []string{"kb_refund_7d"}, CreatedAt: now},
 	}
+	st.tickets = []TransferTicket{
+		{ID: "ticket_demo_transfer", ConversationID: "conv_demo_transfer", Question: "我已经催了三次，必须马上找人工处理。", Reason: "TRANSFER_THRESHOLD", Priority: "HIGH", Status: "OPEN", CreatedAt: now},
+	}
 	return st
 }
 
@@ -181,6 +200,9 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 	evidence := s.searchLocked(content)
 	agentMessage, gap := s.agentReplyLocked(conversationID, content, evidence, now)
 	s.messages = append(s.messages, userMessage, agentMessage)
+	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
+		s.tickets = append([]TransferTicket{newTransferTicket(conversationID, content, now)}, s.tickets...)
+	}
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
 	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
@@ -244,6 +266,21 @@ func (s *Store) TestRule(content string) (RuleTestResult, error) {
 	return evaluateRules(content, s.searchLocked(content), s.rules), nil
 }
 
+func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx := range s.tickets {
+		if s.tickets[idx].ID == id {
+			s.tickets[idx].Status = "RESOLVED"
+			s.tickets[idx].Assignee = fallback(assignee, "operator")
+			s.tickets[idx].ResolutionNote = fallback(note, "人工已处理")
+			s.tickets[idx].ResolvedAt = time.Now().UTC().Format(time.RFC3339)
+			return s.tickets[idx], nil
+		}
+	}
+	return TransferTicket{}, fmt.Errorf("transfer ticket %s not found", id)
+}
+
 func (s *Store) Dashboard() (Dashboard, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -253,16 +290,24 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			openGaps++
 		}
 	}
+	openTransfers := 0
+	for _, ticket := range s.tickets {
+		if ticket.Status == "OPEN" {
+			openTransfers++
+		}
+	}
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
 			{Label: "Knowledge items", Value: fmt.Sprintf("%d", len(s.knowledge)), Note: "seeded trusted articles"},
 			{Label: "Open gaps", Value: fmt.Sprintf("%d", openGaps), Note: "created by no-evidence fallback"},
+			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(s.rules)), Note: "guardrail and transfer policies"},
 		},
 		Conversations: append([]Conversation(nil), s.conversations...),
 		KnowledgeGaps: append([]KnowledgeGap(nil), s.gaps...),
 		Rules:         append([]Rule(nil), s.rules...),
+		Transfers:     append([]TransferTicket(nil), s.tickets...),
 	}, nil
 }
 
@@ -450,4 +495,16 @@ func ruleEnabled(rules []Rule, code string) bool {
 		}
 	}
 	return false
+}
+
+func newTransferTicket(conversationID, question, createdAt string) TransferTicket {
+	return TransferTicket{
+		ID:             fmt.Sprintf("ticket_%d", time.Now().UnixNano()),
+		ConversationID: conversationID,
+		Question:       question,
+		Reason:         "TRANSFER_THRESHOLD",
+		Priority:       "HIGH",
+		Status:         "OPEN",
+		CreatedAt:      createdAt,
+	}
 }

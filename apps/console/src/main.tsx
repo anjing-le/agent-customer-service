@@ -49,6 +49,18 @@ type RuleTestResult = {
   reason: string;
   recommended: string;
 };
+type TransferTicket = {
+  id: string;
+  conversationId: string;
+  question: string;
+  reason: string;
+  priority: string;
+  status: string;
+  assignee?: string;
+  resolutionNote?: string;
+  createdAt: string;
+  resolvedAt?: string;
+};
 type KnowledgeArticle = {
   id: string;
   title: string;
@@ -62,6 +74,7 @@ type Dashboard = {
   conversations: Conversation[] | null;
   knowledgeGaps: KnowledgeGap[] | null;
   rules: Rule[] | null;
+  transfers: TransferTicket[] | null;
 };
 type SendMessageResult = {
   conversation: Conversation;
@@ -95,9 +108,11 @@ function App() {
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
   const rules = dashboard?.rules ?? [];
+  const transfers = dashboard?.transfers ?? [];
   const activeConversation = useMemo(() => conversations[0], [conversations]);
   const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
   const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
+  const openTransferCount = transfers.filter((item) => item.status === 'OPEN').length;
 
   const load = async () => {
     setLoading(true);
@@ -178,6 +193,19 @@ function App() {
     }
   };
 
+  const resolveTransfer = async (ticket: TransferTicket) => {
+    setError('');
+    try {
+      await api<TransferTicket>('/api/ops/transfers/resolve', {
+        method: 'POST',
+        body: JSON.stringify({ id: ticket.id, assignee: 'operator', note: '人工已接管并回写处理结果' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'resolve transfer failed');
+    }
+  };
+
   return (
     <main className="shell">
       <aside className="nav">
@@ -219,6 +247,11 @@ function App() {
             <span>High risk</span>
             <strong>{highRiskCount}</strong>
             <small>sessions needing operator attention</small>
+          </article>
+          <article className="metric">
+            <span>Human queue</span>
+            <strong>{openTransferCount}</strong>
+            <small>open transfer tickets</small>
           </article>
           {loading && <article className="metric skeleton">Loading</article>}
         </section>
@@ -273,6 +306,35 @@ function App() {
                   </div>
                 </article>
               ))}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">人工队列</p>
+                <h2>待接管工单</h2>
+              </div>
+              <span className="status">{openTransferCount}</span>
+            </div>
+            <div className="tableList">
+              {transfers.map((ticket) => (
+                <article className="tableRow" key={ticket.id}>
+                  <div>
+                    <strong>{ticket.question}</strong>
+                    <span>{ticket.reason} · {ticket.conversationId}</span>
+                  </div>
+                  <div className="gapActions">
+                    <b className={statusClass(ticket.priority)}>{ticket.status}</b>
+                    {ticket.status === 'OPEN' && (
+                      <span>
+                        <button className="tinyButton" onClick={() => resolveTransfer(ticket)} title="处理工单">
+                          <UserRoundCheck size={14} />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+              {transfers.length === 0 && <p className="empty">暂无人工工单</p>}
             </div>
           </section>
 
