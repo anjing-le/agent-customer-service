@@ -69,6 +69,16 @@ type KnowledgeArticle = {
   tags?: string[];
   trustLevel: string;
 };
+type AgentTrace = {
+  strategy: string;
+  evidenceCount: number;
+  historyCount: number;
+  modelAttempted: boolean;
+  model?: string;
+  modelDurationMs?: number;
+  modelFallback: boolean;
+  modelFallbackReason?: string;
+};
 type Message = {
   id: string;
   conversationId: string;
@@ -79,6 +89,7 @@ type Message = {
   fallbackReason?: string;
   evidenceIds?: string[];
   createdAt: string;
+  trace?: AgentTrace;
 };
 type Dashboard = {
   metrics: Metric[];
@@ -89,7 +100,7 @@ type Dashboard = {
 };
 type SendMessageResult = {
   conversation: Conversation;
-  agentMessage: { content: string; engine: string; fallbackReason?: string; evidenceIds?: string[] };
+  agentMessage: Message;
   evidence: KnowledgeArticle[];
   gap?: KnowledgeGap;
 };
@@ -104,6 +115,25 @@ const api = async <T,>(path: string, init?: RequestInit): Promise<T> => {
     throw new Error(payload.error?.message ?? 'request failed');
   }
   return payload.data;
+};
+
+const traceChips = (trace?: AgentTrace) => {
+  if (!trace) {
+    return [];
+  }
+  const chips = [
+    trace.strategy,
+    `${trace.evidenceCount} evidence`,
+    `${trace.historyCount} history`
+  ];
+  if (trace.modelAttempted) {
+    chips.push(trace.model ? `model ${trace.model}` : 'model attempted');
+    chips.push(`${trace.modelDurationMs ?? 0} ms`);
+  }
+  if (trace.modelFallback) {
+    chips.push(trace.modelFallbackReason ? `fallback ${trace.modelFallbackReason}` : 'model fallback');
+  }
+  return chips;
 };
 
 function App() {
@@ -323,6 +353,9 @@ function App() {
                   <span>{result.agentMessage.fallbackReason ?? 'EVIDENCE_OK'}</span>
                   <span>{result.evidence.length} evidence</span>
                 </div>
+                <div className="traceMeta">
+                  {traceChips(result.agentMessage.trace).map((item) => <small key={item}>{item}</small>)}
+                </div>
                 <p>{result.agentMessage.content}</p>
               </div>
             )}
@@ -335,6 +368,9 @@ function App() {
                 <article className={`message ${item.role}`} key={item.id}>
                   <span>{item.role} · {item.engine}</span>
                   <p>{item.content}</p>
+                  <div className="traceMeta">
+                    {traceChips(item.trace).map((trace) => <small key={trace}>{trace}</small>)}
+                  </div>
                   {(item.evidenceIds?.length ?? 0) > 0 && <small>{item.evidenceIds?.join(', ')}</small>}
                   {item.fallbackReason && <small>{item.fallbackReason}</small>}
                 </article>

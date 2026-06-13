@@ -168,7 +168,21 @@
         "safe": "boolean",
         "fallbackReason": "NO_EVIDENCE|TRANSFER_THRESHOLD",
         "evidenceIds": "string[]",
-        "createdAt": "RFC3339 string"
+        "createdAt": "RFC3339 string",
+        "trace": "AgentTrace"
+      }
+    },
+    "AgentTrace": {
+      "required": ["strategy", "evidenceCount", "historyCount", "modelAttempted", "modelFallback"],
+      "fields": {
+        "strategy": "human_transfer|no_evidence_fallback|evidence_answer",
+        "evidenceCount": "number",
+        "historyCount": "number",
+        "modelAttempted": "boolean",
+        "model": "string",
+        "modelDurationMs": "number",
+        "modelFallback": "boolean",
+        "modelFallbackReason": "string"
       }
     },
     "KnowledgeArticle": {

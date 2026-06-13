@@ -34,12 +34,12 @@ func (c *Client) Enabled() bool {
 	return c != nil && c.apiURL != "" && c.apiKey != ""
 }
 
-func (c *Client) GenerateReply(ctx context.Context, req store.ReplyRequest) (string, error) {
+func (c *Client) GenerateReply(ctx context.Context, req store.ReplyRequest) (store.ReplyGeneration, error) {
 	if !c.Enabled() {
-		return "", fmt.Errorf("llm client is not configured")
+		return store.ReplyGeneration{}, fmt.Errorf("llm client is not configured")
 	}
 	if len(req.Evidence) == 0 {
-		return "", fmt.Errorf("evidence is required")
+		return store.ReplyGeneration{}, fmt.Errorf("evidence is required")
 	}
 
 	body := chatRequest{
@@ -49,37 +49,37 @@ func (c *Client) GenerateReply(ctx context.Context, req store.ReplyRequest) (str
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return "", fmt.Errorf("marshal llm request: %w", err)
+		return store.ReplyGeneration{}, fmt.Errorf("marshal llm request: %w", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL, bytes.NewReader(payload))
 	if err != nil {
-		return "", fmt.Errorf("create llm request: %w", err)
+		return store.ReplyGeneration{}, fmt.Errorf("create llm request: %w", err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return "", fmt.Errorf("call llm: %w", err)
+		return store.ReplyGeneration{}, fmt.Errorf("call llm: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("llm status %d", resp.StatusCode)
+		return store.ReplyGeneration{}, fmt.Errorf("llm status %d", resp.StatusCode)
 	}
 
 	var decoded chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return "", fmt.Errorf("decode llm response: %w", err)
+		return store.ReplyGeneration{}, fmt.Errorf("decode llm response: %w", err)
 	}
 	if len(decoded.Choices) == 0 {
-		return "", fmt.Errorf("llm response has no choices")
+		return store.ReplyGeneration{}, fmt.Errorf("llm response has no choices")
 	}
 	content := strings.TrimSpace(decoded.Choices[0].Message.Content)
 	if content == "" {
-		return "", fmt.Errorf("llm response is empty")
+		return store.ReplyGeneration{}, fmt.Errorf("llm response is empty")
 	}
-	return content, nil
+	return store.ReplyGeneration{Content: content, Model: c.model}, nil
 }
 
 func (c *Client) messages(req store.ReplyRequest) []chatMessage {

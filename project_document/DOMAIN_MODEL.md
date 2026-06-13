@@ -7,7 +7,8 @@
 | 模型 | 说明 | 当前来源 |
 |---|---|---|
 | `Conversation` | 一条客服会话，记录客户、渠道、意图、风险和最后一句话 | `internal/platform/store` |
-| `Message` | 用户或助手的一条消息，包含回复引擎、证据和兜底原因 | `SendMessage` runtime |
+| `Message` | 用户或助手的一条消息，包含回复引擎、证据、兜底原因和 trace | `SendMessage` runtime |
+| `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
 | `KnowledgeArticle` | 可引用的可信知识 | seed store 或 PostgreSQL |
 | `KnowledgeGap` | 无可靠证据时沉淀的知识缺口 | `NO_EVIDENCE_FALLBACK` |
 | `Rule` | 规则兜底或转人工策略 | seed store 或 PostgreSQL |

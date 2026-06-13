@@ -49,7 +49,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`TransferTicket`
 
 新增或修改接口时，需要同时更新：
 

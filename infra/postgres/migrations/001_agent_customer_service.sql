@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
   safe BOOLEAN NOT NULL DEFAULT true,
   fallback_reason TEXT NOT NULL DEFAULT '',
   evidence_ids TEXT[] NOT NULL DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  trace JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE TABLE IF NOT EXISTS knowledge_articles (

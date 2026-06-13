@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -68,7 +69,7 @@ func (s *PostgresStore) CreateConversation(customer, channel string) (Conversati
 
 func (s *PostgresStore) ListMessages(conversationID string) ([]Message, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at
+		select id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at, trace
 		from conversation_messages
 		where conversation_id = $1
 		order by created_at asc, id asc
@@ -82,13 +83,21 @@ func (s *PostgresStore) ListMessages(conversationID string) ([]Message, error) {
 	for rows.Next() {
 		var item Message
 		var createdAt time.Time
+		var traceBytes []byte
 		if err := rows.Scan(
 			&item.ID, &item.ConversationID, &item.Role, &item.Content, &item.Engine,
-			&item.Safe, &item.FallbackReason, &item.EvidenceIDs, &createdAt,
+			&item.Safe, &item.FallbackReason, &item.EvidenceIDs, &createdAt, &traceBytes,
 		); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
 		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		if len(traceBytes) > 0 && string(traceBytes) != "{}" {
+			var trace AgentTrace
+			if err := json.Unmarshal(traceBytes, &trace); err != nil {
+				return nil, fmt.Errorf("decode message trace: %w", err)
+			}
+			item.Trace = &trace
+		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -139,15 +148,15 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 	defer tx.Rollback(ctx)
 
 	if _, err := tx.Exec(ctx, `
-		insert into conversation_messages (id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, userMessage.ID, userMessage.ConversationID, userMessage.Role, userMessage.Content, userMessage.Engine, userMessage.Safe, userMessage.FallbackReason, userMessage.EvidenceIDs, now); err != nil {
+		insert into conversation_messages (id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at, trace)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, userMessage.ID, userMessage.ConversationID, userMessage.Role, userMessage.Content, userMessage.Engine, userMessage.Safe, userMessage.FallbackReason, userMessage.EvidenceIDs, now, messageTraceJSON(userMessage.Trace)); err != nil {
 		return SendMessageResult{}, fmt.Errorf("insert user message: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
-		insert into conversation_messages (id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, agentMessage.ID, agentMessage.ConversationID, agentMessage.Role, agentMessage.Content, agentMessage.Engine, agentMessage.Safe, agentMessage.FallbackReason, agentMessage.EvidenceIDs, now); err != nil {
+		insert into conversation_messages (id, conversation_id, role, content, engine, safe, fallback_reason, evidence_ids, created_at, trace)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, agentMessage.ID, agentMessage.ConversationID, agentMessage.Role, agentMessage.Content, agentMessage.Engine, agentMessage.Safe, agentMessage.FallbackReason, agentMessage.EvidenceIDs, now, messageTraceJSON(agentMessage.Trace)); err != nil {
 		return SendMessageResult{}, fmt.Errorf("insert agent message: %w", err)
 	}
 	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
@@ -522,6 +531,7 @@ func postgresAgentReply(generator ReplyGenerator, conversationID, content string
 			ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
 			Content: "我已经为你转接人工客服，并保留当前对话上下文。人工客服接手前，我不会编造处理结果。",
 			Engine:  "rule", Safe: true, FallbackReason: "TRANSFER_THRESHOLD", CreatedAt: now.Format(time.RFC3339),
+			Trace: newAgentTrace("human_transfer", evidence, history),
 		}, nil
 	}
 	if len(evidence) == 0 {
@@ -533,31 +543,54 @@ func postgresAgentReply(generator ReplyGenerator, conversationID, content string
 			ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
 			Content: "这个问题我还没有找到可靠知识依据，已记录给运营补充知识。为了避免误导，我先不直接下结论。",
 			Engine:  "rule", Safe: true, FallbackReason: "NO_EVIDENCE", CreatedAt: now.Format(time.RFC3339),
+			Trace: newAgentTrace("no_evidence_fallback", evidence, history),
 		}, &gap
 	}
 	ids := make([]string, 0, len(evidence))
 	for _, item := range evidence {
 		ids = append(ids, item.ID)
 	}
+	trace := newAgentTrace("evidence_answer", evidence, history)
 	if generator != nil {
-		reply, err := generator.GenerateReply(context.Background(), ReplyRequest{
+		trace.ModelAttempted = true
+		startedAt := time.Now()
+		generated, err := generator.GenerateReply(context.Background(), ReplyRequest{
 			ConversationID: conversationID,
 			Question:       content,
 			Evidence:       evidence,
 			History:        history,
 		})
-		if err == nil && strings.TrimSpace(reply) != "" {
+		trace.ModelDurationMs = time.Since(startedAt).Milliseconds()
+		trace.Model = strings.TrimSpace(generated.Model)
+		if err == nil && strings.TrimSpace(generated.Content) != "" {
 			return Message{
 				ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
-				Content: strings.TrimSpace(reply), Engine: "llm+rag", Safe: true, EvidenceIDs: ids, CreatedAt: now.Format(time.RFC3339),
+				Content: strings.TrimSpace(generated.Content), Engine: "llm+rag", Safe: true, EvidenceIDs: ids, CreatedAt: now.Format(time.RFC3339), Trace: trace,
 			}, nil
+		}
+		trace.ModelFallback = true
+		if err != nil {
+			trace.ModelFallbackReason = err.Error()
+		} else {
+			trace.ModelFallbackReason = "empty model response"
 		}
 	}
 	return Message{
 		ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
 		Content: fmt.Sprintf("根据知识库《%s》：%s", evidence[0].Title, evidence[0].Content),
-		Engine:  "rag+rule", Safe: true, EvidenceIDs: ids, CreatedAt: now.Format(time.RFC3339),
+		Engine:  "rag+rule", Safe: true, EvidenceIDs: ids, CreatedAt: now.Format(time.RFC3339), Trace: trace,
 	}, nil
+}
+
+func messageTraceJSON(trace *AgentTrace) []byte {
+	if trace == nil {
+		return []byte("{}")
+	}
+	payload, err := json.Marshal(trace)
+	if err != nil {
+		return []byte("{}")
+	}
+	return payload
 }
 
 func postgresConversationState(conversationID, content string, evidence []KnowledgeArticle, gap *KnowledgeGap, now time.Time) Conversation {

@@ -35,8 +35,11 @@ func TestClientGenerateReplyUsesOpenAICompatibleRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate reply: %v", err)
 	}
-	if reply != "基于证据的模型回复" {
-		t.Fatalf("unexpected reply %q", reply)
+	if reply.Content != "基于证据的模型回复" {
+		t.Fatalf("unexpected reply %q", reply.Content)
+	}
+	if reply.Model != "test-model" {
+		t.Fatalf("unexpected reply model %q", reply.Model)
 	}
 	if captured.Model != "test-model" {
 		t.Fatalf("unexpected model %q", captured.Model)

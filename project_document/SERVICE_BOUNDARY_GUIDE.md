@@ -23,14 +23,15 @@
 ## Runtime Truth
 
 - 用户消息进入 `/api/customer-service/messages`。
-- 有可信知识时返回 RAG 证据回复。
+- 有可信知识时返回 RAG 证据回复；配置模型客户端后可生成 `llm+rag`。
 - 无可信知识时返回安全兜底，并创建知识缺口。
 - 命中投诉、催办、法律风险或人工诉求时创建人工 ticket。
+- 每条助手消息通过 `trace` 暴露策略、证据、历史和模型回退观测。
 - 知识缺口可以关闭，也可以生成知识后回归到可检索状态。
 - 规则测试可以在不发送真实消息的情况下验证兜底边界。
 
 ## Update Rules
 
-- 新增运行接口先更新 `contracts/service-boundaries.json`。
+- 新增运行接口先更新 `contracts/service-boundaries.json` 和 `contracts/api-contract.json`。
 - 同步 React 控制台调用点。
 - 运行 `go test ./...` 和 `pnpm build:console`。

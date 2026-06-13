@@ -22,6 +22,8 @@
 | 规则测试 | Runtime connected | 场景配置区可输入问题测试转人工、无证据兜底和可回答边界 |
 | 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看并处理工单 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
+| API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
+| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
 
 ## 迁移原则
 
@@ -32,5 +34,5 @@
 
 ## 下一步
 
-1. 为 Go API contract 补机器可读文档。
-2. 增加流式回复和模型调用观测字段。
+1. 增加 SSE 流式回复。
+2. 建立批量回归问题集，验证知识命中、无证据兜底和转人工边界。

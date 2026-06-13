@@ -11,11 +11,11 @@ type fakeReplyGenerator struct {
 	err   error
 }
 
-func (f fakeReplyGenerator) GenerateReply(context.Context, ReplyRequest) (string, error) {
+func (f fakeReplyGenerator) GenerateReply(context.Context, ReplyRequest) (ReplyGeneration, error) {
 	if f.err != nil {
-		return "", f.err
+		return ReplyGeneration{}, f.err
 	}
-	return f.reply, nil
+	return ReplyGeneration{Content: f.reply, Model: "fake-model"}, nil
 }
 
 func TestSendMessageUsesKnowledgeEvidence(t *testing.T) {
@@ -65,6 +65,9 @@ func TestSendMessageUsesLLMWhenEvidenceExists(t *testing.T) {
 	if len(result.AgentMessage.EvidenceIDs) == 0 {
 		t.Fatalf("expected evidence ids, got %#v", result.AgentMessage)
 	}
+	if result.AgentMessage.Trace == nil || !result.AgentMessage.Trace.ModelAttempted || result.AgentMessage.Trace.Model != "fake-model" {
+		t.Fatalf("expected model trace, got %#v", result.AgentMessage.Trace)
+	}
 }
 
 func TestSendMessageFallsBackWhenLLMUnavailable(t *testing.T) {
@@ -80,6 +83,9 @@ func TestSendMessageFallsBackWhenLLMUnavailable(t *testing.T) {
 	}
 	if result.AgentMessage.FallbackReason != "" {
 		t.Fatalf("expected no safety fallback reason for evidence answer, got %q", result.AgentMessage.FallbackReason)
+	}
+	if result.AgentMessage.Trace == nil || !result.AgentMessage.Trace.ModelFallback || result.AgentMessage.Trace.ModelFallbackReason == "" {
+		t.Fatalf("expected model fallback trace, got %#v", result.AgentMessage.Trace)
 	}
 }
 
@@ -99,6 +105,9 @@ func TestSendMessageCreatesGapWhenEvidenceMissing(t *testing.T) {
 	}
 	if result.Conversation.Status != "KnowledgeGap" {
 		t.Fatalf("expected conversation status KnowledgeGap, got %q", result.Conversation.Status)
+	}
+	if result.AgentMessage.Trace == nil || result.AgentMessage.Trace.Strategy != "no_evidence_fallback" {
+		t.Fatalf("expected no evidence trace, got %#v", result.AgentMessage.Trace)
 	}
 }
 

@@ -311,11 +311,28 @@ textarea {
   line-height: 1.65;
 }
 
-.replyMeta {
+.replyMeta,
+.traceMeta {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   font-weight: 800;
+}
+
+.traceMeta {
+  margin-top: 8px;
+}
+
+.traceMeta small {
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid #cfe2d8;
+  border-radius: 999px;
+  color: #426153;
+  background: #ffffff;
+  font-size: 12px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
 }
 
 .history {
