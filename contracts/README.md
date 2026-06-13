@@ -15,3 +15,9 @@
 - `/api/channels`
 
 新增接口需要先更新本目录，再同步 Go handler 和 React 控制台调用点。
+
+本地演示渠道协议时，先启动 `go run ./cmd/platform-all`，再执行：
+
+```bash
+./scripts/demo-channel-inbound.sh
+```

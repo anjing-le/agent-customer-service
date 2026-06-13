@@ -78,6 +78,8 @@ Go API 当前响应格式：
 
 `scripts/check-channel-examples.js` 会在质量门禁里重新计算签名，并确认样例 endpoint 和错误码仍存在于 API contract。
 
+本地服务启动后，可以执行 `./scripts/demo-channel-inbound.sh`，脚本会读取同一份样例，动态刷新 timestamp、消息 ID 和签名，并把请求发送到运行中的渠道入口。
+
 ## Pagination
 
 V1 数据量小，当前接口返回数组。后续列表增长后统一迁移到：

@@ -64,6 +64,15 @@ go run ./cmd/platform-all
 
 adapter 只做字段归一，验签、时间窗、replay 和会话映射仍复用标准 inbound 链路。
 
+演示脚本会读取 `contracts/examples/channel-protocols.json`，动态生成当前 timestamp、唯一消息 ID 和 HMAC-SHA256 signature：
+
+```bash
+./scripts/demo-channel-inbound.sh
+./scripts/demo-channel-inbound.sh http://localhost:10002 wechat-adapter-inbound
+```
+
+第一个参数是服务地址，默认 `http://localhost:10002`；第二个参数是样例 ID，默认 `all`。
+
 ## Smoke Checks
 
 ```bash

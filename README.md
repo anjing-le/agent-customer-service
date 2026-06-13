@@ -75,6 +75,12 @@ export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
 - `/api/channels/app/inbound`
 - `/api/channels/marketplace/inbound`
 
+本地服务启动后，可用契约样例演示渠道接入：
+
+```bash
+./scripts/demo-channel-inbound.sh
+```
+
 流式回复：
 
 ```bash
