@@ -414,6 +414,17 @@ func TestRuleComparisonShowsCanaryDecisionChange(t *testing.T) {
 func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
 	st := NewSeedStore()
 
+	if _, err := st.PublishCanaryRule("CANCEL_RISK_TRANSFER", "qa-lead", "未审批直接发布"); err == nil {
+		t.Fatal("expected publish to require approval gate")
+	}
+	approval, err := st.SubmitRuleApproval("CANCEL_RISK_TRANSFER", "qa-lead", "LOW", "3 条灰度样本通过", 3)
+	if err != nil {
+		t.Fatalf("submit rule approval: %v", err)
+	}
+	if approval.Status != "APPROVED" {
+		t.Fatalf("expected approved gate, got %#v", approval)
+	}
+
 	published, err := st.PublishCanaryRule("CANCEL_RISK_TRANSFER", "qa-lead", "灰度样本通过，发布规则")
 	if err != nil {
 		t.Fatalf("publish canary rule: %v", err)
@@ -443,5 +454,8 @@ func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
 	}
 	if len(dashboard.RuleEvents) != 2 {
 		t.Fatalf("expected two rule events, got %#v", dashboard.RuleEvents)
+	}
+	if len(dashboard.RuleApprovals) != 1 {
+		t.Fatalf("expected one approval record, got %#v", dashboard.RuleApprovals)
 	}
 }

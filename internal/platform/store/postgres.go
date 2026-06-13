@@ -452,6 +452,31 @@ func (s *PostgresStore) CompareRuleVersions(content string) (RuleComparison, err
 	return compareRuleResults(content, current, canary), nil
 }
 
+func (s *PostgresStore) SubmitRuleApproval(code, approver, riskLevel, note string, sampleCount int) (RuleApproval, error) {
+	ctx := context.Background()
+	var exists bool
+	if err := s.pool.QueryRow(ctx, `
+		select exists(select 1 from agent_rules where code = $1 and stage = 'canary')
+	`, code).Scan(&exists); err != nil {
+		return RuleApproval{}, fmt.Errorf("check canary rule: %w", err)
+	}
+	if !exists {
+		return RuleApproval{}, fmt.Errorf("canary rule %s not found", code)
+	}
+	approval := newRuleApproval(code, approver, riskLevel, note, sampleCount, time.Now().UTC().Format(time.RFC3339))
+	createdAt, err := time.Parse(time.RFC3339, approval.CreatedAt)
+	if err != nil {
+		createdAt = time.Now().UTC()
+	}
+	if _, err := s.pool.Exec(ctx, `
+		insert into rule_approvals (id, rule_code, approver, risk_level, sample_count, status, note, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, approval.ID, approval.RuleCode, approval.Approver, approval.RiskLevel, approval.SampleCount, approval.Status, approval.Note, createdAt); err != nil {
+		return RuleApproval{}, fmt.Errorf("submit rule approval: %w", err)
+	}
+	return approval, nil
+}
+
 func (s *PostgresStore) PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error) {
 	ctx := context.Background()
 	tx, err := s.pool.Begin(ctx)
@@ -469,6 +494,21 @@ func (s *PostgresStore) PublishCanaryRule(code, actor, note string) (RuleRelease
 		  and enabled = true
 	`, code).Scan(&version); err != nil {
 		return RuleReleaseEvent{}, fmt.Errorf("load canary rule: %w", err)
+	}
+	var approved bool
+	if err := tx.QueryRow(ctx, `
+		select exists(
+			select 1
+			from rule_approvals
+			where rule_code = $1
+			  and status = 'APPROVED'
+			  and sample_count >= 3
+		)
+	`, code).Scan(&approved); err != nil {
+		return RuleReleaseEvent{}, fmt.Errorf("check rule approval: %w", err)
+	}
+	if !approved {
+		return RuleReleaseEvent{}, fmt.Errorf("rule %s requires approved gate before publish", code)
 	}
 	publishedVersion := nextPublishedVersion(version)
 	if _, err := tx.Exec(ctx, `
@@ -723,6 +763,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	ruleApprovals, err := s.listRuleApprovals()
+	if err != nil {
+		return Dashboard{}, err
+	}
 	ruleEvents, err := s.listRuleEvents()
 	if err != nil {
 		return Dashboard{}, err
@@ -798,6 +842,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
 		ReviewTasks:     reviewTasks,
+		RuleApprovals:   ruleApprovals,
 		RuleEvents:      ruleEvents,
 	}, nil
 }
@@ -890,6 +935,34 @@ func (s *PostgresStore) recordRuleHit(code string) error {
 		return fmt.Errorf("record rule hit: %w", err)
 	}
 	return nil
+}
+
+func (s *PostgresStore) listRuleApprovals() ([]RuleApproval, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, rule_code, approver, risk_level, sample_count, status, note, created_at
+		from rule_approvals
+		order by created_at desc, id desc
+		limit 20
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list rule approvals: %w", err)
+	}
+	defer rows.Close()
+
+	approvals := make([]RuleApproval, 0)
+	for rows.Next() {
+		var item RuleApproval
+		var createdAt time.Time
+		if err := rows.Scan(&item.ID, &item.RuleCode, &item.Approver, &item.RiskLevel, &item.SampleCount, &item.Status, &item.Note, &createdAt); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		approvals = append(approvals, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return approvals, nil
 }
 
 func insertRuleEvent(ctx context.Context, tx pgx.Tx, event RuleReleaseEvent) error {

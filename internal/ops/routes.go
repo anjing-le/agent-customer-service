@@ -59,6 +59,33 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, result)
 	})
 
+	mux.HandleFunc("/api/ops/rules/approve", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Code        string `json:"code"`
+			Approver    string `json:"approver"`
+			RiskLevel   string `json:"riskLevel"`
+			SampleCount int    `json:"sampleCount"`
+			Note        string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.Code == "" {
+			httpjson.BadRequest(w, "code is required")
+			return
+		}
+		approval, err := st.SubmitRuleApproval(req.Code, req.Approver, req.RiskLevel, req.Note, req.SampleCount)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, approval)
+	})
+
 	mux.HandleFunc("/api/ops/rules/publish-canary", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

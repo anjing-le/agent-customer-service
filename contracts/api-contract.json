@@ -136,6 +136,14 @@
       "response": { "status": 200, "schema": "RuleComparison" }
     },
     {
+      "id": "approveRuleRelease",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/rules/approve",
+      "request": { "body": "RuleApprovalRequest" },
+      "response": { "status": 200, "schema": "RuleApproval" }
+    },
+    {
       "id": "publishCanaryRule",
       "boundary": "ops",
       "method": "POST",
@@ -313,6 +321,16 @@
         "note": "string"
       }
     },
+    "RuleApprovalRequest": {
+      "required": ["code"],
+      "fields": {
+        "code": "string",
+        "approver": "string",
+        "riskLevel": "LOW|MEDIUM|HIGH|CRITICAL",
+        "sampleCount": "number",
+        "note": "string"
+      }
+    },
     "ResolveTransferRequest": {
       "required": ["id"],
       "fields": {
@@ -465,6 +483,19 @@
         "createdAt": "RFC3339 string"
       }
     },
+    "RuleApproval": {
+      "required": ["id", "ruleCode", "approver", "riskLevel", "sampleCount", "status", "note", "createdAt"],
+      "fields": {
+        "id": "string",
+        "ruleCode": "string",
+        "approver": "string",
+        "riskLevel": "LOW|MEDIUM|HIGH|CRITICAL",
+        "sampleCount": "number",
+        "status": "APPROVED|REJECTED",
+        "note": "string",
+        "createdAt": "RFC3339 string"
+      }
+    },
     "TransferTicket": {
       "required": ["id", "conversationId", "channel", "question", "reason", "priority", "status", "createdAt"],
       "fields": {
@@ -561,7 +592,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations", "reviewTasks", "ruleEvents"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -574,6 +605,7 @@
         "quality": "QualitySummary",
         "annotations": "Annotation[]",
         "reviewTasks": "ReviewTask[]",
+        "ruleApprovals": "RuleApproval[]",
         "ruleEvents": "RuleReleaseEvent[]"
       }
     },

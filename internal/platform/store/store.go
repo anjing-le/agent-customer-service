@@ -54,6 +54,7 @@ type Runtime interface {
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
 	CompareRuleVersions(content string) (RuleComparison, error)
+	SubmitRuleApproval(code, approver, riskLevel, note string, sampleCount int) (RuleApproval, error)
 	PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error)
 	RollbackRule(code, actor, note string) (RuleReleaseEvent, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
@@ -75,6 +76,7 @@ type Store struct {
 	tickets         []TransferTicket
 	channelPolicies []ChannelPolicy
 	integrations    []ChannelIntegration
+	ruleApprovals   []RuleApproval
 	ruleEvents      []RuleReleaseEvent
 	annotations     []Annotation
 	reviewTasks     []ReviewTask
@@ -169,6 +171,17 @@ type RuleComparison struct {
 	Canary         RuleTestResult `json:"canary"`
 	Changed        bool           `json:"changed"`
 	Recommendation string         `json:"recommendation"`
+}
+
+type RuleApproval struct {
+	ID          string `json:"id"`
+	RuleCode    string `json:"ruleCode"`
+	Approver    string `json:"approver"`
+	RiskLevel   string `json:"riskLevel"`
+	SampleCount int    `json:"sampleCount"`
+	Status      string `json:"status"`
+	Note        string `json:"note"`
+	CreatedAt   string `json:"createdAt"`
 }
 
 type RuleReleaseEvent struct {
@@ -294,6 +307,7 @@ type Dashboard struct {
 	Quality         QualitySummary       `json:"quality"`
 	Annotations     []Annotation         `json:"annotations"`
 	ReviewTasks     []ReviewTask         `json:"reviewTasks"`
+	RuleApprovals   []RuleApproval       `json:"ruleApprovals"`
 	RuleEvents      []RuleReleaseEvent   `json:"ruleEvents"`
 }
 
@@ -614,12 +628,26 @@ func (s *Store) CompareRuleVersions(content string) (RuleComparison, error) {
 	return compareRuleResults(content, current, canary), nil
 }
 
+func (s *Store) SubmitRuleApproval(code, approver, riskLevel, note string, sampleCount int) (RuleApproval, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ruleIndexLocked(code, "canary") < 0 {
+		return RuleApproval{}, fmt.Errorf("canary rule %s not found", code)
+	}
+	approval := newRuleApproval(code, approver, riskLevel, note, sampleCount, time.Now().UTC().Format(time.RFC3339))
+	s.ruleApprovals = append([]RuleApproval{approval}, s.ruleApprovals...)
+	return approval, nil
+}
+
 func (s *Store) PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	canaryIndex := s.ruleIndexLocked(code, "canary")
 	if canaryIndex < 0 {
 		return RuleReleaseEvent{}, fmt.Errorf("canary rule %s not found", code)
+	}
+	if !hasApprovedRuleGate(s.ruleApprovals, code) {
+		return RuleReleaseEvent{}, fmt.Errorf("rule %s requires approved gate before publish", code)
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	for idx := range s.rules {
@@ -761,6 +789,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
 		ReviewTasks:     append([]ReviewTask(nil), s.reviewTasks...),
+		RuleApprovals:   append([]RuleApproval(nil), s.ruleApprovals...),
 		RuleEvents:      append([]RuleReleaseEvent(nil), s.ruleEvents...),
 	}, nil
 }
@@ -1108,6 +1137,33 @@ func newRuleReleaseEvent(code, version, action, actor, note, createdAt string) R
 		Note:      fallback(note, "规则发布动作已记录"),
 		CreatedAt: createdAt,
 	}
+}
+
+func newRuleApproval(code, approver, riskLevel, note string, sampleCount int, createdAt string) RuleApproval {
+	riskLevel = strings.ToUpper(fallback(riskLevel, "LOW"))
+	status := "REJECTED"
+	if sampleCount >= 3 && riskLevel != "HIGH" && riskLevel != "CRITICAL" {
+		status = "APPROVED"
+	}
+	return RuleApproval{
+		ID:          fmt.Sprintf("rule_approval_%d", time.Now().UnixNano()),
+		RuleCode:    code,
+		Approver:    fallback(approver, "qa-lead"),
+		RiskLevel:   riskLevel,
+		SampleCount: sampleCount,
+		Status:      status,
+		Note:        fallback(note, "规则发布审批"),
+		CreatedAt:   createdAt,
+	}
+}
+
+func hasApprovedRuleGate(approvals []RuleApproval, code string) bool {
+	for _, approval := range approvals {
+		if approval.RuleCode == code && approval.Status == "APPROVED" && approval.SampleCount >= 3 {
+			return true
+		}
+	}
+	return false
 }
 
 func nextPublishedVersion(version string) string {

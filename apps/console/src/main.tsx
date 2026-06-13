@@ -81,6 +81,16 @@ type RuleReleaseEvent = {
   note: string;
   createdAt: string;
 };
+type RuleApproval = {
+  id: string;
+  ruleCode: string;
+  approver: string;
+  riskLevel: string;
+  sampleCount: number;
+  status: string;
+  note: string;
+  createdAt: string;
+};
 type TransferTicket = {
   id: string;
   conversationId: string;
@@ -284,6 +294,7 @@ type Dashboard = {
   conversations: Conversation[] | null;
   knowledgeGaps: KnowledgeGap[] | null;
   rules: Rule[] | null;
+  ruleApprovals: RuleApproval[] | null;
   ruleEvents: RuleReleaseEvent[] | null;
   transfers: TransferTicket[] | null;
   channelPolicies: ChannelPolicy[] | null;
@@ -493,6 +504,7 @@ function App() {
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
   const rules = dashboard?.rules ?? [];
+  const ruleApprovals = dashboard?.ruleApprovals ?? [];
   const ruleEvents = dashboard?.ruleEvents ?? [];
   const transfers = dashboard?.transfers ?? [];
   const annotations = dashboard?.annotations ?? [];
@@ -528,6 +540,7 @@ function App() {
   const openTransferCount = transfers.filter((item) => item.status === 'OPEN').length;
   const openReviewCount = reviewTasks.filter((item) => item.status !== 'COMPLETED').length;
   const latestAssistantMessage = result?.agentMessage ?? [...history].reverse().find((item) => item.role === 'assistant');
+  const hasApprovedRuleGate = (rule: Rule) => ruleApprovals.some((item) => item.ruleCode === rule.code && item.status === 'APPROVED' && item.sampleCount >= 3);
 
   const load = async () => {
     setLoading(true);
@@ -648,6 +661,25 @@ function App() {
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'compare rules failed');
+    }
+  };
+
+  const approveRuleRelease = async (rule: Rule) => {
+    setError('');
+    try {
+      await api<RuleApproval>('/api/ops/rules/approve', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: rule.code,
+          approver: 'qa-lead',
+          riskLevel: 'LOW',
+          sampleCount: 3,
+          note: '灰度对比通过，3 条样本无高风险异常'
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'approve rule failed');
     }
   };
 
@@ -1487,7 +1519,12 @@ function App() {
                   <span>{item.hitCount} hits{item.lastHitAt ? ` · ${item.lastHitAt.slice(11, 19)}` : ''}</span>
                   <p>{item.trigger}</p>
                   <div className="ruleActions">
-                    {item.stage === 'canary' && item.enabled && (
+                    {item.stage === 'canary' && item.enabled && !hasApprovedRuleGate(item) && (
+                      <button className="tinyButton" onClick={() => approveRuleRelease(item)} title="提交发布审批">
+                        <ShieldCheck size={14} />
+                      </button>
+                    )}
+                    {item.stage === 'canary' && item.enabled && hasApprovedRuleGate(item) && (
                       <button className="tinyButton" onClick={() => publishCanaryRule(item)} title="发布灰度规则">
                         <CheckCircle2 size={14} />
                       </button>
@@ -1501,6 +1538,20 @@ function App() {
                 </article>
               ))}
             </div>
+            {ruleApprovals.length > 0 && (
+              <div className="ruleEvents">
+                {ruleApprovals.slice(0, 4).map((approval) => (
+                  <article className="eventRow" key={approval.id}>
+                    <div>
+                      <strong>{approval.status} · {approval.ruleCode}</strong>
+                      <span>{approval.sampleCount} samples · {approval.riskLevel} · {approval.approver}</span>
+                      <span>{approval.note}</span>
+                    </div>
+                    <b className={statusClass(approval.status === 'APPROVED' ? 'LOW' : 'REVIEW')}>{approval.createdAt.slice(11, 19)}</b>
+                  </article>
+                ))}
+              </div>
+            )}
             {ruleEvents.length > 0 && (
               <div className="ruleEvents">
                 {ruleEvents.slice(0, 4).map((event) => (

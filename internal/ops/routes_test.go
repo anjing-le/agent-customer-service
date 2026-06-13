@@ -72,6 +72,28 @@ func TestRuleReleaseRoutesPublishAndRollback(t *testing.T) {
 	mux := http.NewServeMux()
 	Register(mux, store.NewSeedStore())
 
+	blockedReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/publish-canary", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","actor":"qa-lead","note":"未审批直接发布"}`))
+	blockedRec := httptest.NewRecorder()
+	mux.ServeHTTP(blockedRec, blockedReq)
+
+	if blockedRec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected publish gate error, got %d: %s", blockedRec.Code, blockedRec.Body.String())
+	}
+	if !strings.Contains(blockedRec.Body.String(), "requires approved gate") {
+		t.Fatalf("expected approval gate error, got %s", blockedRec.Body.String())
+	}
+
+	approvalReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/approve", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","approver":"qa-lead","riskLevel":"LOW","sampleCount":3,"note":"灰度样本通过"}`))
+	approvalRec := httptest.NewRecorder()
+	mux.ServeHTTP(approvalRec, approvalReq)
+
+	if approvalRec.Code != http.StatusOK {
+		t.Fatalf("expected approval 200, got %d: %s", approvalRec.Code, approvalRec.Body.String())
+	}
+	if !strings.Contains(approvalRec.Body.String(), `"status":"APPROVED"`) {
+		t.Fatalf("expected approved gate, got %s", approvalRec.Body.String())
+	}
+
 	publishReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/publish-canary", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","actor":"qa-lead","note":"发布灰度规则"}`))
 	publishRec := httptest.NewRecorder()
 	mux.ServeHTTP(publishRec, publishReq)

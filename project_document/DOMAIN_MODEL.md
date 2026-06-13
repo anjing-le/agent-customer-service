@@ -17,6 +17,7 @@
 | `Rule` | 规则兜底或转人工策略，包含版本、阶段、命中次数和最后命中时间 | seed store 或 PostgreSQL |
 | `RuleTestResult` | 对单句用户输入的当前规则测试结果 | `/api/ops/rules/test` |
 | `RuleComparison` | 当前 active 规则与 canary 规则的处置结果对比 | `/api/ops/rules/compare` |
+| `RuleApproval` | 规则发布审批记录，包含审批人、样本数、风险等级和审批状态 | `/api/ops/rules/approve` |
 | `RuleReleaseEvent` | 规则发布/回滚事件，记录规则 code、版本、动作、操作者和备注 | `/api/ops/rules/*` |
 | `TransferTicket` | 转人工工单，包含 SLA、升级状态、创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
 | `ChannelPolicy` | 渠道级客服策略，定义语气、风险加权、转人工 SLA 和升级说明 | seed store 或 PostgreSQL |
@@ -54,7 +55,7 @@ user message
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
 | 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |
-| 规则发布 | canary 可发布为 active，active 可回滚并记录 `RuleReleaseEvent`，用于教学发布留痕 |
+| 规则发布 | canary 需要先通过 `RuleApproval` 门禁，才能发布为 active；active 可回滚并记录 `RuleReleaseEvent` |
 | 质检任务 | 每条助手回复生成 `ReviewTask`，运营可领取/完成；提交 `Annotation` 会自动完成对应任务 |
 | 人工质检 | 对助手消息提交 `Annotation`，把 groundedness、safety、helpfulness 汇总进质量评估 |
 | 复盘导出 | 对低分、`FAIL` 或 `REVIEW` 标注生成 `TrainingSample`，用于运营复盘和后续训练数据整理 |
@@ -74,6 +75,7 @@ user message
 | `CreateArticleFromGap` | 由缺口生成可信知识 |
 | `TestRule` | 规则兜底测试 |
 | `CompareRuleVersions` | 对比 active 与 canary 规则处置结果 |
+| `SubmitRuleApproval` | 提交规则发布审批门禁 |
 | `PublishCanaryRule` / `RollbackRule` | 规则发布和回滚 |
 | `ResolveTransferTicket` | 人工工单处理 |
 | `AssignReviewTask` / `CompleteReviewTask` | 质检任务领取和完成 |
