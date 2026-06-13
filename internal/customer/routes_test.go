@@ -40,6 +40,10 @@ func (f failingRuntime) CreateArticleFromGap(string, string, string, string, []s
 	return store.KnowledgeArticle{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) TestRule(string) (store.RuleTestResult, error) {
+	return store.RuleTestResult{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) Dashboard() (store.Dashboard, error) {
 	return store.Dashboard{}, errors.New("database unavailable")
 }

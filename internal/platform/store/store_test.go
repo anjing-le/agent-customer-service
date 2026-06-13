@@ -95,3 +95,31 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 		t.Fatalf("expected no knowledge gap for transfer, got %#v", result.Gap)
 	}
 }
+
+func TestRuleTestDetectsTransferAndNoEvidenceBoundaries(t *testing.T) {
+	st := NewSeedStore()
+
+	transfer, err := st.TestRule("我已经投诉很多次了，现在必须转人工")
+	if err != nil {
+		t.Fatalf("test rule: %v", err)
+	}
+	if transfer.RuleCode != "TRANSFER_THRESHOLD" || !transfer.Fallback || transfer.RiskLevel != "HIGH" {
+		t.Fatalf("expected transfer rule, got %#v", transfer)
+	}
+
+	noEvidence, err := st.TestRule("新品保价规则是什么？")
+	if err != nil {
+		t.Fatalf("test rule: %v", err)
+	}
+	if noEvidence.RuleCode != "NO_EVIDENCE_FALLBACK" || !noEvidence.Fallback || noEvidence.RiskLevel != "MEDIUM" {
+		t.Fatalf("expected no evidence fallback, got %#v", noEvidence)
+	}
+
+	evidenceOK, err := st.TestRule("这个商品能不能开发票？")
+	if err != nil {
+		t.Fatalf("test rule: %v", err)
+	}
+	if evidenceOK.Matched || evidenceOK.Fallback || evidenceOK.Action != "allow_answer" {
+		t.Fatalf("expected allowed answer, got %#v", evidenceOK)
+	}
+}

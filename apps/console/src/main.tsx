@@ -39,6 +39,16 @@ type KnowledgeGap = {
   priority: string;
 };
 type Rule = { id: string; code: string; name: string; trigger: string; action: string; enabled: boolean };
+type RuleTestResult = {
+  input: string;
+  matched: boolean;
+  ruleCode?: string;
+  action: string;
+  riskLevel: string;
+  fallback: boolean;
+  reason: string;
+  recommended: string;
+};
 type KnowledgeArticle = {
   id: string;
   title: string;
@@ -77,6 +87,8 @@ function App() {
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('7 天无理由退货的运费怎么计算？');
+  const [ruleInput, setRuleInput] = useState('我已经投诉很多次了，现在必须转人工');
+  const [ruleResult, setRuleResult] = useState<RuleTestResult | null>(null);
   const [result, setResult] = useState<SendMessageResult | null>(null);
   const [error, setError] = useState('');
 
@@ -151,6 +163,18 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'create article failed');
+    }
+  };
+
+  const testRule = async () => {
+    setError('');
+    try {
+      setRuleResult(await api<RuleTestResult>('/api/ops/rules/test', {
+        method: 'POST',
+        body: JSON.stringify({ content: ruleInput })
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'test rule failed');
     }
   };
 
@@ -311,10 +335,25 @@ function App() {
             <div className="panelHeader">
               <div>
                 <p className="sectionLabel">场景配置</p>
-                <h2>兜底规则</h2>
+                <h2>规则测试</h2>
               </div>
               <ShieldCheck size={18} />
             </div>
+            <textarea className="compactInput" value={ruleInput} onChange={(event) => setRuleInput(event.target.value)} />
+            <div className="actionRow">
+              <button className="primary" onClick={testRule}>测试规则</button>
+              <span>{ruleResult?.riskLevel ?? 'Ready'}</span>
+            </div>
+            {ruleResult && (
+              <div className="ruleResult">
+                <div>
+                  <b className={statusClass(ruleResult.riskLevel)}>{ruleResult.ruleCode ?? 'ALLOW'}</b>
+                  <span>{ruleResult.action}</span>
+                </div>
+                <p>{ruleResult.reason}</p>
+                <strong>{ruleResult.recommended}</strong>
+              </div>
+            )}
             <div className="ruleGrid">
               {rules.map((item) => (
                 <article className="rule" key={item.id}>

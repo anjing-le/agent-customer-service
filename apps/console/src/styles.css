@@ -277,6 +277,10 @@ textarea {
   line-height: 1.6;
 }
 
+.compactInput {
+  min-height: 88px;
+}
+
 .actionRow {
   justify-content: space-between;
   gap: 10px;
@@ -382,6 +386,32 @@ textarea {
   border: 1px solid #edf2ef;
   border-radius: 6px;
   background: #fbfdfc;
+}
+
+.ruleResult {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  border-left: 4px solid #1f6f52;
+  border-radius: 6px;
+  background: #eef7f2;
+}
+
+.ruleResult div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ruleResult span {
+  color: #64786d;
+  font-size: 13px;
+}
+
+.ruleResult strong {
+  line-height: 1.45;
 }
 
 .rule div {

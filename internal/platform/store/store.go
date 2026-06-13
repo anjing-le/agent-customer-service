@@ -15,6 +15,7 @@ type Runtime interface {
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
 	ResolveKnowledgeGap(id string) (KnowledgeGap, error)
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
+	TestRule(content string) (RuleTestResult, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -78,6 +79,17 @@ type Rule struct {
 	Trigger string `json:"trigger"`
 	Action  string `json:"action"`
 	Enabled bool   `json:"enabled"`
+}
+
+type RuleTestResult struct {
+	Input       string `json:"input"`
+	Matched     bool   `json:"matched"`
+	RuleCode    string `json:"ruleCode,omitempty"`
+	Action      string `json:"action"`
+	RiskLevel   string `json:"riskLevel"`
+	Fallback    bool   `json:"fallback"`
+	Reason      string `json:"reason"`
+	Recommended string `json:"recommended"`
 }
 
 type Dashboard struct {
@@ -224,6 +236,12 @@ func (s *Store) CreateArticleFromGap(gapID, title, category, content string, tag
 	s.knowledge = append([]KnowledgeArticle{article}, s.knowledge...)
 	s.gaps[gapIndex].Status = "RESOLVED"
 	return article, nil
+}
+
+func (s *Store) TestRule(content string) (RuleTestResult, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return evaluateRules(content, s.searchLocked(content), s.rules), nil
 }
 
 func (s *Store) Dashboard() (Dashboard, error) {
@@ -380,4 +398,56 @@ func normalizeTags(tags []string, fallbackTag string) []string {
 		result = append(result, fallbackTag)
 	}
 	return result
+}
+
+func evaluateRules(content string, evidence []KnowledgeArticle, rules []Rule) RuleTestResult {
+	result := RuleTestResult{
+		Input:       content,
+		Matched:     false,
+		Action:      "allow_answer",
+		RiskLevel:   "LOW",
+		Fallback:    false,
+		Reason:      "EVIDENCE_OK",
+		Recommended: "可以基于可靠知识回答。",
+	}
+	if strings.TrimSpace(content) == "" {
+		result.Matched = true
+		result.RuleCode = "EMPTY_INPUT"
+		result.Action = "reject_request"
+		result.RiskLevel = "LOW"
+		result.Fallback = true
+		result.Reason = "EMPTY_INPUT"
+		result.Recommended = "请输入用户问题后再测试规则。"
+		return result
+	}
+	if shouldTransfer(content) && ruleEnabled(rules, "TRANSFER_THRESHOLD") {
+		result.Matched = true
+		result.RuleCode = "TRANSFER_THRESHOLD"
+		result.Action = "recommend_human_transfer"
+		result.RiskLevel = "HIGH"
+		result.Fallback = true
+		result.Reason = "用户问题触发投诉、催办、法律风险或人工诉求。"
+		result.Recommended = "停止自由生成，保留上下文并转人工处理。"
+		return result
+	}
+	if len(evidence) == 0 && ruleEnabled(rules, "NO_EVIDENCE_FALLBACK") {
+		result.Matched = true
+		result.RuleCode = "NO_EVIDENCE_FALLBACK"
+		result.Action = "safe_fallback_and_create_gap"
+		result.RiskLevel = "MEDIUM"
+		result.Fallback = true
+		result.Reason = "当前问题没有命中可信知识证据。"
+		result.Recommended = "返回无答案兜底话术，并沉淀知识缺口。"
+		return result
+	}
+	return result
+}
+
+func ruleEnabled(rules []Rule, code string) bool {
+	for _, rule := range rules {
+		if rule.Code == code && rule.Enabled {
+			return true
+		}
+	}
+	return false
 }

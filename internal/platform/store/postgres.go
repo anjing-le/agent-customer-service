@@ -241,6 +241,18 @@ func (s *PostgresStore) CreateArticleFromGap(gapID, title, category, content str
 	return article, nil
 }
 
+func (s *PostgresStore) TestRule(content string) (RuleTestResult, error) {
+	evidence, err := s.SearchKnowledge(content)
+	if err != nil {
+		return RuleTestResult{}, err
+	}
+	rules, err := s.listRules()
+	if err != nil {
+		return RuleTestResult{}, err
+	}
+	return evaluateRules(content, evidence, rules), nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	conversations, err := s.ListConversations()
 	if err != nil {
