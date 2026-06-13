@@ -219,6 +219,28 @@ func (s *PostgresStore) RecordChannelInbound(receipt ChannelInboundReceipt) (boo
 	return tag.RowsAffected() == 1, nil
 }
 
+func (s *PostgresStore) RecordChannelFailure(event ChannelFailureEvent) error {
+	if strings.TrimSpace(event.Channel) == "" {
+		event.Channel = "Unknown"
+	}
+	if strings.TrimSpace(event.Code) == "" {
+		event.Code = "channel_failure"
+	}
+	createdAt := time.Now().UTC()
+	if parsed, err := time.Parse(time.RFC3339, event.CreatedAt); err == nil {
+		createdAt = parsed.UTC()
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into channel_failure_events (
+			channel, code, reason, external_conversation_id, external_message_id, origin, created_at
+		)
+		values ($1, $2, $3, $4, $5, $6, $7)
+	`, event.Channel, event.Code, event.Reason, event.ExternalConversationID, event.ExternalMessageID, event.Origin, createdAt); err != nil {
+		return fmt.Errorf("record channel failure: %w", err)
+	}
+	return nil
+}
+
 func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, error) {
 	var item ChannelIntegration
 	var updatedAt time.Time
@@ -559,6 +581,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	channelAlerts, err := s.listChannelAlerts()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -583,6 +609,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(rules)), Note: "guardrail and transfer policies"},
+			{Label: "Channel failures", Value: fmt.Sprintf("%d", channelAlertCount(channelAlerts)), Note: "rejected inbound requests"},
 		},
 		Conversations:   conversations,
 		KnowledgeGaps:   gaps,
@@ -590,6 +617,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		Transfers:       transfers,
 		ChannelPolicies: channelPolicies,
 		Integrations:    integrations,
+		ChannelAlerts:   channelAlerts,
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
 	}, nil
@@ -774,6 +802,45 @@ func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) 
 		return defaultChannelIntegrations(time.Now().UTC().Format(time.RFC3339)), nil
 	}
 	return items, nil
+}
+
+func (s *PostgresStore) listChannelAlerts() ([]ChannelAlert, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select channel, code, count(*)::int, max(created_at)
+		from channel_failure_events
+		where created_at >= now() - interval '24 hours'
+		group by channel, code
+		order by max(created_at) desc
+		limit 20
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel alerts: %w", err)
+	}
+	defer rows.Close()
+
+	alerts := make([]ChannelAlert, 0)
+	for rows.Next() {
+		var alert ChannelAlert
+		var lastSeenAt time.Time
+		if err := rows.Scan(&alert.Channel, &alert.Code, &alert.Count, &lastSeenAt); err != nil {
+			return nil, err
+		}
+		alert.LastSeenAt = lastSeenAt.UTC().Format(time.RFC3339)
+		if err := s.pool.QueryRow(context.Background(), `
+			select reason, origin
+			from channel_failure_events
+			where channel = $1 and code = $2
+			order by created_at desc
+			limit 1
+		`, alert.Channel, alert.Code).Scan(&alert.LastReason, &alert.LastOrigin); err != nil {
+			return nil, err
+		}
+		alerts = append(alerts, alert)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return alerts, nil
 }
 
 func (s *PostgresStore) listRecentMessages() ([]Message, error) {

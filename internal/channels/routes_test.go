@@ -319,7 +319,8 @@ func TestInboundRouteRejectsDeniedOrigin(t *testing.T) {
 	mux := http.NewServeMux()
 	integration := testIntegration("WeChat", true, "ANJING_CHANNEL_WECHAT_SECRET", 300, true)
 	integration.AllowedOrigins = []string{"https://wechat.example.com"}
-	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration})), testConfig())
+	st := store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration}))
+	RegisterWithConfig(mux, st, testConfig())
 
 	timestamp := "2026-06-14T02:10:00Z"
 	content := "这个商品能不能开发票？"
@@ -335,6 +336,16 @@ func TestInboundRouteRejectsDeniedOrigin(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"channel_origin_denied"`) {
 		t.Fatalf("expected origin denied error, got %s", rec.Body.String())
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ChannelAlerts) != 1 {
+		t.Fatalf("expected one channel alert, got %#v", dashboard.ChannelAlerts)
+	}
+	if dashboard.ChannelAlerts[0].Code != "channel_origin_denied" {
+		t.Fatalf("expected origin denied alert, got %#v", dashboard.ChannelAlerts[0])
 	}
 }
 

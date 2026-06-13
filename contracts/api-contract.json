@@ -459,7 +459,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "quality", "annotations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -468,8 +468,20 @@
         "transfers": "TransferTicket[]",
         "channelPolicies": "ChannelPolicy[]",
         "integrations": "ChannelIntegration[]",
+        "channelAlerts": "ChannelAlert[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]"
+      }
+    },
+    "ChannelAlert": {
+      "required": ["channel", "code", "count", "lastReason", "lastOrigin", "lastSeenAt"],
+      "fields": {
+        "channel": "string",
+        "code": "string",
+        "count": "number",
+        "lastReason": "string",
+        "lastOrigin": "string",
+        "lastSeenAt": "RFC3339 string"
       }
     },
     "ChannelPolicy": {

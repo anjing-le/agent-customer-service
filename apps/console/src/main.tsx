@@ -175,6 +175,14 @@ type ChannelIntegration = {
   rotatesAt?: string;
   updatedAt: string;
 };
+type ChannelAlert = {
+  channel: string;
+  code: string;
+  count: number;
+  lastReason: string;
+  lastOrigin: string;
+  lastSeenAt: string;
+};
 type ChannelProtocolExample = {
   id: string;
   channel: string;
@@ -240,6 +248,7 @@ type Dashboard = {
   transfers: TransferTicket[] | null;
   channelPolicies: ChannelPolicy[] | null;
   integrations: ChannelIntegration[] | null;
+  channelAlerts: ChannelAlert[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
 };
@@ -446,6 +455,7 @@ function App() {
   const annotations = dashboard?.annotations ?? [];
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
+  const channelAlerts = dashboard?.channelAlerts ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
@@ -715,6 +725,7 @@ function App() {
         code,
         reason: errorExample.reason
       });
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'channel failure demo failed');
     } finally {
@@ -1133,6 +1144,30 @@ function App() {
                   </button>
                 </article>
               ))}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">失败指标</p>
+                <h2>最近 24 小时</h2>
+              </div>
+              <span className="status warning">{channelAlerts.length}</span>
+            </div>
+            <div className="alertList">
+              {channelAlerts.map((alert) => (
+                <article className="alertRow" key={`${alert.channel}-${alert.code}`}>
+                  <div>
+                    <strong>{alert.channel}</strong>
+                    <span>{alert.code} · {alert.lastReason}</span>
+                    {alert.lastOrigin && <span>{alert.lastOrigin}</span>}
+                  </div>
+                  <div>
+                    <em>{alert.count}</em>
+                    <b className="status warning">{alert.lastSeenAt.slice(11, 19)}</b>
+                  </div>
+                </article>
+              ))}
+              {channelAlerts.length === 0 && <p className="empty">暂无渠道失败记录</p>}
             </div>
           </section>
 

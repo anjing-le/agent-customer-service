@@ -23,11 +23,11 @@
 | 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看、筛选、处理工单，并展示 SLA、升级状态和事件时间线 |
 | 渠道策略 | Runtime connected | `ChannelPolicy` 定义 Web/WeChat/App/Marketplace 的语气、风险加权和 SLA，转人工工单按渠道计算升级 |
 | 渠道接入 | Runtime connected | `/api/channels/inbound` 读取 `ChannelIntegration` 后执行来源、限流、HMAC-SHA256 签名、timestamp 时间窗、enabled、external message id 和 replay 校验 |
-| 渠道协议适配 | Runtime connected | `/api/channels/wechat|app|marketplace/inbound` 将真实渠道字段归一到标准 inbound 链路，控制台可发送成功/失败 contract examples 并展示 trace/evidence 与协议差异 |
+| 渠道协议适配 | Runtime connected | `/api/channels/wechat|app|marketplace/inbound` 将真实渠道字段归一到标准 inbound 链路，控制台可发送成功/失败 contract examples 并展示 trace/evidence、协议差异和失败指标 |
 | 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示 active/next secret ref、allowed origins、rate limit、签名窗口、replay 开关和轮换提示，不返回密钥值 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
-| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
+| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因；`ChannelAlert` 聚合渠道失败类型 |
 | 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
 | 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
@@ -44,4 +44,4 @@
 ## 下一步
 
 1. 补质检任务分配和规则版本灰度。
-2. 增加渠道告警视图和失败指标聚合。
+2. 增加渠道失败指标趋势和通知策略。

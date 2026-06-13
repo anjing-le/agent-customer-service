@@ -46,6 +46,7 @@ type Runtime interface {
 	ChannelIntegration(channel string) (ChannelIntegration, error)
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
+	RecordChannelFailure(event ChannelFailureEvent) error
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -72,6 +73,7 @@ type Store struct {
 	annotations     []Annotation
 	inboundReplay   map[string]ChannelInboundReceipt
 	rateWindows     map[string]int
+	channelFailures []ChannelFailureEvent
 	generator       ReplyGenerator
 }
 
@@ -246,6 +248,7 @@ type Dashboard struct {
 	Transfers       []TransferTicket     `json:"transfers"`
 	ChannelPolicies []ChannelPolicy      `json:"channelPolicies"`
 	Integrations    []ChannelIntegration `json:"integrations"`
+	ChannelAlerts   []ChannelAlert       `json:"channelAlerts"`
 	Quality         QualitySummary       `json:"quality"`
 	Annotations     []Annotation         `json:"annotations"`
 }
@@ -290,6 +293,25 @@ type ChannelInboundReceipt struct {
 	Timestamp              string `json:"timestamp"`
 	Signature              string `json:"signature"`
 	ContentHash            string `json:"contentHash"`
+}
+
+type ChannelFailureEvent struct {
+	Channel                string `json:"channel"`
+	Code                   string `json:"code"`
+	Reason                 string `json:"reason"`
+	ExternalConversationID string `json:"externalConversationId"`
+	ExternalMessageID      string `json:"externalMessageId"`
+	Origin                 string `json:"origin"`
+	CreatedAt              string `json:"createdAt"`
+}
+
+type ChannelAlert struct {
+	Channel    string `json:"channel"`
+	Code       string `json:"code"`
+	Count      int    `json:"count"`
+	LastReason string `json:"lastReason"`
+	LastOrigin string `json:"lastOrigin"`
+	LastSeenAt string `json:"lastSeenAt"`
 }
 
 func NewSeedStore(options ...Option) *Store {
@@ -411,6 +433,25 @@ func (s *Store) RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error
 	}
 	s.inboundReplay[receipt.ReplayKey] = receipt
 	return true, nil
+}
+
+func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if strings.TrimSpace(event.Channel) == "" {
+		event.Channel = "Unknown"
+	}
+	if strings.TrimSpace(event.Code) == "" {
+		event.Code = "channel_failure"
+	}
+	if strings.TrimSpace(event.CreatedAt) == "" {
+		event.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	s.channelFailures = append([]ChannelFailureEvent{event}, s.channelFailures...)
+	if len(s.channelFailures) > 100 {
+		s.channelFailures = s.channelFailures[:100]
+	}
+	return nil
 }
 
 func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
@@ -563,6 +604,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 	}
 	transfers := withTransferSLAs(s.tickets, s.channelPolicies, time.Now().UTC())
 	quality := qualitySummary(s.messages, s.gaps, transfers, s.annotations)
+	channelAlerts := channelAlerts(s.channelFailures)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
@@ -572,6 +614,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			{Label: "Open transfers", Value: fmt.Sprintf("%d", openTransfers), Note: "waiting for human agents"},
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(s.rules)), Note: "guardrail and transfer policies"},
+			{Label: "Channel failures", Value: fmt.Sprintf("%d", channelAlertCount(channelAlerts)), Note: "rejected inbound requests"},
 		},
 		Conversations:   append([]Conversation(nil), s.conversations...),
 		KnowledgeGaps:   append([]KnowledgeGap(nil), s.gaps...),
@@ -579,6 +622,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Transfers:       transfers,
 		ChannelPolicies: append([]ChannelPolicy(nil), s.channelPolicies...),
 		Integrations:    append([]ChannelIntegration(nil), s.integrations...),
+		ChannelAlerts:   channelAlerts,
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
 	}, nil
@@ -1175,6 +1219,43 @@ func qualitySummary(messages []Message, gaps []KnowledgeGap, tickets []TransferT
 		fmt.Sprintf("%d human annotations", summary.AnnotationCount),
 	}
 	return summary
+}
+
+func channelAlerts(events []ChannelFailureEvent) []ChannelAlert {
+	type key struct {
+		channel string
+		code    string
+	}
+	alertsByKey := make(map[key]ChannelAlert)
+	order := make([]key, 0)
+	for _, event := range events {
+		k := key{channel: fallback(event.Channel, "Unknown"), code: fallback(event.Code, "channel_failure")}
+		alert, exists := alertsByKey[k]
+		if !exists {
+			order = append(order, k)
+			alert = ChannelAlert{Channel: k.channel, Code: k.code}
+		}
+		alert.Count++
+		if alert.LastSeenAt == "" || event.CreatedAt > alert.LastSeenAt {
+			alert.LastSeenAt = event.CreatedAt
+			alert.LastReason = event.Reason
+			alert.LastOrigin = event.Origin
+		}
+		alertsByKey[k] = alert
+	}
+	alerts := make([]ChannelAlert, 0, len(order))
+	for _, k := range order {
+		alerts = append(alerts, alertsByKey[k])
+	}
+	return alerts
+}
+
+func channelAlertCount(alerts []ChannelAlert) int {
+	total := 0
+	for _, alert := range alerts {
+		total += alert.Count
+	}
+	return total
 }
 
 func openGapCount(gaps []KnowledgeGap) int {

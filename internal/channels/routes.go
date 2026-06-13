@@ -143,11 +143,11 @@ func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg
 		return
 	}
 	if !integration.Enabled {
-		httpjson.Fail(w, http.StatusForbidden, "channel_disabled", "channel integration is disabled")
+		failChannelInbound(w, r, st, http.StatusForbidden, "channel_disabled", "channel integration is disabled", req)
 		return
 	}
 	if !originAllowed(r, integration) {
-		httpjson.Fail(w, http.StatusForbidden, "channel_origin_denied", "channel origin is not allowed")
+		failChannelInbound(w, r, st, http.StatusForbidden, "channel_origin_denied", "channel origin is not allowed", req)
 		return
 	}
 	rateAllowed, err := recordRateLimit(st, cfg, integration)
@@ -156,12 +156,12 @@ func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg
 		return
 	}
 	if !rateAllowed {
-		httpjson.Fail(w, http.StatusTooManyRequests, "channel_rate_limited", "channel rate limit exceeded")
+		failChannelInbound(w, r, st, http.StatusTooManyRequests, "channel_rate_limited", "channel rate limit exceeded", req)
 		return
 	}
 	ok, code, message := cfg.validSignature(req, integration)
 	if !ok {
-		httpjson.Fail(w, http.StatusUnauthorized, code, message)
+		failChannelInbound(w, r, st, http.StatusUnauthorized, code, message, req)
 		return
 	}
 	if integration.ReplayProtection {
@@ -171,7 +171,7 @@ func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg
 			return
 		}
 		if !accepted {
-			httpjson.Fail(w, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted")
+			failChannelInbound(w, r, st, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted", req)
 			return
 		}
 	}
@@ -188,14 +188,24 @@ func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg
 	httpjson.OK(w, result)
 }
 
+func failChannelInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, status int, code, message string, req inboundRequest) {
+	_ = st.RecordChannelFailure(store.ChannelFailureEvent{
+		Channel:                strings.TrimSpace(req.Channel),
+		Code:                   code,
+		Reason:                 message,
+		ExternalConversationID: strings.TrimSpace(req.ExternalConversationID),
+		ExternalMessageID:      strings.TrimSpace(req.ExternalMessageID),
+		Origin:                 requestOrigin(r),
+		CreatedAt:              time.Now().UTC().Format(time.RFC3339),
+	})
+	httpjson.Fail(w, status, code, message)
+}
+
 func originAllowed(r *http.Request, integration store.ChannelIntegration) bool {
 	if len(integration.AllowedOrigins) == 0 {
 		return true
 	}
-	origin := strings.TrimSpace(r.Header.Get("X-Channel-Origin"))
-	if origin == "" {
-		origin = strings.TrimSpace(r.Header.Get("Origin"))
-	}
+	origin := requestOrigin(r)
 	if origin == "" {
 		return true
 	}
@@ -205,6 +215,14 @@ func originAllowed(r *http.Request, integration store.ChannelIntegration) bool {
 		}
 	}
 	return false
+}
+
+func requestOrigin(r *http.Request) string {
+	origin := strings.TrimSpace(r.Header.Get("X-Channel-Origin"))
+	if origin == "" {
+		origin = strings.TrimSpace(r.Header.Get("Origin"))
+	}
+	return origin
 }
 
 func recordRateLimit(st store.Runtime, cfg Config, integration store.ChannelIntegration) (bool, error) {

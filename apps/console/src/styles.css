@@ -466,7 +466,8 @@ textarea {
 .ruleGrid,
 .protocolList,
 .protocolMatrix,
-.failureList {
+.failureList,
+.alertList {
   display: grid;
   gap: 10px;
 }
@@ -685,6 +686,38 @@ textarea {
 .failureExample small {
   color: #8d2b1f;
   font-weight: 800;
+}
+
+.alertRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #f1dfc0;
+  border-radius: 6px;
+  background: #fffaf0;
+}
+
+.alertRow div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.alertRow span {
+  overflow: hidden;
+  color: #7a5a28;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alertRow em {
+  color: #8d2b1f;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: right;
 }
 
 .evidence {

@@ -19,6 +19,7 @@
 | `TransferTicket` | 转人工工单，包含 SLA、升级状态、创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
 | `ChannelPolicy` | 渠道级客服策略，定义语气、风险加权、转人工 SLA 和升级说明 | seed store 或 PostgreSQL |
 | `ChannelIntegration` | 渠道接入配置的非敏感视图，记录 active/next secret ref、allowed origins、rate limit、签名窗口和 replay 开关 | seed store 或 PostgreSQL |
+| `ChannelAlert` | 渠道失败聚合，按渠道和错误码统计最近失败类型 | `Dashboard.channelAlerts` |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
 | `AnnotationDimensions` | 人工质检评分维度：证据贴合、安全性、帮助性 | `Annotation.dimensions` |
