@@ -205,6 +205,20 @@ func (s *PostgresStore) ReceiveChannelMessage(message ChannelInboundMessage) (Se
 	return s.SendMessage(conversationID, message.Content)
 }
 
+func (s *PostgresStore) RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error) {
+	tag, err := s.pool.Exec(context.Background(), `
+		insert into channel_inbound_events (
+			replay_key, channel, external_conversation_id, payload_timestamp, signature, content_hash
+		)
+		values ($1, $2, $3, $4, $5, $6)
+		on conflict (replay_key) do nothing
+	`, receipt.ReplayKey, receipt.Channel, receipt.ExternalConversationID, receipt.Timestamp, receipt.Signature, receipt.ContentHash)
+	if err != nil {
+		return false, fmt.Errorf("record channel inbound: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 func (s *PostgresStore) ListKnowledge() ([]KnowledgeArticle, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, title, category, content, tags, trust_level, updated_at

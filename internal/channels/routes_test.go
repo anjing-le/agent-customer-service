@@ -69,6 +69,33 @@ func TestInboundRouteRejectsStaleTimestamp(t *testing.T) {
 	}
 }
 
+func TestInboundRouteRejectsDuplicateReplay(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("WeChat", "wx-open-duplicate", timestamp, content)
+	body := `{"channel":"WeChat","externalConversationId":"wx-open-duplicate","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", strings.NewReader(body))
+	firstRec := httptest.NewRecorder()
+	mux.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected first request 200, got %d: %s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", strings.NewReader(body))
+	secondRec := httptest.NewRecorder()
+	mux.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusConflict {
+		t.Fatalf("expected duplicate request 409, got %d: %s", secondRec.Code, secondRec.Body.String())
+	}
+	if !strings.Contains(secondRec.Body.String(), `"code":"duplicate_inbound"`) {
+		t.Fatalf("expected duplicate inbound error, got %s", secondRec.Body.String())
+	}
+}
+
 func TestInboundRouteAcceptsConfiguredChannelSecret(t *testing.T) {
 	mux := http.NewServeMux()
 	cfg := testConfig()

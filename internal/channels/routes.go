@@ -75,6 +75,15 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			httpjson.Fail(w, http.StatusUnauthorized, code, message)
 			return
 		}
+		accepted, err := st.RecordChannelInbound(channelInboundReceipt(req))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		if !accepted {
+			httpjson.Fail(w, http.StatusConflict, "duplicate_inbound", "channel inbound message was already accepted")
+			return
+		}
 		result, err := st.ReceiveChannelMessage(store.ChannelInboundMessage{
 			Channel:                req.Channel,
 			ExternalConversationID: req.ExternalConversationID,
@@ -129,6 +138,17 @@ func (cfg Config) validSignature(req inboundRequest) (bool, string, string) {
 	return true, "", ""
 }
 
+func channelInboundReceipt(req inboundRequest) store.ChannelInboundReceipt {
+	return store.ChannelInboundReceipt{
+		ReplayKey:              replayKey(req),
+		Channel:                strings.TrimSpace(req.Channel),
+		ExternalConversationID: strings.TrimSpace(req.ExternalConversationID),
+		Timestamp:              strings.TrimSpace(req.Timestamp),
+		Signature:              strings.TrimSpace(req.Signature),
+		ContentHash:            contentHash(req.Content),
+	}
+}
+
 func ChannelSignature(channel, externalConversationID, timestamp, content string) string {
 	secret := DefaultConfig().channelSecret(channel)
 	return ChannelSignatureWithSecret(secret, channel, externalConversationID, timestamp, content)
@@ -147,6 +167,16 @@ func canonicalPayload(channel, externalConversationID, timestamp, content string
 		strings.TrimSpace(timestamp),
 		strings.TrimSpace(content),
 	)
+}
+
+func replayKey(req inboundRequest) string {
+	sum := sha256.Sum256([]byte(canonicalPayload(req.Channel, req.ExternalConversationID, req.Timestamp, strings.TrimSpace(req.Signature))))
+	return hex.EncodeToString(sum[:])
+}
+
+func contentHash(content string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(content)))
+	return hex.EncodeToString(sum[:])
 }
 
 func channelSecret(channel string) string {

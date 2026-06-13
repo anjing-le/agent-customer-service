@@ -37,6 +37,7 @@ type Runtime interface {
 	CreateConversation(customer, channel string) (Conversation, error)
 	ListMessages(conversationID string) ([]Message, error)
 	SendMessage(conversationID, content string) (SendMessageResult, error)
+	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -60,6 +61,7 @@ type Store struct {
 	tickets         []TransferTicket
 	channelPolicies []ChannelPolicy
 	annotations     []Annotation
+	inboundReplay   map[string]ChannelInboundReceipt
 	generator       ReplyGenerator
 }
 
@@ -253,9 +255,19 @@ type ChannelInboundMessage struct {
 	Content                string `json:"content"`
 }
 
+type ChannelInboundReceipt struct {
+	ReplayKey              string `json:"replayKey"`
+	Channel                string `json:"channel"`
+	ExternalConversationID string `json:"externalConversationId"`
+	Timestamp              string `json:"timestamp"`
+	Signature              string `json:"signature"`
+	ContentHash            string `json:"contentHash"`
+}
+
 func NewSeedStore(options ...Option) *Store {
 	now := time.Now().UTC().Format(time.RFC3339)
 	st := &Store{
+		inboundReplay: make(map[string]ChannelInboundReceipt),
 		conversations: []Conversation{
 			{
 				ID: "conv_demo_refund", Customer: "林夏", Channel: "Web", Intent: "退款规则",
@@ -356,6 +368,19 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
 	return SendMessageResult{Conversation: conv, UserMessage: userMessage, AgentMessage: agentMessage, Evidence: evidence, Gap: gap}, nil
+}
+
+func (s *Store) RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if receipt.ReplayKey == "" {
+		return false, fmt.Errorf("channel inbound replay key is required")
+	}
+	if _, exists := s.inboundReplay[receipt.ReplayKey]; exists {
+		return false, nil
+	}
+	s.inboundReplay[receipt.ReplayKey] = receipt
+	return true, nil
 }
 
 func (s *Store) ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error) {

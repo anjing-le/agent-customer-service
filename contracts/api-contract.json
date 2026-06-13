@@ -49,7 +49,11 @@
       "method": "POST",
       "path": "/api/channels/inbound",
       "request": { "body": "ChannelInboundRequest" },
-      "response": { "status": 200, "schema": "SendMessageResult" }
+      "response": { "status": 200, "schema": "SendMessageResult" },
+      "errorResponses": [
+        { "status": 401, "code": "invalid_signature|invalid_timestamp|stale_signature" },
+        { "status": 409, "code": "duplicate_inbound" }
+      ]
     },
     {
       "id": "listArticles",
@@ -150,7 +154,7 @@
         "customer": "string",
         "content": "string",
         "timestamp": "RFC3339 string within ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS",
-        "signature": "HMAC-SHA256 hex using channel env secret"
+        "signature": "HMAC-SHA256 hex using channel env secret; duplicate signed payload returns duplicate_inbound"
       }
     },
     "MessageStreamEvent": {

@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/platform/db"
 )
@@ -26,6 +28,36 @@ func TestPostgresStoreRuntime(t *testing.T) {
 	}
 
 	st := NewPostgresStore(pool)
+	replayKey := fmt.Sprintf("integration-replay-key-%d", time.Now().UnixNano())
+	accepted, err := st.RecordChannelInbound(ChannelInboundReceipt{
+		ReplayKey:              replayKey,
+		Channel:                "WeChat",
+		ExternalConversationID: "wx-integration",
+		Timestamp:              "2026-06-14T02:30:00Z",
+		Signature:              "integration-signature",
+		ContentHash:            "integration-content-hash",
+	})
+	if err != nil {
+		t.Fatalf("record channel inbound: %v", err)
+	}
+	if !accepted {
+		t.Fatalf("expected first channel inbound receipt to be accepted")
+	}
+	accepted, err = st.RecordChannelInbound(ChannelInboundReceipt{
+		ReplayKey:              replayKey,
+		Channel:                "WeChat",
+		ExternalConversationID: "wx-integration",
+		Timestamp:              "2026-06-14T02:30:00Z",
+		Signature:              "integration-signature",
+		ContentHash:            "integration-content-hash",
+	})
+	if err != nil {
+		t.Fatalf("record duplicate channel inbound: %v", err)
+	}
+	if accepted {
+		t.Fatalf("expected duplicate channel inbound receipt to be rejected")
+	}
+
 	knowledge, err := st.SearchKnowledge("发票")
 	if err != nil {
 		t.Fatalf("search knowledge: %v", err)

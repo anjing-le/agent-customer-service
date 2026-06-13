@@ -24,7 +24,7 @@
 ## Runtime Truth
 
 - 用户消息进入 `/api/customer-service/messages`。
-- 外部渠道消息进入 `/api/channels/inbound`，通过 env 密钥、HMAC-SHA256 签名和 timestamp 时间窗校验后映射为内部会话。
+- 外部渠道消息进入 `/api/channels/inbound`，通过 env 密钥、HMAC-SHA256 签名、timestamp 时间窗和 replay 记录校验后映射为内部会话。
 - 控制台可以使用 `/api/customer-service/messages/stream` 获取 SSE 流式输出。
 - 有可信知识时返回 RAG 证据回复；配置模型客户端后可生成 `llm+rag`。
 - 无可信知识时返回安全兜底，并创建知识缺口。
