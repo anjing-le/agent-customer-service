@@ -34,6 +34,7 @@ Go API 当前响应格式：
 - `/api/customer-service/conversations`: 会话列表和创建。
 - `GET /api/customer-service/messages?conversationId=...`: 读取指定会话历史消息。
 - `POST /api/customer-service/messages`: 发送用户消息，触发 RAG、兜底、缺口和人工 ticket。
+- `POST /api/customer-service/messages/stream`: 发送用户消息并以 SSE 返回 `meta`、`delta`、`done` 事件。
 - `/api/knowledge/articles`: 可信知识列表。
 - `/api/knowledge/search`: 知识检索。
 - `/api/knowledge/gaps/resolve`: 关闭知识缺口。

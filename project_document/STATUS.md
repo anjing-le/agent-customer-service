@@ -25,6 +25,7 @@
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
 | 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因，seed 与 PostgreSQL runtime 均支持 |
 | 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
+| 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
 
 ## 迁移原则
 
@@ -35,5 +36,5 @@
 
 ## 下一步
 
-1. 增加 SSE 流式回复。
-2. 补更完整的人工接管记录和处理备注流转。
+1. 补更完整的人工接管记录和处理备注流转。
+2. 增加质量评估集和人工标注反馈。

@@ -104,6 +104,10 @@ type SendMessageResult = {
   evidence: KnowledgeArticle[];
   gap?: KnowledgeGap;
 };
+type StreamEvent = {
+  type: 'meta' | 'delta' | 'done';
+  data?: unknown;
+};
 
 const api = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(path, {
@@ -136,6 +140,62 @@ const traceChips = (trace?: AgentTrace) => {
   return chips;
 };
 
+const parseSSEBlock = (block: string): StreamEvent | null => {
+  const dataLine = block.split('\n').find((line) => line.startsWith('data: '));
+  if (!dataLine) {
+    return null;
+  }
+  return JSON.parse(dataLine.slice(6)) as StreamEvent;
+};
+
+const postMessageStream = async (
+  conversationId: string | undefined,
+  content: string,
+  onDelta: (content: string) => void
+) => {
+  const response = await fetch('/api/customer-service/messages/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, content })
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`stream failed: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalResult: SendMessageResult | null = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split('\n\n');
+    buffer = blocks.pop() ?? '';
+    for (const block of blocks) {
+      const event = parseSSEBlock(block);
+      if (!event) {
+        continue;
+      }
+      if (event.type === 'delta') {
+        const data = event.data as { content?: string };
+        onDelta(data.content ?? '');
+      }
+      if (event.type === 'done') {
+        finalResult = event.data as SendMessageResult;
+      }
+    }
+  }
+
+  if (!finalResult) {
+    throw new Error('stream ended without final result');
+  }
+  return finalResult;
+};
+
 function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
@@ -147,6 +207,8 @@ function App() {
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [history, setHistory] = useState<Message[]>([]);
   const [error, setError] = useState('');
+  const [streaming, setStreaming] = useState(false);
+  const [streamReply, setStreamReply] = useState('');
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
@@ -207,10 +269,11 @@ function App() {
 
   const send = async () => {
     setError('');
+    setStreaming(true);
+    setStreamReply('');
     try {
-      const data = await api<SendMessageResult>('/api/customer-service/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: activeConversation?.id, content: message })
+      const data = await postMessageStream(activeConversation?.id, message, (chunk) => {
+        setStreamReply((current) => current + chunk);
       });
       setResult(data);
       setSelectedConversationId(data.conversation.id);
@@ -218,6 +281,8 @@ function App() {
       await loadMessages(data.conversation.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'send failed');
+    } finally {
+      setStreaming(false);
     }
   };
 
@@ -343,9 +408,18 @@ function App() {
             </div>
             <textarea value={message} onChange={(event) => setMessage(event.target.value)} />
             <div className="actionRow">
-              <button className="primary" onClick={send}>发送并审计</button>
-              <span>{openGapCount} open gaps</span>
+              <button className="primary" onClick={send} disabled={streaming}>{streaming ? '流式生成中' : '发送并审计'}</button>
+              <span>{streaming ? 'streaming reply' : `${openGapCount} open gaps`}</span>
             </div>
+            {streaming && (
+              <div className="reply streamingReply">
+                <div className="replyMeta">
+                  <span>SSE</span>
+                  <span>streaming</span>
+                </div>
+                <p>{streamReply || '等待 Agent 回复...'}</p>
+              </div>
+            )}
             {result && (
               <div className="reply">
                 <div className="replyMeta">

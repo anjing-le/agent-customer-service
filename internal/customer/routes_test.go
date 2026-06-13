@@ -87,3 +87,26 @@ func TestListMessagesRouteReturnsConversationHistory(t *testing.T) {
 		t.Fatalf("expected conversation history, got %s", rec.Body.String())
 	}
 }
+
+func TestStreamMessagesRouteReturnsSSEEvents(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	body := strings.NewReader(`{"conversationId":"conv_demo_refund","content":"这个商品能不能开发票？"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/customer-service/messages/stream", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if contentType := rec.Header().Get("Content-Type"); !strings.Contains(contentType, "text/event-stream") {
+		t.Fatalf("expected event stream content type, got %q", contentType)
+	}
+	bodyText := rec.Body.String()
+	for _, expected := range []string{"event: meta", "event: delta", "event: done", `"engine":"rag+rule"`, `"agentMessage"`} {
+		if !strings.Contains(bodyText, expected) {
+			t.Fatalf("expected %q in SSE body, got %s", expected, bodyText)
+		}
+	}
+}

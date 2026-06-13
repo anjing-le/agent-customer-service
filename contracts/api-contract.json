@@ -36,6 +36,14 @@
       "response": { "status": 200, "schema": "SendMessageResult" }
     },
     {
+      "id": "streamMessage",
+      "boundary": "customer-service",
+      "method": "POST",
+      "path": "/api/customer-service/messages/stream",
+      "request": { "body": "SendMessageRequest" },
+      "response": { "status": 200, "contentType": "text/event-stream", "schema": "MessageStreamEvent" }
+    },
+    {
       "id": "listArticles",
       "boundary": "knowledge",
       "method": "GET",
@@ -107,6 +115,28 @@
       "required": ["content"],
       "fields": {
         "conversationId": "string",
+        "content": "string"
+      }
+    },
+    "MessageStreamEvent": {
+      "required": ["type"],
+      "fields": {
+        "type": "meta|delta|done",
+        "data": "StreamMeta|StreamDelta|SendMessageResult"
+      }
+    },
+    "StreamMeta": {
+      "required": ["engine", "evidenceCount"],
+      "fields": {
+        "engine": "customer|rule|rag+rule|llm+rag",
+        "fallbackReason": "NO_EVIDENCE|TRANSFER_THRESHOLD",
+        "evidenceCount": "number",
+        "trace": "AgentTrace"
+      }
+    },
+    "StreamDelta": {
+      "required": ["content"],
+      "fields": {
         "content": "string"
       }
     },

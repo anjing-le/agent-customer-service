@@ -65,6 +65,14 @@ curl -X POST http://localhost:10002/api/ops/rules/test \
   -d '{"content":"我已经投诉很多次了，现在必须转人工"}'
 ```
 
+流式回复：
+
+```bash
+curl -N -X POST http://localhost:10002/api/customer-service/messages/stream \
+  -H "Content-Type: application/json" \
+  -d '{"conversationId":"conv_demo_refund","content":"这个商品能不能开发票？"}'
+```
+
 ## Quality Checks
 
 ```bash

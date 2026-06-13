@@ -61,6 +61,14 @@ go run ./cmd/platform-all
 
 模型客户端默认关闭；开启后也只在命中知识证据时参与回复生成。无证据、高风险或模型不可用时仍走规则兜底。
 
+流式回复：
+
+```bash
+curl -N -X POST http://localhost:10002/api/customer-service/messages/stream \
+  -H "Content-Type: application/json" \
+  -d '{"conversationId":"conv_demo_refund","content":"这个商品能不能开发票？"}'
+```
+
 ## 校验
 
 ```bash

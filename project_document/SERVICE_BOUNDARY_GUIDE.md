@@ -23,6 +23,7 @@
 ## Runtime Truth
 
 - 用户消息进入 `/api/customer-service/messages`。
+- 控制台可以使用 `/api/customer-service/messages/stream` 获取 SSE 流式输出。
 - 有可信知识时返回 RAG 证据回复；配置模型客户端后可生成 `llm+rag`。
 - 无可信知识时返回安全兜底，并创建知识缺口。
 - 命中投诉、催办、法律风险或人工诉求时创建人工 ticket。
