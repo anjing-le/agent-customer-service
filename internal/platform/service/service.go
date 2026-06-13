@@ -10,9 +10,9 @@ import (
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
 )
 
-type RegisterFunc func(mux *http.ServeMux, st *store.Store)
+type RegisterFunc func(mux *http.ServeMux, st store.Runtime)
 
-func NewMux(serviceName string, st *store.Store, registers ...RegisterFunc) *http.ServeMux {
+func NewMux(serviceName string, st store.Runtime, registers ...RegisterFunc) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodGet) {

@@ -7,6 +7,15 @@ import (
 	"time"
 )
 
+type Runtime interface {
+	ListConversations() []Conversation
+	CreateConversation(customer, channel string) Conversation
+	SendMessage(conversationID, content string) SendMessageResult
+	ListKnowledge() []KnowledgeArticle
+	SearchKnowledge(query string) []KnowledgeArticle
+	Dashboard() Dashboard
+}
+
 type Store struct {
 	mu sync.RWMutex
 

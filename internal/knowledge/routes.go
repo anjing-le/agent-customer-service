@@ -7,7 +7,7 @@ import (
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
 )
 
-func Register(mux *http.ServeMux, st *store.Store) {
+func Register(mux *http.ServeMux, st store.Runtime) {
 	mux.HandleFunc("/api/knowledge/articles", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodGet) {
 			return

@@ -41,6 +41,14 @@ go run ./cmd/platform-all
 
 默认端口：后端和静态控制台 `10002`。
 
+PostgreSQL 模式：
+
+```bash
+export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:5432/agent_customer_service?sslmode=disable'
+go run ./cmd/migrate-db
+go run ./cmd/platform-all
+```
+
 ## 校验
 
 ```bash

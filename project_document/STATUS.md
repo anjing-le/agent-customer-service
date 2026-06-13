@@ -15,7 +15,7 @@
 | 知识 API | V1 seed runtime | 知识列表和关键词检索，后续接 PostgreSQL repository |
 | 运营 API | V1 seed runtime | 运营指标、会话队列、知识缺口、规则清单 |
 | 前端控制台 | V1 shell | React/Vite 控制台已展示会话、Agent 工作区、知识缺口、兜底规则 |
-| 数据底座 | Schema ready | `infra/postgres/migrations/001_agent_customer_service.sql` 定义核心表 |
+| 数据底座 | Runtime connected | `infra/postgres/migrations` 定义核心表和 demo seed；配置 `ANJING_DATABASE_URL` 后 API 切到 PostgreSQL store |
 
 ## 迁移原则
 
@@ -26,7 +26,7 @@
 
 ## 下一步
 
-1. 为 Go seed runtime 补单元测试和 API contract 文档。
-2. 把 `Store` 拆成领域 repository 接口，并接入 PostgreSQL 实现。
+1. 为 Go API contract 补机器可读文档。
+2. 将 PostgreSQL store 的错误返回显式化到 HTTP envelope。
 3. 将旧 Vue 页面信息架构迁移到 React 控制台。
 4. 删除旧 Java/Vue 运行入口，更新教学文档为 DVSkyFolding 口径。

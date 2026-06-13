@@ -7,7 +7,7 @@ import (
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
 )
 
-func Register(mux *http.ServeMux, st *store.Store) {
+func Register(mux *http.ServeMux, st store.Runtime) {
 	mux.HandleFunc("/api/customer-service/conversations", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
