@@ -13,7 +13,8 @@
 | `KnowledgeGap` | 无可靠证据时沉淀的知识缺口 | `NO_EVIDENCE_FALLBACK` |
 | `Rule` | 规则兜底或转人工策略 | seed store 或 PostgreSQL |
 | `RuleTestResult` | 对单句用户输入的规则测试结果 | `/api/ops/rules/test` |
-| `TransferTicket` | 转人工工单 | `TRANSFER_THRESHOLD` |
+| `TransferTicket` | 转人工工单，包含创建和处理事件时间线 | `TRANSFER_THRESHOLD` |
+| `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Dashboard` | 会话、知识、规则、缺口和人工队列的运营聚合 | `/api/ops/dashboard` |
 
 ## Runtime Flow
@@ -34,7 +35,7 @@ user message
 |---|---|
 | 命中可信知识 | 默认返回基于知识的 `rag+rule` 回复；配置模型客户端后可生成 `llm+rag` 回复 |
 | 无可信知识 | 返回安全兜底，不自由生成；创建 `KnowledgeGap` |
-| 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` |
+| 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界 |
 

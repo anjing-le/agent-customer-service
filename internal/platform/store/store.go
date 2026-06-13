@@ -134,16 +134,24 @@ type RuleTestResult struct {
 }
 
 type TransferTicket struct {
-	ID             string `json:"id"`
-	ConversationID string `json:"conversationId"`
-	Question       string `json:"question"`
-	Reason         string `json:"reason"`
-	Priority       string `json:"priority"`
-	Status         string `json:"status"`
-	Assignee       string `json:"assignee,omitempty"`
-	ResolutionNote string `json:"resolutionNote,omitempty"`
-	CreatedAt      string `json:"createdAt"`
-	ResolvedAt     string `json:"resolvedAt,omitempty"`
+	ID             string          `json:"id"`
+	ConversationID string          `json:"conversationId"`
+	Question       string          `json:"question"`
+	Reason         string          `json:"reason"`
+	Priority       string          `json:"priority"`
+	Status         string          `json:"status"`
+	Assignee       string          `json:"assignee,omitempty"`
+	ResolutionNote string          `json:"resolutionNote,omitempty"`
+	CreatedAt      string          `json:"createdAt"`
+	ResolvedAt     string          `json:"resolvedAt,omitempty"`
+	Events         []TransferEvent `json:"events,omitempty"`
+}
+
+type TransferEvent struct {
+	Type      string `json:"type"`
+	Actor     string `json:"actor"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type Dashboard struct {
@@ -198,7 +206,7 @@ func NewSeedStore(options ...Option) *Store {
 		{ID: "msg_demo_2", ConversationID: "conv_demo_refund", Role: "assistant", Content: "根据售后知识库，签收 7 天内可申请无理由退货；非质量问题寄回运费通常由用户承担，质量问题由商家承担。", Engine: "rag+rule", Safe: true, EvidenceIDs: []string{"kb_refund_7d"}, CreatedAt: now},
 	}
 	st.tickets = []TransferTicket{
-		{ID: "ticket_demo_transfer", ConversationID: "conv_demo_transfer", Question: "我已经催了三次，必须马上找人工处理。", Reason: "TRANSFER_THRESHOLD", Priority: "HIGH", Status: "OPEN", CreatedAt: now},
+		demoTransferTicket("ticket_demo_transfer", "conv_demo_transfer", "我已经催了三次，必须马上找人工处理。", now),
 	}
 	for _, option := range options {
 		option(st)
@@ -337,6 +345,7 @@ func (s *Store) ResolveTransferTicket(id, assignee, note string) (TransferTicket
 			s.tickets[idx].Assignee = fallback(assignee, "operator")
 			s.tickets[idx].ResolutionNote = fallback(note, "人工已处理")
 			s.tickets[idx].ResolvedAt = time.Now().UTC().Format(time.RFC3339)
+			s.tickets[idx].Events = transferEvents(s.tickets[idx])
 			return s.tickets[idx], nil
 		}
 	}
@@ -604,8 +613,15 @@ func ruleEnabled(rules []Rule, code string) bool {
 }
 
 func newTransferTicket(conversationID, question, createdAt string) TransferTicket {
-	return TransferTicket{
-		ID:             fmt.Sprintf("ticket_%d", time.Now().UnixNano()),
+	return demoTransferTicket(fmt.Sprintf("ticket_%d", time.Now().UnixNano()), conversationID, question, createdAt)
+}
+
+func demoTransferTicket(id, conversationID, question, createdAt string) TransferTicket {
+	if id == "" {
+		id = fmt.Sprintf("ticket_%d", time.Now().UnixNano())
+	}
+	ticket := TransferTicket{
+		ID:             id,
 		ConversationID: conversationID,
 		Question:       question,
 		Reason:         "TRANSFER_THRESHOLD",
@@ -613,4 +629,24 @@ func newTransferTicket(conversationID, question, createdAt string) TransferTicke
 		Status:         "OPEN",
 		CreatedAt:      createdAt,
 	}
+	ticket.Events = transferEvents(ticket)
+	return ticket
+}
+
+func transferEvents(ticket TransferTicket) []TransferEvent {
+	events := []TransferEvent{{
+		Type:      "CREATED",
+		Actor:     "agent",
+		Note:      "Agent 命中高风险边界并创建人工接管工单。",
+		CreatedAt: ticket.CreatedAt,
+	}}
+	if ticket.Status == "RESOLVED" {
+		events = append(events, TransferEvent{
+			Type:      "RESOLVED",
+			Actor:     fallback(ticket.Assignee, "operator"),
+			Note:      fallback(ticket.ResolutionNote, "人工已处理"),
+			CreatedAt: ticket.ResolvedAt,
+		})
+	}
+	return events
 }

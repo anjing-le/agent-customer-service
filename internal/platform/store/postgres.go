@@ -342,6 +342,7 @@ func (s *PostgresStore) ResolveTransferTicket(id, assignee, note string) (Transf
 	if resolvedAt != nil {
 		item.ResolvedAt = resolvedAt.UTC().Format(time.RFC3339)
 	}
+	item.Events = transferEvents(item)
 	return item, nil
 }
 
@@ -483,6 +484,7 @@ func (s *PostgresStore) listTransferTickets() ([]TransferTicket, error) {
 		if resolvedAt != nil {
 			item.ResolvedAt = resolvedAt.UTC().Format(time.RFC3339)
 		}
+		item.Events = transferEvents(item)
 		tickets = append(tickets, item)
 	}
 	if err := rows.Err(); err != nil {

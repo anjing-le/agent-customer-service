@@ -434,6 +434,19 @@ textarea {
   gap: 6px;
 }
 
+.timeline {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.timeline small {
+  color: #64786d;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
 .tableRow strong,
 .evidence strong,
 .rule strong {

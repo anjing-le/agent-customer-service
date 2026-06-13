@@ -173,6 +173,9 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 	if len(dashboard.Transfers) == 0 || dashboard.Transfers[0].Status != "OPEN" {
 		t.Fatalf("expected open transfer ticket, got %#v", dashboard.Transfers)
 	}
+	if len(dashboard.Transfers[0].Events) != 1 || dashboard.Transfers[0].Events[0].Type != "CREATED" {
+		t.Fatalf("expected created event, got %#v", dashboard.Transfers[0].Events)
+	}
 
 	resolved, err := st.ResolveTransferTicket(dashboard.Transfers[0].ID, "agent-a", "已电话回访")
 	if err != nil {
@@ -180,6 +183,9 @@ func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 	}
 	if resolved.Status != "RESOLVED" || resolved.Assignee != "agent-a" {
 		t.Fatalf("expected resolved ticket, got %#v", resolved)
+	}
+	if len(resolved.Events) != 2 || resolved.Events[1].Type != "RESOLVED" || resolved.Events[1].Note != "已电话回访" {
+		t.Fatalf("expected resolved event timeline, got %#v", resolved.Events)
 	}
 }
 

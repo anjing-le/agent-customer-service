@@ -275,7 +275,17 @@
         "assignee": "string",
         "resolutionNote": "string",
         "createdAt": "RFC3339 string",
-        "resolvedAt": "RFC3339 string"
+        "resolvedAt": "RFC3339 string",
+        "events": "TransferEvent[]"
+      }
+    },
+    "TransferEvent": {
+      "required": ["type", "actor", "note", "createdAt"],
+      "fields": {
+        "type": "CREATED|RESOLVED",
+        "actor": "string",
+        "note": "string",
+        "createdAt": "RFC3339 string"
       }
     },
     "Metric": {

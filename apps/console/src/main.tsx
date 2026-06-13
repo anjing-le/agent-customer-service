@@ -60,6 +60,13 @@ type TransferTicket = {
   resolutionNote?: string;
   createdAt: string;
   resolvedAt?: string;
+  events?: TransferEvent[];
+};
+type TransferEvent = {
+  type: string;
+  actor: string;
+  note: string;
+  createdAt: string;
 };
 type KnowledgeArticle = {
   id: string;
@@ -492,6 +499,14 @@ function App() {
                   <div>
                     <strong>{ticket.question}</strong>
                     <span>{ticket.reason} · {ticket.conversationId}</span>
+                    {ticket.assignee && <span>{ticket.assignee} · {ticket.resolutionNote}</span>}
+                    <div className="timeline">
+                      {(ticket.events ?? []).map((event) => (
+                        <small key={`${ticket.id}-${event.type}-${event.createdAt}`}>
+                          {event.type} · {event.actor} · {event.note}
+                        </small>
+                      ))}
+                    </div>
                   </div>
                   <div className="gapActions">
                     <b className={statusClass(ticket.priority)}>{ticket.status}</b>
