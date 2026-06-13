@@ -163,9 +163,11 @@ type ChannelIntegration = {
   enabled: boolean;
   secretSource: string;
   secretRef: string;
+  nextSecretRef: string;
   signatureWindowSeconds: number;
   replayProtection: boolean;
   rotationHint: string;
+  rotatesAt?: string;
   updatedAt: string;
 };
 type Dashboard = {
@@ -774,10 +776,11 @@ function App() {
                   <div>
                     <strong>{item.displayName}</strong>
                     <span>{item.secretSource} · {item.secretRef}</span>
+                    {item.nextSecretRef && <span>next · {item.nextSecretRef}</span>}
                     <span>{item.rotationHint}</span>
                   </div>
                   <div>
-                    <em>{item.signatureWindowSeconds}s</em>
+                    <em>{item.rotatesAt ? item.rotatesAt.slice(0, 10) : `${item.signatureWindowSeconds}s`}</em>
                     <b className={statusClass(item.replayProtection ? 'PASS' : 'FAIL')}>{item.replayProtection ? 'REPLAY' : 'OFF'}</b>
                   </div>
                 </article>

@@ -222,8 +222,9 @@ func (s *PostgresStore) RecordChannelInbound(receipt ChannelInboundReceipt) (boo
 func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, error) {
 	var item ChannelIntegration
 	var updatedAt time.Time
+	var rotatesAt *time.Time
 	err := s.pool.QueryRow(context.Background(), `
-		select channel, display_name, enabled, secret_source, secret_ref, signature_window_seconds, replay_protection, rotation_hint, updated_at
+		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, rotation_hint, rotates_at, updated_at
 		from channel_integrations
 		where lower(channel) = lower($1)
 	`, channel).Scan(
@@ -232,12 +233,17 @@ func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, 
 		&item.Enabled,
 		&item.SecretSource,
 		&item.SecretRef,
+		&item.NextSecretRef,
 		&item.SignatureWindowSeconds,
 		&item.ReplayProtection,
 		&item.RotationHint,
+		&rotatesAt,
 		&updatedAt,
 	)
 	if err == nil {
+		if rotatesAt != nil {
+			item.RotatesAt = rotatesAt.UTC().Format(time.RFC3339)
+		}
 		item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
 		return item, nil
 	}
@@ -698,7 +704,7 @@ func (s *PostgresStore) listChannelPolicies() ([]ChannelPolicy, error) {
 
 func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select channel, display_name, enabled, secret_source, secret_ref, signature_window_seconds, replay_protection, rotation_hint, updated_at
+		select channel, display_name, enabled, secret_source, secret_ref, next_secret_ref, signature_window_seconds, replay_protection, rotation_hint, rotates_at, updated_at
 		from channel_integrations
 		order by channel asc
 	`)
@@ -711,18 +717,24 @@ func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) 
 	for rows.Next() {
 		var item ChannelIntegration
 		var updatedAt time.Time
+		var rotatesAt *time.Time
 		if err := rows.Scan(
 			&item.Channel,
 			&item.DisplayName,
 			&item.Enabled,
 			&item.SecretSource,
 			&item.SecretRef,
+			&item.NextSecretRef,
 			&item.SignatureWindowSeconds,
 			&item.ReplayProtection,
 			&item.RotationHint,
+			&rotatesAt,
 			&updatedAt,
 		); err != nil {
 			return nil, err
+		}
+		if rotatesAt != nil {
+			item.RotatesAt = rotatesAt.UTC().Format(time.RFC3339)
 		}
 		item.UpdatedAt = updatedAt.UTC().Format(time.RFC3339)
 		items = append(items, item)

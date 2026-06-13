@@ -484,16 +484,18 @@
       }
     },
     "ChannelIntegration": {
-      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "signatureWindowSeconds", "replayProtection", "rotationHint", "updatedAt"],
+      "required": ["channel", "displayName", "enabled", "secretSource", "secretRef", "nextSecretRef", "signatureWindowSeconds", "replayProtection", "rotationHint", "updatedAt"],
       "fields": {
         "channel": "string",
         "displayName": "string",
         "enabled": "boolean",
         "secretSource": "env|database",
         "secretRef": "string",
+        "nextSecretRef": "string",
         "signatureWindowSeconds": "number",
         "replayProtection": "boolean",
         "rotationHint": "string",
+        "rotatesAt": "RFC3339 string",
         "updatedAt": "RFC3339 string"
       }
     },

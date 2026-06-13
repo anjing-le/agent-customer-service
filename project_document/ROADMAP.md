@@ -39,12 +39,13 @@
 - 已支持 webhook 校验读取 `ChannelIntegration`，将 enabled、secret ref、签名窗口和 replay 开关接入运行时。
 - 已支持 `externalMessageId` 对账，真实渠道可用官方消息 ID 做幂等，缺省时退回签名载荷 replay key。
 - 已支持 WeChat/App/Marketplace adapter，将真实渠道字段归一到标准 inbound 链路。
-- 下一步补更细的真实平台回调协议差异和密钥轮换。
+- 已支持 active/next secret ref 双密钥轮换窗口，控制台不暴露密钥值。
+- 下一步补更细的真实平台回调协议差异和渠道权限。
 
 ## V3: 生产化扩展
 
 - 接入向量数据库和 rerank，替换 V1 关键词检索。
-- 真实渠道接入生产化：Web、App、微信、抖音等渠道密钥轮换、回调协议差异和官方 message id 对账。
+- 真实渠道接入生产化：Web、App、微信、抖音等渠道权限、回调协议差异和官方 message id 对账。
 - 更完整的质检任务分配、规则版本灰度和复盘样本流转。
 - 多租户、权限、限流、成本统计和治理面板。
 - 继续扩展 DVSkyFolding 口径下的生产化运维、审计和治理能力。

@@ -244,11 +244,13 @@ func (cfg Config) validSignature(req inboundRequest, integration store.ChannelIn
 	if delta > cfg.signatureWindow(integration) {
 		return false, "stale_signature", "channel signature timestamp is outside allowed window"
 	}
-	expected := ChannelSignatureWithSecret(cfg.channelSecret(req.Channel, integration), req.Channel, req.ExternalConversationID, req.Timestamp, req.Content)
-	if !hmac.Equal([]byte(expected), []byte(strings.TrimSpace(req.Signature))) {
-		return false, "invalid_signature", "channel signature verification failed"
+	for _, secret := range cfg.channelSecrets(req.Channel, integration) {
+		expected := ChannelSignatureWithSecret(secret, req.Channel, req.ExternalConversationID, req.Timestamp, req.Content)
+		if hmac.Equal([]byte(expected), []byte(strings.TrimSpace(req.Signature))) {
+			return true, "", ""
+		}
 	}
-	return true, "", ""
+	return false, "invalid_signature", "channel signature verification failed"
 }
 
 func channelInboundReceipt(req inboundRequest) store.ChannelInboundReceipt {
@@ -306,16 +308,33 @@ func channelSecret(channel string) string {
 }
 
 func (cfg Config) channelSecret(channel string, integration store.ChannelIntegration) string {
-	if secretRef := strings.TrimSpace(integration.SecretRef); secretRef != "" {
-		if value := os.Getenv(secretRef); strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	secret, ok := cfg.Secrets[strings.ToLower(strings.TrimSpace(channel))]
-	if !ok {
+	secrets := cfg.channelSecrets(channel, integration)
+	if len(secrets) == 0 {
 		return "web-demo-secret"
 	}
-	return secret
+	return secrets[0]
+}
+
+func (cfg Config) channelSecrets(channel string, integration store.ChannelIntegration) []string {
+	secrets := make([]string, 0, 2)
+	if secretRef := strings.TrimSpace(integration.SecretRef); secretRef != "" {
+		if value := os.Getenv(secretRef); strings.TrimSpace(value) != "" {
+			secrets = append(secrets, value)
+		}
+	}
+	if nextSecretRef := strings.TrimSpace(integration.NextSecretRef); nextSecretRef != "" {
+		if value := os.Getenv(nextSecretRef); strings.TrimSpace(value) != "" {
+			secrets = append(secrets, value)
+		}
+	}
+	if len(secrets) > 0 {
+		return secrets
+	}
+	secret, ok := cfg.Secrets[strings.ToLower(strings.TrimSpace(channel))]
+	if !ok || strings.TrimSpace(secret) == "" {
+		return []string{"web-demo-secret"}
+	}
+	return []string{secret}
 }
 
 func (cfg Config) signatureWindow(integration store.ChannelIntegration) time.Duration {

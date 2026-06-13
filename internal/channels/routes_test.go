@@ -274,6 +274,27 @@ func TestInboundRouteUsesIntegrationSecretRef(t *testing.T) {
 	}
 }
 
+func TestInboundRouteAcceptsNextSecretRefDuringRotation(t *testing.T) {
+	t.Setenv("ANJING_TEST_ACTIVE_WECHAT_SECRET", "active-wechat-secret")
+	t.Setenv("ANJING_TEST_NEXT_WECHAT_SECRET", "next-wechat-secret")
+	mux := http.NewServeMux()
+	integration := testIntegration("WeChat", true, "ANJING_TEST_ACTIVE_WECHAT_SECRET", 300, true)
+	integration.NextSecretRef = "ANJING_TEST_NEXT_WECHAT_SECRET"
+	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{integration})), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignatureWithSecret("next-wechat-secret", "WeChat", "wx-open-next-secret", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-next-secret","externalMessageId":"next-secret-msg-1","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected next secret to verify during rotation, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestInboundRouteRejectsDisabledIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterWithConfig(mux, store.NewSeedStore(store.WithChannelIntegrations([]store.ChannelIntegration{

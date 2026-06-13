@@ -49,6 +49,7 @@ go run ./cmd/platform-all
 ```bash
 export ANJING_CHANNEL_WEB_SECRET='your-web-secret'
 export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
+export ANJING_CHANNEL_WECHAT_NEXT_SECRET='your-next-wechat-secret'
 export ANJING_CHANNEL_APP_SECRET='your-app-secret'
 export ANJING_CHANNEL_MARKETPLACE_SECRET='your-marketplace-secret'
 export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
