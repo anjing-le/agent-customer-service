@@ -1,6 +1,6 @@
 :root {
-  color: #17201b;
-  background: #f4f7f5;
+  color: #18211d;
+  background: #f3f6f4;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -36,7 +36,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 44px;
+  height: 48px;
   padding: 0 10px 18px;
   font-weight: 800;
 }
@@ -52,27 +52,53 @@ textarea {
 }
 
 .nav a.active {
-  background: #1f3a30;
+  background: #1e3a30;
   color: #ffffff;
 }
 
 .workspace {
-  padding: 28px;
+  min-width: 0;
+  padding: 24px;
+}
+
+.topbar,
+.topActions,
+.panelHeader,
+.actionRow,
+.runtime,
+.notice {
+  display: flex;
+  align-items: center;
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
-.eyebrow {
-  margin: 0 0 4px;
-  color: #4e6a5b;
+.topActions {
+  gap: 10px;
+}
+
+.runtime {
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #cfdcd5;
+  border-radius: 6px;
+  color: #426153;
+  background: #ffffff;
   font-size: 13px;
   font-weight: 700;
+}
+
+.eyebrow,
+.sectionLabel {
+  margin: 0 0 4px;
+  color: #527063;
+  font-size: 12px;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -83,7 +109,7 @@ p {
 }
 
 h1 {
-  font-size: 28px;
+  font-size: 27px;
   line-height: 1.2;
 }
 
@@ -101,25 +127,23 @@ h2 {
 .iconButton {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   color: #193328;
-  background: #d9e7de;
+  background: #dbe9e2;
 }
 
 .primary {
-  height: 42px;
-  padding: 0 18px;
+  height: 40px;
+  padding: 0 16px;
   color: #ffffff;
   background: #1f6f52;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .notice {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   padding: 10px 12px;
   border: 1px solid #efc077;
   border-radius: 6px;
@@ -129,87 +153,123 @@ h2 {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .metric,
 .panel {
   background: #ffffff;
-  border: 1px solid #dbe4df;
+  border: 1px solid #d9e3de;
   border-radius: 8px;
 }
 
 .metric {
-  min-height: 112px;
-  padding: 16px;
+  min-height: 104px;
+  padding: 14px;
 }
 
 .metric span,
-.row span,
-.replyMeta {
-  color: #607268;
+.tableRow span,
+.replyMeta,
+.evidence span,
+.rule span,
+.activeSession span,
+.actionRow span {
+  color: #64786d;
   font-size: 13px;
 }
 
 .metric strong {
   display: block;
   margin: 8px 0 4px;
-  font-size: 27px;
+  font-size: 25px;
 }
 
 .metric small {
-  color: #7a8b82;
+  color: #7b8e84;
 }
 
 .skeleton {
   color: #7a8b82;
 }
 
-.grid {
+.runtimeGrid {
   display: grid;
-  grid-template-columns: minmax(360px, 1.1fr) minmax(280px, 0.9fr);
-  gap: 14px;
+  grid-template-columns: minmax(360px, 1.15fr) minmax(300px, 0.95fr) minmax(280px, 0.85fr);
+  gap: 12px;
 }
 
 .panel {
-  min-height: 260px;
+  min-height: 246px;
   padding: 16px;
 }
 
-.conversationPanel {
+.agentPanel {
   grid-row: span 2;
 }
 
+.queuePanel {
+  grid-row: span 2;
+}
+
+.evidencePanel {
+  min-height: 246px;
+}
+
 .panelHeader {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
 }
 
-.status,
-.row em {
-  padding: 4px 8px;
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
   border-radius: 999px;
   color: #1b5c45;
   background: #dff1e8;
   font-size: 12px;
   font-style: normal;
-  font-weight: 700;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.status.warning {
+  color: #7a4e12;
+  background: #fff0cf;
+}
+
+.status.danger {
+  color: #8d2b1f;
+  background: #fde8e2;
+}
+
+.activeSession {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #edf2ef;
 }
 
 textarea {
   width: 100%;
-  min-height: 142px;
+  min-height: 150px;
   resize: vertical;
   margin-bottom: 12px;
   padding: 12px;
-  border: 1px solid #cdd9d2;
+  border: 1px solid #cbd9d2;
   border-radius: 6px;
   line-height: 1.6;
+}
+
+.actionRow {
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .reply {
@@ -220,47 +280,95 @@ textarea {
   border-radius: 6px;
 }
 
-.reply p {
+.reply p,
+.evidence p,
+.rule p {
   margin-top: 8px;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
 .replyMeta {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.list {
+.tableList,
+.evidenceList,
+.ruleGrid {
   display: grid;
   gap: 10px;
 }
 
-.row {
-  display: flex;
-  justify-content: space-between;
+.tableRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   padding: 12px 0;
   border-top: 1px solid #edf2ef;
 }
 
-.row:first-child {
+.tableRow:first-child {
   border-top: 0;
 }
 
-.row div {
+.tableRow div {
   display: grid;
+  min-width: 0;
   gap: 4px;
 }
 
-.row strong {
+.tableRow strong,
+.evidence strong,
+.rule strong {
   line-height: 1.35;
 }
 
-.row em.danger {
-  color: #8d2b1f;
-  background: #fde8e2;
+.tableRow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tableRow em {
+  color: #4d665a;
+  font-size: 12px;
+  font-style: normal;
+  text-align: right;
+}
+
+.evidence {
+  padding: 12px 0;
+  border-top: 1px solid #edf2ef;
+}
+
+.evidence:first-child {
+  border-top: 0;
+}
+
+.evidence div,
+.rule div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rule {
+  padding: 12px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.rule div {
+  justify-content: flex-start;
+}
+
+.rule svg {
+  color: #1f6f52;
+  flex: 0 0 auto;
 }
 
 .empty {
@@ -268,7 +376,17 @@ textarea {
   line-height: 1.7;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1180px) {
+  .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .runtimeGrid {
+    grid-template-columns: minmax(360px, 1fr) minmax(300px, 1fr);
+  }
+}
+
+@media (max-width: 820px) {
   .shell {
     grid-template-columns: 1fr;
   }
@@ -284,8 +402,13 @@ textarea {
     padding: 0 10px;
   }
 
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .metrics,
-  .grid {
+  .runtimeGrid {
     grid-template-columns: 1fr;
   }
 }

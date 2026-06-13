@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AlertTriangle, BookOpen, Bot, MessagesSquare, RefreshCcw, ShieldCheck, UserRoundCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpen,
+  Bot,
+  CheckCircle2,
+  Database,
+  FileSearch,
+  MessageSquareText,
+  RefreshCcw,
+  ShieldCheck,
+  UserRoundCheck
+} from 'lucide-react';
 import './styles.css';
 
 type ApiResponse<T> = {
@@ -27,16 +38,24 @@ type KnowledgeGap = {
   priority: string;
 };
 type Rule = { id: string; code: string; name: string; trigger: string; action: string; enabled: boolean };
+type KnowledgeArticle = {
+  id: string;
+  title: string;
+  category: string;
+  content?: string;
+  tags?: string[];
+  trustLevel: string;
+};
 type Dashboard = {
   metrics: Metric[];
-  conversations: Conversation[];
-  knowledgeGaps: KnowledgeGap[];
-  rules: Rule[];
+  conversations: Conversation[] | null;
+  knowledgeGaps: KnowledgeGap[] | null;
+  rules: Rule[] | null;
 };
 type SendMessageResult = {
   conversation: Conversation;
   agentMessage: { content: string; engine: string; fallbackReason?: string; evidenceIds?: string[] };
-  evidence: { id: string; title: string; category: string; trustLevel: string }[];
+  evidence: KnowledgeArticle[];
   gap?: KnowledgeGap;
 };
 
@@ -54,16 +73,29 @@ const api = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 
 function App() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [knowledge, setKnowledge] = useState<KnowledgeArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('7 天无理由退货的运费怎么计算？');
   const [result, setResult] = useState<SendMessageResult | null>(null);
   const [error, setError] = useState('');
 
+  const conversations = dashboard?.conversations ?? [];
+  const gaps = dashboard?.knowledgeGaps ?? [];
+  const rules = dashboard?.rules ?? [];
+  const activeConversation = useMemo(() => conversations[0], [conversations]);
+  const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
+  const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
+
   const load = async () => {
     setLoading(true);
     setError('');
     try {
-      setDashboard(await api<Dashboard>('/api/ops/dashboard'));
+      const [dashboardData, knowledgeData] = await Promise.all([
+        api<Dashboard>('/api/ops/dashboard'),
+        api<KnowledgeArticle[]>('/api/knowledge/articles')
+      ]);
+      setDashboard(dashboardData);
+      setKnowledge(knowledgeData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -74,8 +106,6 @@ function App() {
   useEffect(() => {
     void load();
   }, []);
-
-  const activeConversation = useMemo(() => dashboard?.conversations[0], [dashboard]);
 
   const send = async () => {
     setError('');
@@ -98,10 +128,10 @@ function App() {
           <Bot size={24} />
           <span>Agent CS</span>
         </div>
-        <a className="active"><MessagesSquare size={18} /> 会话</a>
-        <a><BookOpen size={18} /> 知识</a>
-        <a><ShieldCheck size={18} /> 规则</a>
-        <a><UserRoundCheck size={18} /> 人工</a>
+        <a className="active"><MessageSquareText size={18} /> 对话中心</a>
+        <a><BookOpen size={18} /> 知识中心</a>
+        <a><ShieldCheck size={18} /> 场景配置</a>
+        <a><UserRoundCheck size={18} /> 人工队列</a>
       </aside>
 
       <section className="workspace">
@@ -110,9 +140,12 @@ function App() {
             <p className="eyebrow">DVSkyFolding Runtime</p>
             <h1>可靠客服 Agent 控制台</h1>
           </div>
-          <button className="iconButton" onClick={load} aria-label="刷新" title="刷新">
-            <RefreshCcw size={18} />
-          </button>
+          <div className="topActions">
+            <span className="runtime"><Database size={16} /> Go · React · PostgreSQL</span>
+            <button className="iconButton" onClick={load} aria-label="刷新" title="刷新">
+              <RefreshCcw size={18} />
+            </button>
+          </div>
         </header>
 
         {error && <div className="notice"><AlertTriangle size={18} /> {error}</div>}
@@ -125,77 +158,145 @@ function App() {
               <small>{item.note}</small>
             </article>
           ))}
+          <article className="metric">
+            <span>High risk</span>
+            <strong>{highRiskCount}</strong>
+            <small>sessions needing operator attention</small>
+          </article>
           {loading && <article className="metric skeleton">Loading</article>}
         </section>
 
-        <section className="grid">
-          <div className="panel conversationPanel">
+        <section className="runtimeGrid">
+          <section className="panel agentPanel">
             <div className="panelHeader">
-              <h2>Agent 工作区</h2>
-              <span className="status">{activeConversation?.status ?? 'Ready'}</span>
+              <div>
+                <p className="sectionLabel">对话中心</p>
+                <h2>Agent 工作区</h2>
+              </div>
+              <span className={statusClass(activeConversation?.riskLevel)}>{activeConversation?.status ?? 'Ready'}</span>
+            </div>
+            <div className="activeSession">
+              <strong>{activeConversation?.customer ?? '访客'}</strong>
+              <span>{activeConversation?.intent ?? '待识别'} · {activeConversation?.channel ?? 'Web'}</span>
             </div>
             <textarea value={message} onChange={(event) => setMessage(event.target.value)} />
-            <button className="primary" onClick={send}>发送并审计</button>
+            <div className="actionRow">
+              <button className="primary" onClick={send}>发送并审计</button>
+              <span>{openGapCount} open gaps</span>
+            </div>
             {result && (
               <div className="reply">
                 <div className="replyMeta">
                   <span>{result.agentMessage.engine}</span>
                   <span>{result.agentMessage.fallbackReason ?? 'EVIDENCE_OK'}</span>
+                  <span>{result.evidence.length} evidence</span>
                 </div>
                 <p>{result.agentMessage.content}</p>
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="panel">
-            <div className="panelHeader"><h2>会话队列</h2></div>
-            <div className="list">
-              {(dashboard?.conversations ?? []).map((item) => (
-                <article className="row" key={item.id}>
+          <section className="panel queuePanel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">会话运行</p>
+                <h2>会话队列</h2>
+              </div>
+            </div>
+            <div className="tableList">
+              {conversations.map((item) => (
+                <article className="tableRow" key={item.id}>
                   <div>
                     <strong>{item.customer}</strong>
-                    <span>{item.intent} · {item.channel}</span>
+                    <span>{item.lastMessage}</span>
                   </div>
-                  <em className={item.riskLevel === 'HIGH' ? 'danger' : ''}>{item.status}</em>
+                  <div>
+                    <em>{item.intent}</em>
+                    <b className={statusClass(item.riskLevel)}>{item.status}</b>
+                  </div>
                 </article>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="panel">
-            <div className="panelHeader"><h2>知识缺口</h2></div>
-            <div className="list">
-              {(dashboard?.knowledgeGaps ?? []).map((item) => (
-                <article className="row" key={item.id}>
+          <section className="panel evidencePanel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">RAG 证据</p>
+                <h2>本轮召回</h2>
+              </div>
+              <FileSearch size={18} />
+            </div>
+            <div className="evidenceList">
+              {(result?.evidence.length ? result.evidence : knowledge.slice(0, 3)).map((item) => (
+                <article className="evidence" key={item.id}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>{item.category} · {item.trustLevel}</span>
+                  </div>
+                  {item.content && <p>{item.content}</p>}
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">知识中心</p>
+                <h2>知识缺口</h2>
+              </div>
+              <span className="status">{openGapCount}</span>
+            </div>
+            <div className="tableList">
+              {gaps.map((item) => (
+                <article className="tableRow" key={item.id}>
                   <div>
                     <strong>{item.question}</strong>
                     <span>{item.reason}</span>
                   </div>
-                  <em>{item.priority}</em>
+                  <b className={statusClass(item.priority)}>{item.priority}</b>
                 </article>
               ))}
-              {dashboard?.knowledgeGaps.length === 0 && <p className="empty">暂无开放缺口</p>}
+              {gaps.length === 0 && <p className="empty">暂无开放缺口</p>}
             </div>
-          </div>
+          </section>
 
-          <div className="panel">
-            <div className="panelHeader"><h2>兜底规则</h2></div>
-            <div className="list">
-              {(dashboard?.rules ?? []).map((item) => (
-                <article className="row" key={item.id}>
+          <section className="panel">
+            <div className="panelHeader">
+              <div>
+                <p className="sectionLabel">场景配置</p>
+                <h2>兜底规则</h2>
+              </div>
+              <ShieldCheck size={18} />
+            </div>
+            <div className="ruleGrid">
+              {rules.map((item) => (
+                <article className="rule" key={item.id}>
                   <div>
+                    <CheckCircle2 size={16} />
                     <strong>{item.name}</strong>
-                    <span>{item.code}</span>
                   </div>
-                  <em>{item.enabled ? 'ON' : 'OFF'}</em>
+                  <span>{item.code}</span>
+                  <p>{item.trigger}</p>
                 </article>
               ))}
             </div>
-          </div>
+          </section>
         </section>
       </section>
     </main>
   );
+}
+
+function statusClass(value?: string) {
+  if (value === 'HIGH' || value === 'HIGH_PRIORITY') {
+    return 'status danger';
+  }
+  if (value === 'MEDIUM' || value === 'KnowledgeGap') {
+    return 'status warning';
+  }
+  return 'status';
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

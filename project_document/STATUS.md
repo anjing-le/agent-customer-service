@@ -15,7 +15,7 @@
 | 知识 API | V1 seed runtime | 知识列表和关键词检索，后续接 PostgreSQL repository |
 | 运营 API | V1 seed runtime | 运营指标、会话队列、知识缺口、规则清单 |
 | 错误边界 | Runtime connected | Store 接口显式返回 error，路由层统一转 `store_error` JSON envelope |
-| 前端控制台 | V1 shell | React/Vite 控制台已展示会话、Agent 工作区、知识缺口、兜底规则 |
+| 前端控制台 | Runtime workspace | React/Vite 控制台已按对话中心、知识中心、场景配置迁移旧 Vue 信息架构，并展示证据、缺口和规则护栏 |
 | 数据底座 | Runtime connected | `infra/postgres/migrations` 定义核心表和 demo seed；配置 `ANJING_DATABASE_URL` 后 API 切到 PostgreSQL store |
 | 本地数据库 | Ready | `infra/local/docker-compose.yml`、`pnpm db:*` 脚本和可选 Postgres 集成测试已接入 |
 
@@ -29,5 +29,5 @@
 ## 下一步
 
 1. 为 Go API contract 补机器可读文档。
-2. 将旧 Vue 页面信息架构迁移到 React 控制台。
+2. 继续补齐 React 控制台的知识维护、规则测试和人工队列操作。
 3. 删除旧 Java/Vue 运行入口，更新教学文档为 DVSkyFolding 口径。
