@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/channels"
 	"github.com/anjing-le/agent-customer-service/internal/consoleweb"
@@ -33,7 +35,13 @@ func main() {
 		defer pool.Close()
 		st = store.NewPostgresStore(pool, postgresOptions...)
 	}
-	mux := service.NewMux(cfg.ServiceName, st, customer.Register, channels.Register, knowledge.Register, ops.Register)
+	channelRegister := func(mux *http.ServeMux, st store.Runtime) {
+		channels.RegisterWithConfig(mux, st, channels.Config{
+			Secrets:         cfg.Channels.Secrets,
+			SignatureWindow: time.Duration(cfg.Channels.SignatureWindowSeconds) * time.Second,
+		})
+	}
+	mux := service.NewMux(cfg.ServiceName, st, customer.Register, channelRegister, knowledge.Register, ops.Register)
 	consoleweb.Register(mux, cfg.StaticDir)
 	if err := service.Listen(cfg.Addr, cfg.ServiceName, mux); err != nil {
 		panic(err)

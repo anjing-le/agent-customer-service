@@ -42,6 +42,19 @@ go run ./cmd/platform-all
 
 模型只在命中知识证据时参与生成；无证据、高风险和模型失败都会回到规则兜底。
 
+## Channel Webhook Runtime
+
+`/api/channels/inbound` 使用 HMAC-SHA256 签名，并校验 RFC3339 timestamp 是否在允许时间窗内。默认保留 demo secret，真实渠道演示时用 env 覆盖：
+
+```bash
+export ANJING_CHANNEL_WEB_SECRET='your-web-secret'
+export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
+export ANJING_CHANNEL_APP_SECRET='your-app-secret'
+export ANJING_CHANNEL_MARKETPLACE_SECRET='your-marketplace-secret'
+export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
+go run ./cmd/platform-all
+```
+
 ## Smoke Checks
 
 ```bash

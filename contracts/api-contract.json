@@ -149,8 +149,8 @@
         "externalConversationId": "string",
         "customer": "string",
         "content": "string",
-        "timestamp": "RFC3339 string",
-        "signature": "HMAC-SHA256 hex"
+        "timestamp": "RFC3339 string within ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS",
+        "signature": "HMAC-SHA256 hex using channel env secret"
       }
     },
     "MessageStreamEvent": {
