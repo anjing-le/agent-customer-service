@@ -863,6 +863,37 @@ textarea {
   white-space: nowrap;
 }
 
+.approvalSamples {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.approvalSample {
+  display: grid;
+  grid-template-columns: auto minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.approvalSample span,
+.approvalSample small {
+  overflow: hidden;
+  color: #64786d;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approvalSample small:last-child {
+  color: #426153;
+}
+
 .empty {
   color: #6d7d74;
   line-height: 1.7;
@@ -906,5 +937,9 @@ textarea {
 
   .matrixRow {
     grid-template-columns: 1fr;
+  }
+
+  .approvalSample {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 }

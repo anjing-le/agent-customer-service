@@ -571,6 +571,8 @@ function App() {
     () => conversations.find((item) => item.id === selectedConversationId) ?? visibleConversations[0] ?? conversations[0],
     [conversations, selectedConversationId, visibleConversations]
   );
+  const trainingSampleById = useMemo(() => new Map(trainingSamples.map((item) => [item.id, item])), [trainingSamples]);
+  const approvalSampleCandidates = trainingSamples.slice(0, 3);
   const highRiskCount = conversations.filter((item) => item.riskLevel === 'HIGH').length;
   const openGapCount = gaps.filter((item) => item.status === 'OPEN').length;
   const openTransferCount = transfers.filter((item) => item.status === 'OPEN').length;
@@ -702,8 +704,9 @@ function App() {
 
   const approveRuleRelease = async (rule: Rule) => {
     setError('');
-    const sampleIds = trainingSamples.slice(0, 3).map((item) => item.id);
+    const sampleIds = approvalSampleCandidates.map((item) => item.id);
     const fallbackSampleIds = ['sample_cancel_1', 'sample_cancel_2', 'sample_cancel_3'];
+    const hasTrainingSamples = sampleIds.length >= 3;
     try {
       await api<RuleApproval>('/api/ops/rules/approve', {
         method: 'POST',
@@ -711,8 +714,8 @@ function App() {
           code: rule.code,
           approver: 'qa-lead',
           riskLevel: 'LOW',
-          sampleIds: sampleIds.length >= 3 ? sampleIds : fallbackSampleIds,
-          note: '灰度对比通过，样本明细无高风险异常'
+          sampleIds: hasTrainingSamples ? sampleIds : fallbackSampleIds,
+          note: hasTrainingSamples ? '灰度对比通过，已绑定低分复盘样本' : '灰度对比通过，使用课堂样例样本 ID'
         })
       });
       await load();
@@ -1667,6 +1670,19 @@ function App() {
                       <strong>{approval.status} · {approval.ruleCode}</strong>
                       <span>{approval.sampleCount} samples · {approval.riskLevel} · {approval.approver}</span>
                       <span>{approval.sampleIds.slice(0, 3).join(' / ')}</span>
+                      <div className="approvalSamples">
+                        {approval.sampleIds.slice(0, 3).map((sampleId) => {
+                          const sample = trainingSampleById.get(sampleId);
+                          return (
+                            <div className="approvalSample" key={sampleId}>
+                              <b className={statusClass(sample?.verdict ?? 'REVIEW')}>{sample?.verdict ?? 'PENDING'}</b>
+                              <span>{sample ? `${sample.score} · ${sample.channel} · ${sample.reviewer}` : `${sampleId} · 样本待生成`}</span>
+                              {sample && <small>{sample.prompt}</small>}
+                              {sample && <small>{sample.note}</small>}
+                            </div>
+                          );
+                        })}
+                      </div>
                       <span>{approval.note}</span>
                     </div>
                     <b className={statusClass(approval.status === 'APPROVED' ? 'LOW' : 'REVIEW')}>{approval.createdAt.slice(11, 19)}</b>
