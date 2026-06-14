@@ -834,3 +834,42 @@ func TestHTTPNotificationDeliveryClientPostsSignedWebhook(t *testing.T) {
 		t.Fatalf("expected signature header %s, got %s", notification.Signature, signatureHeader)
 	}
 }
+
+func TestChannelOpsReportRetentionPrunesOlderReports(t *testing.T) {
+	st := NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if _, err := st.SaveChannelOpsReport(ChannelOpsReport{
+			ID:          fmt.Sprintf("report_%d", idx),
+			Format:      "markdown",
+			ContentType: "text/markdown; charset=utf-8",
+			Content:     fmt.Sprintf("# report %d", idx),
+			GeneratedAt: time.Now().UTC().Add(time.Duration(idx) * time.Minute).Format(time.RFC3339),
+		}); err != nil {
+			t.Fatalf("save report: %v", err)
+		}
+	}
+	pruned, err := st.PruneChannelOpsReports(2)
+	if err != nil {
+		t.Fatalf("prune reports: %v", err)
+	}
+	if pruned != 1 {
+		t.Fatalf("expected one pruned report, got %d", pruned)
+	}
+	reports, err := st.ListChannelOpsReports(10)
+	if err != nil {
+		t.Fatalf("list reports: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("expected two reports, got %#v", reports)
+	}
+	if reports[0].Content != "" {
+		t.Fatalf("expected list response to omit content, got %#v", reports[0])
+	}
+	report, err := st.ChannelOpsReport(reports[0].ID)
+	if err != nil {
+		t.Fatalf("load report: %v", err)
+	}
+	if report.Content == "" {
+		t.Fatalf("expected detail response to include content, got %#v", report)
+	}
+}

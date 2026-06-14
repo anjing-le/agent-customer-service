@@ -15,6 +15,7 @@ type Config struct {
 	LLM           LLMConfig
 	Channels      ChannelConfig
 	Notifications NotificationConfig
+	Reports       ReportConfig
 }
 
 type LLMConfig struct {
@@ -31,6 +32,14 @@ type ChannelConfig struct {
 type NotificationConfig struct {
 	DeliveryMode      string
 	HTTPTimeoutMillis int
+}
+
+type ReportConfig struct {
+	SchedulerEnabled      bool
+	SchedulerIntervalMins int
+	SchedulerFormat       string
+	SchedulerRetain       int
+	SchedulerRunOnStartup bool
 }
 
 func Load(serviceName, defaultPort string) Config {
@@ -58,6 +67,13 @@ func Load(serviceName, defaultPort string) Config {
 			DeliveryMode:      env("ANJING_NOTIFICATION_DELIVERY_MODE", "demo"),
 			HTTPTimeoutMillis: envInt("ANJING_NOTIFICATION_HTTP_TIMEOUT_MS", 2000),
 		},
+		Reports: ReportConfig{
+			SchedulerEnabled:      envBool("ANJING_CHANNEL_REPORT_SCHEDULER_ENABLED", false),
+			SchedulerIntervalMins: envInt("ANJING_CHANNEL_REPORT_INTERVAL_MINUTES", 1440),
+			SchedulerFormat:       env("ANJING_CHANNEL_REPORT_FORMAT", "markdown"),
+			SchedulerRetain:       envInt("ANJING_CHANNEL_REPORT_RETAIN", 30),
+			SchedulerRunOnStartup: envBool("ANJING_CHANNEL_REPORT_RUN_ON_STARTUP", false),
+		},
 	}
 }
 
@@ -76,6 +92,18 @@ func envInt(key string, fallback int) int {
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
 		return fallback
 	}
 	return parsed

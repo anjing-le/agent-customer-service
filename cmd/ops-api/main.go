@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/ops"
 	"github.com/anjing-le/agent-customer-service/internal/platform/config"
@@ -27,6 +28,13 @@ func main() {
 		defer pool.Close()
 		st = store.NewPostgresStore(pool, postgresOptions...)
 	}
+	ops.NewReportScheduler(st, ops.ReportSchedulerConfig{
+		Enabled:    cfg.Reports.SchedulerEnabled,
+		Format:     cfg.Reports.SchedulerFormat,
+		Interval:   time.Duration(cfg.Reports.SchedulerIntervalMins) * time.Minute,
+		Retain:     cfg.Reports.SchedulerRetain,
+		RunOnStart: cfg.Reports.SchedulerRunOnStartup,
+	}, nil).Start(context.Background())
 	mux := service.NewMux(cfg.ServiceName, st, ops.Register)
 	if err := service.Listen(cfg.Addr, cfg.ServiceName, mux); err != nil {
 		panic(err)

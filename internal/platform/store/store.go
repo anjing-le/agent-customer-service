@@ -110,6 +110,7 @@ type Runtime interface {
 	SaveChannelOpsReport(report ChannelOpsReport) (ChannelOpsReport, error)
 	ListChannelOpsReports(limit int) ([]ChannelOpsReport, error)
 	ChannelOpsReport(id string) (ChannelOpsReport, error)
+	PruneChannelOpsReports(retain int) (int, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -1152,8 +1153,8 @@ func (s *Store) SaveChannelOpsReport(report ChannelOpsReport) (ChannelOpsReport,
 	defer s.mu.Unlock()
 	normalizeChannelOpsReport(&report)
 	s.channelReports = append([]ChannelOpsReport{report}, s.channelReports...)
-	if len(s.channelReports) > 30 {
-		s.channelReports = s.channelReports[:30]
+	if len(s.channelReports) > 365 {
+		s.channelReports = s.channelReports[:365]
 	}
 	return report, nil
 }
@@ -1181,6 +1182,18 @@ func (s *Store) ChannelOpsReport(id string) (ChannelOpsReport, error) {
 		}
 	}
 	return ChannelOpsReport{}, fmt.Errorf("channel ops report %s not found", id)
+}
+
+func (s *Store) PruneChannelOpsReports(retain int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	retain = normalizeReportRetention(retain)
+	if len(s.channelReports) <= retain {
+		return 0, nil
+	}
+	pruned := len(s.channelReports) - retain
+	s.channelReports = append([]ChannelOpsReport(nil), s.channelReports[:retain]...)
+	return pruned, nil
 }
 
 func (s *Store) Dashboard() (Dashboard, error) {
@@ -2205,6 +2218,16 @@ func normalizeReportLimit(limit int) int {
 		return 30
 	}
 	return limit
+}
+
+func normalizeReportRetention(retain int) int {
+	if retain <= 0 {
+		return 30
+	}
+	if retain > 365 {
+		return 365
+	}
+	return retain
 }
 
 func normalizeChannelOpsReport(report *ChannelOpsReport) {

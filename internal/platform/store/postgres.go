@@ -1211,6 +1211,24 @@ func (s *PostgresStore) ChannelOpsReport(id string) (ChannelOpsReport, error) {
 	return items[0], nil
 }
 
+func (s *PostgresStore) PruneChannelOpsReports(retain int) (int, error) {
+	tag, err := s.pool.Exec(context.Background(), `
+		delete from channel_ops_reports
+		where id in (
+			select id
+			from (
+				select id, row_number() over (order by generated_at desc, id desc) as row_index
+				from channel_ops_reports
+			) ranked
+			where ranked.row_index > $1
+		)
+	`, normalizeReportRetention(retain))
+	if err != nil {
+		return 0, fmt.Errorf("prune channel ops reports: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err := s.expireNotificationPolicyChanges(); err != nil {
 		return Dashboard{}, err

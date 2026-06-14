@@ -69,6 +69,18 @@ adapter 只做字段归一，验签、时间窗、replay 和会话映射仍复�
 
 渠道告警通知会从 `ChannelNotification.secretRef` 解析 env secret 生成 HMAC-SHA256 出站签名；未配置 env 时使用 demo secret，便于本地教学。默认 `ANJING_NOTIFICATION_DELIVERY_MODE=demo` 不访问外网；改成 `http` 后会使用真实 HTTP delivery client，并读取 `ANJING_NOTIFICATION_HTTP_TIMEOUT_MS` 控制超时。
 
+渠道运营日报默认手动生成。需要演示后台定时生成和保留策略时，可以开启：
+
+```bash
+export ANJING_CHANNEL_REPORT_SCHEDULER_ENABLED=true
+export ANJING_CHANNEL_REPORT_INTERVAL_MINUTES=1440
+export ANJING_CHANNEL_REPORT_FORMAT=markdown
+export ANJING_CHANNEL_REPORT_RETAIN=30
+export ANJING_CHANNEL_REPORT_RUN_ON_STARTUP=true
+```
+
+`platform-all` 和 `ops-api` 会按同一组 env 生成 `ChannelOpsReport`，并保留最近 N 份历史快照。
+
 演示脚本会读取 `contracts/examples/channel-protocols.json`，动态生成当前 timestamp、唯一消息 ID 和 HMAC-SHA256 signature：
 
 ```bash
