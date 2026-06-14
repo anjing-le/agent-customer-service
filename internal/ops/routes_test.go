@@ -266,6 +266,40 @@ func TestRejectChannelAlertPolicyChangeRoute(t *testing.T) {
 	}
 }
 
+func TestCancelChannelAlertPolicyChangeRoute(t *testing.T) {
+	st := store.NewSeedStore()
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/update", strings.NewReader(`{"channel":"Marketplace","targetUrl":"https://ops.example.com/hooks/cancel","secretRef":"ANJING_NOTIFICATION_CANCEL_SECRET","maxAttempts":4,"backoffSeconds":30,"actor":"ops-a","note":"待撤销"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.PolicyChanges) != 1 {
+		t.Fatalf("expected pending policy change, got %#v", dashboard.PolicyChanges)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/cancel-change", strings.NewReader(`{"id":"`+dashboard.PolicyChanges[0].ID+`","actor":"ops-a","note":"申请人撤销"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"status":"CANCELED"`, `"approvedBy":"ops-a"`, `"note":"待撤销"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
 func TestDispatchChannelNotificationRouteRetriesAndDeadLetters(t *testing.T) {
 	st := store.NewSeedStore()
 	for idx := 0; idx < 3; idx++ {

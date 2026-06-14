@@ -639,6 +639,77 @@ func TestRejectNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
 	}
 }
 
+func TestCancelNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
+	st := NewSeedStore()
+	original, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/cancel", "ANJING_NOTIFICATION_CANCEL_SECRET", 5, 45, "ops-a", "待撤销变更")
+	if err != nil {
+		t.Fatalf("request channel alert policy update: %v", err)
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.PolicyChanges) != 1 || dashboard.PolicyChanges[0].Status != "PENDING" || dashboard.PolicyChanges[0].ExpiresAt == "" {
+		t.Fatalf("expected pending policy change with expiry, got %#v", dashboard.PolicyChanges)
+	}
+	canceled, err := st.CancelNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-a", "申请人撤销")
+	if err != nil {
+		t.Fatalf("cancel policy change: %v", err)
+	}
+	if canceled.Status != "CANCELED" || canceled.ApprovedBy != "ops-a" {
+		t.Fatalf("expected canceled policy change, got %#v", canceled)
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	var marketplace ChannelAlertPolicy
+	for _, policy := range dashboard.AlertPolicies {
+		if policy.Channel == "Marketplace" {
+			marketplace = policy
+			break
+		}
+	}
+	if marketplace.TargetURL != original.TargetURL || marketplace.SecretRef != original.SecretRef {
+		t.Fatalf("expected canceled change to keep original policy, got %#v", marketplace)
+	}
+	if dashboard.PolicyEvents[0].Action != "CANCEL" || !strings.Contains(dashboard.PolicyEvents[0].Note, "申请人撤销") {
+		t.Fatalf("expected cancel event, got %#v", dashboard.PolicyEvents[0])
+	}
+}
+
+func TestExpiredNotificationPolicyChangeIsAudited(t *testing.T) {
+	st := NewSeedStore()
+	_, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/expired", "ANJING_NOTIFICATION_EXPIRED_SECRET", 5, 45, "ops-a", "待过期变更")
+	if err != nil {
+		t.Fatalf("request channel alert policy update: %v", err)
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.PolicyChanges) != 1 {
+		t.Fatalf("expected pending policy change, got %#v", dashboard.PolicyChanges)
+	}
+	st.mu.Lock()
+	st.policyChanges[0].ExpiresAt = time.Now().UTC().Add(-time.Minute).Format(time.RFC3339)
+	st.mu.Unlock()
+
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if dashboard.PolicyChanges[0].Status != "EXPIRED" || dashboard.PolicyChanges[0].ApprovedBy != "system" {
+		t.Fatalf("expected expired policy change, got %#v", dashboard.PolicyChanges[0])
+	}
+	if dashboard.PolicyEvents[0].Action != "EXPIRE" {
+		t.Fatalf("expected expire event, got %#v", dashboard.PolicyEvents[0])
+	}
+	if _, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过"); err == nil {
+		t.Fatal("expected expired policy change approval to fail")
+	}
+}
+
 func TestDispatchChannelNotificationUsesDeliveryClientAndSecretRef(t *testing.T) {
 	t.Setenv("ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET", "custom-notification-secret")
 	client := &recordingDeliveryClient{}

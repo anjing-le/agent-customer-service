@@ -88,6 +88,7 @@ type Runtime interface {
 	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
 	ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error)
 	RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error)
+	CancelNotificationPolicyChange(id string, actor string, note string) (NotificationPolicyChange, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
@@ -279,6 +280,7 @@ type NotificationPolicyChange struct {
 	Status         string `json:"status"`
 	Note           string `json:"note"`
 	CreatedAt      string `json:"createdAt"`
+	ExpiresAt      string `json:"expiresAt"`
 	ApprovedBy     string `json:"approvedBy,omitempty"`
 	ApprovedAt     string `json:"approvedAt,omitempty"`
 }
@@ -709,6 +711,7 @@ func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secre
 func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.expireNotificationPolicyChangesLocked(time.Now().UTC())
 	for changeIdx := range s.policyChanges {
 		if s.policyChanges[changeIdx].ID != id {
 			continue
@@ -743,6 +746,7 @@ func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note
 func (s *Store) RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.expireNotificationPolicyChangesLocked(time.Now().UTC())
 	for changeIdx := range s.policyChanges {
 		if s.policyChanges[changeIdx].ID != id {
 			continue
@@ -756,6 +760,29 @@ func (s *Store) RejectNotificationPolicyChange(id string, reviewer string, note 
 		s.policyChanges[changeIdx].ApprovedAt = now
 		before := notificationPolicyFor(s.alertPolicies, s.policyChanges[changeIdx].Channel)
 		event := newNotificationPolicyEvent(s.policyChanges[changeIdx].Channel, "REJECT", reviewer, notificationPolicySummary(before), notificationPolicyChangeSummary(s.policyChanges[changeIdx]), fallback(note, s.policyChanges[changeIdx].Note), now)
+		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
+		return s.policyChanges[changeIdx], nil
+	}
+	return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s not found", id)
+}
+
+func (s *Store) CancelNotificationPolicyChange(id string, actor string, note string) (NotificationPolicyChange, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.expireNotificationPolicyChangesLocked(time.Now().UTC())
+	for changeIdx := range s.policyChanges {
+		if s.policyChanges[changeIdx].ID != id {
+			continue
+		}
+		if s.policyChanges[changeIdx].Status != "PENDING" {
+			return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s is not pending", id)
+		}
+		now := time.Now().UTC().Format(time.RFC3339)
+		s.policyChanges[changeIdx].Status = "CANCELED"
+		s.policyChanges[changeIdx].ApprovedBy = fallback(actor, "ops-a")
+		s.policyChanges[changeIdx].ApprovedAt = now
+		before := notificationPolicyFor(s.alertPolicies, s.policyChanges[changeIdx].Channel)
+		event := newNotificationPolicyEvent(s.policyChanges[changeIdx].Channel, "CANCEL", actor, notificationPolicySummary(before), notificationPolicyChangeSummary(s.policyChanges[changeIdx]), fallback(note, s.policyChanges[changeIdx].Note), now)
 		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
 		return s.policyChanges[changeIdx], nil
 	}
@@ -1020,8 +1047,9 @@ func (s *Store) ExportTrainingSamples(maxScore int) ([]TrainingSample, error) {
 }
 
 func (s *Store) Dashboard() (Dashboard, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.expireNotificationPolicyChangesLocked(time.Now().UTC())
 	openGaps := 0
 	for _, gap := range s.gaps {
 		if gap.Status == "OPEN" {
@@ -1441,6 +1469,11 @@ func newNotificationPolicyEvent(channel, action, actor, before, after, note, cre
 }
 
 func newNotificationPolicyChange(channel, targetURL, secretRef string, maxAttempts, backoffSeconds int, requestedBy, note, createdAt string) NotificationPolicyChange {
+	createdTime, err := time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		createdTime = time.Now().UTC()
+		createdAt = createdTime.Format(time.RFC3339)
+	}
 	return NotificationPolicyChange{
 		ID:             fmt.Sprintf("notification_policy_change_%d", time.Now().UnixNano()),
 		Channel:        channel,
@@ -1452,6 +1485,7 @@ func newNotificationPolicyChange(channel, targetURL, secretRef string, maxAttemp
 		Status:         "PENDING",
 		Note:           fallback(note, "通知策略变更待审批"),
 		CreatedAt:      createdAt,
+		ExpiresAt:      createdTime.Add(notificationPolicyChangeTTL()).UTC().Format(time.RFC3339),
 	}
 }
 
@@ -1462,6 +1496,38 @@ func notificationPolicySummary(policy ChannelAlertPolicy) string {
 
 func notificationPolicyChangeSummary(change NotificationPolicyChange) string {
 	return fmt.Sprintf("targetUrl=%s secretRef=%s maxAttempts=%d backoffSeconds=%d", change.TargetURL, change.SecretRef, change.MaxAttempts, change.BackoffSeconds)
+}
+
+func notificationPolicyChangeTTL() time.Duration {
+	return 24 * time.Hour
+}
+
+func (s *Store) expireNotificationPolicyChangesLocked(now time.Time) {
+	for idx := range s.policyChanges {
+		if s.policyChanges[idx].Status != "PENDING" || !notificationPolicyChangeExpired(s.policyChanges[idx], now) {
+			continue
+		}
+		s.policyChanges[idx].Status = "EXPIRED"
+		s.policyChanges[idx].ApprovedBy = "system"
+		s.policyChanges[idx].ApprovedAt = now.UTC().Format(time.RFC3339)
+		before := notificationPolicyFor(s.alertPolicies, s.policyChanges[idx].Channel)
+		event := newNotificationPolicyEvent(s.policyChanges[idx].Channel, "EXPIRE", "system", notificationPolicySummary(before), notificationPolicyChangeSummary(s.policyChanges[idx]), "通知策略变更审批超时自动过期", now.UTC().Format(time.RFC3339))
+		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
+	}
+	if len(s.policyEvents) > 30 {
+		s.policyEvents = s.policyEvents[:30]
+	}
+}
+
+func notificationPolicyChangeExpired(change NotificationPolicyChange, now time.Time) bool {
+	if strings.TrimSpace(change.ExpiresAt) == "" {
+		return false
+	}
+	expiresAt, err := time.Parse(time.RFC3339, change.ExpiresAt)
+	if err != nil {
+		return false
+	}
+	return !expiresAt.After(now.UTC())
 }
 
 func requiresNotificationPolicyApproval(policy ChannelAlertPolicy) bool {

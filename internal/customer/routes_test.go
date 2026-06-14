@@ -57,6 +57,10 @@ func (f failingRuntime) RejectNotificationPolicyChange(string, string, string) (
 	return store.NotificationPolicyChange{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) CancelNotificationPolicyChange(string, string, string) (store.NotificationPolicyChange, error) {
+	return store.NotificationPolicyChange{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) DispatchChannelNotification(string, string) (store.ChannelNotification, error) {
 	return store.ChannelNotification{}, errors.New("database unavailable")
 }

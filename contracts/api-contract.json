@@ -224,6 +224,14 @@
       "response": { "status": 200, "schema": "NotificationPolicyChange" }
     },
     {
+      "id": "cancelNotificationPolicyChange",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-alert-policies/cancel-change",
+      "request": { "body": "CancelNotificationPolicyChangeRequest" },
+      "response": { "status": 200, "schema": "NotificationPolicyChange" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -435,6 +443,14 @@
         "note": "string"
       }
     },
+    "CancelNotificationPolicyChangeRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string",
+        "actor": "string",
+        "note": "string"
+      }
+    },
     "SubmitAnnotationRequest": {
       "required": ["messageId"],
       "fields": {
@@ -580,7 +596,7 @@
       }
     },
     "NotificationPolicyChange": {
-      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "requestedBy", "status", "note", "createdAt"],
+      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "requestedBy", "status", "note", "createdAt", "expiresAt"],
       "fields": {
         "id": "string",
         "channel": "string",
@@ -589,9 +605,10 @@
         "maxAttempts": "number",
         "backoffSeconds": "number",
         "requestedBy": "string",
-        "status": "PENDING|APPROVED|REJECTED",
+        "status": "PENDING|APPROVED|REJECTED|CANCELED|EXPIRED",
         "note": "string",
         "createdAt": "RFC3339 string",
+        "expiresAt": "RFC3339 string",
         "approvedBy": "string",
         "approvedAt": "RFC3339 string"
       }

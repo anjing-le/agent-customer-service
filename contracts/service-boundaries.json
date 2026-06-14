@@ -73,6 +73,7 @@
         { "name": "updateChannelAlertPolicy", "path": "/api/ops/channel-alert-policies/update", "methods": ["POST"] },
         { "name": "approveNotificationPolicyChange", "path": "/api/ops/channel-alert-policies/approve-change", "methods": ["POST"] },
         { "name": "rejectNotificationPolicyChange", "path": "/api/ops/channel-alert-policies/reject-change", "methods": ["POST"] },
+        { "name": "cancelNotificationPolicyChange", "path": "/api/ops/channel-alert-policies/cancel-change", "methods": ["POST"] },
         { "name": "submitAnnotation", "path": "/api/ops/annotations/submit", "methods": ["POST"] },
         { "name": "exportTrainingSamples", "path": "/api/ops/training-samples/export", "methods": ["GET"] }
       ]

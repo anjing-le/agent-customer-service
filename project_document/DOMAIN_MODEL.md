@@ -26,7 +26,7 @@
 | `ChannelAlert` | 渠道失败聚合，按渠道和错误码统计最近失败类型 | `Dashboard.channelAlerts` |
 | `ChannelFailureTrend` | 渠道失败趋势桶，按渠道和小时统计最近失败量 | `Dashboard.channelFailureTrends` |
 | `ChannelAlertPolicy` | 渠道失败通知策略，定义阈值、窗口、通知目标、target URL、secret ref、重试参数和当前触发状态 | `Dashboard.channelAlertPolicies` |
-| `NotificationPolicyChange` | 高风险通知策略待审批变更，记录申请人、目标配置、状态和审批结果 | `Dashboard.notificationPolicyChanges` |
+| `NotificationPolicyChange` | 高风险通知策略待审批变更，记录申请人、目标配置、过期时间、审批/拒绝/撤销/过期状态和处理结果 | `Dashboard.notificationPolicyChanges` |
 | `NotificationPolicyEvent` | 通知策略变更审计事件，记录操作者、动作、改前/改后摘要、备注和时间 | `Dashboard.notificationPolicyEvents` |
 | `ChannelNotification` | 渠道告警出站通知事件，记录目标 URL、secret ref、HMAC 签名、发送次数、退避重试、外部回执、投递审计摘要、死信原因和运营确认 | `Dashboard.channelNotifications` |
 | `NotificationDeliveryAudit` | 通知投递审计记录，只保存 attempt、目标、secret ref、签名预览、payload hash 和脱敏请求/响应摘要，不保存完整 signed payload 或密钥值 | `ChannelNotification.deliveryAudit` |
@@ -59,7 +59,7 @@ user message
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
-| 渠道观测 | Dashboard 聚合失败类型、小时趋势、通知策略和通知事件；通知事件可演示目标解析、secret ref 签名、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认 |
+| 渠道观测 | Dashboard 聚合失败类型、小时趋势、通知策略和通知事件；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
 | 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |

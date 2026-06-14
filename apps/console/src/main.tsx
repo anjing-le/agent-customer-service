@@ -104,6 +104,7 @@ type NotificationPolicyChange = {
   status: string;
   note: string;
   createdAt: string;
+  expiresAt: string;
   approvedBy?: string;
   approvedAt?: string;
 };
@@ -977,6 +978,19 @@ function App() {
     }
   };
 
+  const cancelNotificationPolicyChange = async (change: NotificationPolicyChange) => {
+    setError('');
+    try {
+      await api<NotificationPolicyChange>('/api/ops/channel-alert-policies/cancel-change', {
+        method: 'POST',
+        body: JSON.stringify({ id: change.id, actor: 'ops-a', note: '申请人撤销通知目标变更' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'cancel notification policy change failed');
+    }
+  };
+
   const submitAnnotation = async () => {
     if (!latestAssistantMessage) {
       setError('请先选择或生成一条 Agent 回复');
@@ -1647,11 +1661,15 @@ function App() {
                       <strong>{change.channel} · {change.status}</strong>
                       <span>{change.targetUrl} · {change.secretRef}</span>
                       <small>{change.maxAttempts} attempts · {change.backoffSeconds}s backoff</small>
-                      <small>{change.requestedBy} · {change.note}</small>
+                      <small>{change.requestedBy} · expires {change.expiresAt.slice(11, 19)}</small>
+                      <small>{change.note}</small>
                     </div>
                     <div className="gapActions">
                       <button className="tinyButton" onClick={() => approveNotificationPolicyChange(change)} title="批准通知目标变更">
                         <CheckCircle2 size={14} />
+                      </button>
+                      <button className="tinyButton" onClick={() => cancelNotificationPolicyChange(change)} title="撤销通知目标变更">
+                        <RefreshCcw size={14} />
                       </button>
                       <button className="tinyButton dangerButton" onClick={() => rejectNotificationPolicyChange(change)} title="拒绝通知目标变更">
                         <CircleX size={14} />
