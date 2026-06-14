@@ -228,6 +228,9 @@ func TestDispatchChannelNotificationRouteRetriesAndDeadLetters(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), `"signature":"`) {
 			t.Fatalf("expected signed dispatch, got %s", rec.Body.String())
 		}
+		if idx == 0 && (!strings.Contains(rec.Body.String(), `"nextRetryAt":"`) || !strings.Contains(rec.Body.String(), `"backoffSeconds":120`)) {
+			t.Fatalf("expected retry backoff in response, got %s", rec.Body.String())
+		}
 	}
 	finalDashboard, err := st.Dashboard()
 	if err != nil {
@@ -235,6 +238,41 @@ func TestDispatchChannelNotificationRouteRetriesAndDeadLetters(t *testing.T) {
 	}
 	if finalDashboard.Notifications[0].Status != "DEAD_LETTER" || finalDashboard.Notifications[0].Attempts != 3 {
 		t.Fatalf("expected dead letter notification, got %#v", finalDashboard.Notifications[0])
+	}
+}
+
+func TestDispatchChannelNotificationRouteRecordsReceipt(t *testing.T) {
+	st := store.NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("sent-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-notifications/dispatch", strings.NewReader(`{"id":"`+dashboard.Notifications[0].ID+`","outcome":"SUCCESS"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"status":"SENT"`, `"receiptStatus":"202 ACCEPTED"`, `"targetUrl":"https://hooks.example.com/anjing/marketplace-oncall"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
 	}
 }
 

@@ -267,14 +267,19 @@ type ChannelNotification = {
   channel: string;
   severity: string;
   target: string;
+  targetUrl: string;
   status: string;
   reason: string;
   count: number;
   attempts: number;
   maxAttempts: number;
+  backoffSeconds: number;
+  nextRetryAt?: string;
   signature?: string;
   lastDispatchAt?: string;
   lastError?: string;
+  receiptStatus?: string;
+  receiptBody?: string;
   deadLetterReason?: string;
   createdAt: string;
   ackedBy?: string;
@@ -1459,8 +1464,11 @@ function App() {
                   <div>
                     <strong>{item.channel} · {item.target}</strong>
                     <span>{item.reason}</span>
+                    <span>{item.targetUrl}</span>
                     <span>{item.attempts}/{item.maxAttempts} attempts{item.lastDispatchAt ? ` · ${item.lastDispatchAt.slice(11, 19)}` : ''}</span>
+                    {item.nextRetryAt && <span>retry at {item.nextRetryAt.slice(11, 19)} · {item.backoffSeconds}s backoff</span>}
                     {item.signature && <span>sig {item.signature.slice(0, 12)}...</span>}
+                    {item.receiptStatus && <span>{item.receiptStatus} · {item.receiptBody}</span>}
                     {item.lastError && <span>{item.lastError}</span>}
                     {item.deadLetterReason && <span>{item.deadLetterReason}</span>}
                     {item.ackedBy && <span>{item.ackedBy} · {item.ackNote}</span>}

@@ -421,14 +421,19 @@ type ChannelNotification struct {
 	Channel          string `json:"channel"`
 	Severity         string `json:"severity"`
 	Target           string `json:"target"`
+	TargetURL        string `json:"targetUrl"`
 	Status           string `json:"status"`
 	Reason           string `json:"reason"`
 	Count            int    `json:"count"`
 	Attempts         int    `json:"attempts"`
 	MaxAttempts      int    `json:"maxAttempts"`
+	BackoffSeconds   int    `json:"backoffSeconds"`
+	NextRetryAt      string `json:"nextRetryAt,omitempty"`
 	Signature        string `json:"signature,omitempty"`
 	LastDispatchAt   string `json:"lastDispatchAt,omitempty"`
 	LastError        string `json:"lastError,omitempty"`
+	ReceiptStatus    string `json:"receiptStatus,omitempty"`
+	ReceiptBody      string `json:"receiptBody,omitempty"`
 	DeadLetterReason string `json:"deadLetterReason,omitempty"`
 	CreatedAt        string `json:"createdAt"`
 	AckedBy          string `json:"ackedBy,omitempty"`
@@ -1904,21 +1909,29 @@ func hasOpenChannelNotification(items []ChannelNotification, channel string) boo
 
 func newChannelNotification(policy ChannelAlertPolicy, createdAt string) ChannelNotification {
 	return ChannelNotification{
-		ID:          fmt.Sprintf("channel_notice_%d", time.Now().UnixNano()),
-		Channel:     policy.Channel,
-		Severity:    policy.Severity,
-		Target:      policy.NotifyTarget,
-		Status:      "OPEN",
-		Reason:      fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
-		Count:       policy.CurrentCount,
-		MaxAttempts: 3,
-		CreatedAt:   fallback(createdAt, time.Now().UTC().Format(time.RFC3339)),
+		ID:             fmt.Sprintf("channel_notice_%d", time.Now().UnixNano()),
+		Channel:        policy.Channel,
+		Severity:       policy.Severity,
+		Target:         policy.NotifyTarget,
+		TargetURL:      notificationTargetURL(policy.NotifyTarget),
+		Status:         "OPEN",
+		Reason:         fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
+		Count:          policy.CurrentCount,
+		MaxAttempts:    3,
+		BackoffSeconds: 60,
+		CreatedAt:      fallback(createdAt, time.Now().UTC().Format(time.RFC3339)),
 	}
 }
 
 func dispatchChannelNotification(notification ChannelNotification, outcome string, now time.Time) ChannelNotification {
 	if notification.MaxAttempts <= 0 {
 		notification.MaxAttempts = 3
+	}
+	if notification.BackoffSeconds <= 0 {
+		notification.BackoffSeconds = 60
+	}
+	if strings.TrimSpace(notification.TargetURL) == "" {
+		notification.TargetURL = notificationTargetURL(notification.Target)
 	}
 	if notification.Status == "ACKED" || notification.Status == "SENT" || notification.Status == "DEAD_LETTER" {
 		return notification
@@ -1930,23 +1943,42 @@ func dispatchChannelNotification(notification ChannelNotification, outcome strin
 		notification.Status = "SENT"
 		notification.LastError = ""
 		notification.DeadLetterReason = ""
+		notification.NextRetryAt = ""
+		notification.ReceiptStatus = "202 ACCEPTED"
+		notification.ReceiptBody = "notification accepted by demo webhook"
 		return notification
 	}
 	notification.LastError = fallback(outcome, "webhook_timeout")
+	notification.ReceiptStatus = "504 TIMEOUT"
+	notification.ReceiptBody = "demo webhook did not return success"
 	if notification.Attempts >= notification.MaxAttempts {
 		notification.Status = "DEAD_LETTER"
 		notification.DeadLetterReason = fmt.Sprintf("failed after %d signed webhook attempts", notification.Attempts)
+		notification.NextRetryAt = ""
 		return notification
 	}
 	notification.Status = "RETRYING"
+	notification.NextRetryAt = now.Add(time.Duration(notification.BackoffSeconds) * time.Second).Format(time.RFC3339)
+	notification.BackoffSeconds = notification.BackoffSeconds * 2
 	return notification
 }
 
 func signChannelNotification(notification ChannelNotification) string {
-	payload := fmt.Sprintf("%s|%s|%s|%d|%d", notification.ID, notification.Channel, notification.Target, notification.Count, notification.Attempts)
+	payload := fmt.Sprintf("%s|%s|%s|%s|%d|%d", notification.ID, notification.Channel, notification.Target, notification.TargetURL, notification.Count, notification.Attempts)
 	mac := hmac.New(sha256.New, []byte("anjing-notification-demo-secret"))
 	_, _ = mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func notificationTargetURL(target string) string {
+	normalized := strings.ToLower(strings.TrimSpace(target))
+	if normalized == "" {
+		normalized = "ops-webhook"
+	}
+	if strings.HasPrefix(normalized, "http://") || strings.HasPrefix(normalized, "https://") {
+		return strings.TrimSpace(target)
+	}
+	return fmt.Sprintf("https://hooks.example.com/anjing/%s", normalized)
 }
 
 func activeAlertPolicies(policies []ChannelAlertPolicy) int {
