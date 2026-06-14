@@ -550,11 +550,22 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update channel alert policy: %v", err)
 	}
-	if policy.TargetURL != "https://ops.example.com/hooks/marketplace" || policy.SecretRef != "ANJING_NOTIFICATION_CUSTOM_SECRET" {
-		t.Fatalf("expected updated delivery config, got %#v", policy)
+	if policy.TargetURL == "https://ops.example.com/hooks/marketplace" || policy.SecretRef == "ANJING_NOTIFICATION_CUSTOM_SECRET" {
+		t.Fatalf("expected high risk policy change to wait for approval, got %#v", policy)
 	}
-	if policy.MaxAttempts != 5 || policy.BackoffSeconds != 45 {
-		t.Fatalf("expected updated retry config, got %#v", policy)
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.PolicyChanges) != 1 || dashboard.PolicyChanges[0].Status != "PENDING" {
+		t.Fatalf("expected pending policy change, got %#v", dashboard.PolicyChanges)
+	}
+	approved, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过")
+	if err != nil {
+		t.Fatalf("approve policy change: %v", err)
+	}
+	if approved.TargetURL != "https://ops.example.com/hooks/marketplace" || approved.SecretRef != "ANJING_NOTIFICATION_CUSTOM_SECRET" {
+		t.Fatalf("expected approved delivery config, got %#v", approved)
 	}
 	for idx := 0; idx < 3; idx++ {
 		if err := st.RecordChannelFailure(ChannelFailureEvent{
@@ -567,17 +578,17 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 			t.Fatalf("record channel failure: %v", err)
 		}
 	}
-	dashboard, err := st.Dashboard()
+	dashboard, err = st.Dashboard()
 	if err != nil {
 		t.Fatalf("dashboard: %v", err)
 	}
 	if len(dashboard.Notifications) != 1 {
 		t.Fatalf("expected one configured notification, got %#v", dashboard.Notifications)
 	}
-	if len(dashboard.PolicyEvents) != 1 {
+	if len(dashboard.PolicyEvents) < 2 {
 		t.Fatalf("expected one policy audit event, got %#v", dashboard.PolicyEvents)
 	}
-	if dashboard.PolicyEvents[0].Actor != "ops-a" || !strings.Contains(dashboard.PolicyEvents[0].After, "ANJING_NOTIFICATION_CUSTOM_SECRET") {
+	if dashboard.PolicyEvents[0].Actor != "ops-lead" || !strings.Contains(dashboard.PolicyEvents[0].After, "ANJING_NOTIFICATION_CUSTOM_SECRET") {
 		t.Fatalf("expected policy audit event with actor and after summary, got %#v", dashboard.PolicyEvents[0])
 	}
 	notification := dashboard.Notifications[0]

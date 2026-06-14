@@ -92,6 +92,20 @@ type NotificationPolicyEvent = {
   note: string;
   createdAt: string;
 };
+type NotificationPolicyChange = {
+  id: string;
+  channel: string;
+  targetUrl: string;
+  secretRef: string;
+  maxAttempts: number;
+  backoffSeconds: number;
+  requestedBy: string;
+  status: string;
+  note: string;
+  createdAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+};
 type RuleReleaseObservation = {
   ruleCode: string;
   version: string;
@@ -391,6 +405,7 @@ type Dashboard = {
   channelAlertPolicies: ChannelAlertPolicy[] | null;
   channelNotifications: ChannelNotification[] | null;
   notificationPolicyEvents: NotificationPolicyEvent[] | null;
+  notificationPolicyChanges: NotificationPolicyChange[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
   reviewTasks: ReviewTask[] | null;
@@ -612,6 +627,7 @@ function App() {
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
   const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
+  const notificationPolicyChanges = dashboard?.notificationPolicyChanges ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
@@ -931,6 +947,19 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'update notification policy failed');
+    }
+  };
+
+  const approveNotificationPolicyChange = async (change: NotificationPolicyChange) => {
+    setError('');
+    try {
+      await api<ChannelAlertPolicy>('/api/ops/channel-alert-policies/approve-change', {
+        method: 'POST',
+        body: JSON.stringify({ id: change.id, approver: 'ops-lead', note: '通知目标审批通过' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'approve notification policy change failed');
     }
   };
 
@@ -1596,6 +1625,23 @@ function App() {
               })}
               {channelAlertPolicies.length === 0 && <p className="empty">暂无通知策略</p>}
             </div>
+            {notificationPolicyChanges.filter((change) => change.status === 'PENDING').length > 0 && (
+              <div className="policyEvents">
+                {notificationPolicyChanges.filter((change) => change.status === 'PENDING').slice(0, 4).map((change) => (
+                  <article className="policyEvent" key={change.id}>
+                    <div>
+                      <strong>{change.channel} · {change.status}</strong>
+                      <span>{change.targetUrl} · {change.secretRef}</span>
+                      <small>{change.maxAttempts} attempts · {change.backoffSeconds}s backoff</small>
+                      <small>{change.requestedBy} · {change.note}</small>
+                    </div>
+                    <button className="tinyButton" onClick={() => approveNotificationPolicyChange(change)} title="批准通知目标变更">
+                      <CheckCircle2 size={14} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
             {notificationPolicyEvents.length > 0 && (
               <div className="policyEvents">
                 {notificationPolicyEvents.slice(0, 4).map((event) => (

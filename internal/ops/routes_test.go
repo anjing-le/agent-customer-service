@@ -207,17 +207,28 @@ func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	for _, expected := range []string{`"targetUrl":"https://ops.example.com/hooks/marketplace"`, `"secretRef":"ANJING_NOTIFICATION_CUSTOM_SECRET"`, `"maxAttempts":4`, `"backoffSeconds":30`} {
-		if !strings.Contains(rec.Body.String(), expected) {
-			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
-		}
-	}
 	dashboard, err := st.Dashboard()
 	if err != nil {
 		t.Fatalf("dashboard: %v", err)
 	}
-	if len(dashboard.PolicyEvents) != 1 || dashboard.PolicyEvents[0].Actor != "ops-a" {
+	if len(dashboard.PolicyChanges) != 1 || dashboard.PolicyChanges[0].Status != "PENDING" {
+		t.Fatalf("expected pending policy change, got %#v", dashboard.PolicyChanges)
+	}
+	if len(dashboard.PolicyEvents) != 1 || dashboard.PolicyEvents[0].Action != "REQUEST_APPROVAL" {
 		t.Fatalf("expected policy audit event, got %#v", dashboard.PolicyEvents)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/approve-change", strings.NewReader(`{"id":"`+dashboard.PolicyChanges[0].ID+`","approver":"ops-lead","note":"审批通过"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"targetUrl":"https://ops.example.com/hooks/marketplace"`, `"secretRef":"ANJING_NOTIFICATION_CUSTOM_SECRET"`, `"maxAttempts":4`, `"backoffSeconds":30`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
 	}
 }
 

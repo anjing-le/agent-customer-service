@@ -208,6 +208,14 @@
       "response": { "status": 200, "schema": "ChannelAlertPolicy" }
     },
     {
+      "id": "approveNotificationPolicyChange",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-alert-policies/approve-change",
+      "request": { "body": "ApproveNotificationPolicyChangeRequest" },
+      "response": { "status": 200, "schema": "ChannelAlertPolicy" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -403,6 +411,14 @@
         "note": "string"
       }
     },
+    "ApproveNotificationPolicyChangeRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string",
+        "approver": "string",
+        "note": "string"
+      }
+    },
     "SubmitAnnotationRequest": {
       "required": ["messageId"],
       "fields": {
@@ -547,6 +563,23 @@
         "createdAt": "RFC3339 string"
       }
     },
+    "NotificationPolicyChange": {
+      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "requestedBy", "status", "note", "createdAt"],
+      "fields": {
+        "id": "string",
+        "channel": "string",
+        "targetUrl": "string",
+        "secretRef": "string",
+        "maxAttempts": "number",
+        "backoffSeconds": "number",
+        "requestedBy": "string",
+        "status": "PENDING|APPROVED",
+        "note": "string",
+        "createdAt": "RFC3339 string",
+        "approvedBy": "string",
+        "approvedAt": "RFC3339 string"
+      }
+    },
     "RuleReleaseObservation": {
       "required": ["ruleCode", "version", "releasedAt", "window", "ruleHits", "transferTickets", "lowScoreSamples", "averageReview", "riskLevel", "recommendation", "rollbackRecommended"],
       "fields": {
@@ -673,7 +706,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "notificationPolicyEvents", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -687,6 +720,7 @@
         "channelAlertPolicies": "ChannelAlertPolicy[]",
         "channelNotifications": "ChannelNotification[]",
         "notificationPolicyEvents": "NotificationPolicyEvent[]",
+        "notificationPolicyChanges": "NotificationPolicyChange[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]",
         "reviewTasks": "ReviewTask[]",

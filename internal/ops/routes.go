@@ -286,6 +286,31 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, policy)
 	})
 
+	mux.HandleFunc("/api/ops/channel-alert-policies/approve-change", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			ID       string `json:"id"`
+			Approver string `json:"approver"`
+			Note     string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.ID == "" {
+			httpjson.BadRequest(w, "id is required")
+			return
+		}
+		policy, err := st.ApproveNotificationPolicyChange(req.ID, req.Approver, req.Note)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, policy)
+	})
+
 	mux.HandleFunc("/api/ops/annotations/submit", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

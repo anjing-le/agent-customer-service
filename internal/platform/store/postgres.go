@@ -362,6 +362,24 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 	if err != nil {
 		return ChannelAlertPolicy{}, err
 	}
+	if requiresNotificationPolicyApproval(before) {
+		change := newNotificationPolicyChange(before.Channel, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
+		if err := insertNotificationPolicyChange(ctx, tx, change); err != nil {
+			return ChannelAlertPolicy{}, err
+		}
+		event := newNotificationPolicyEvent(before.Channel, "REQUEST_APPROVAL", actor, notificationPolicySummary(before), notificationPolicyChangeSummary(change), note, time.Now().UTC().Format(time.RFC3339))
+		if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
+			return ChannelAlertPolicy{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return ChannelAlertPolicy{}, fmt.Errorf("commit notification policy approval request: %w", err)
+		}
+		alerts, err := s.listChannelAlerts()
+		if err != nil {
+			return ChannelAlertPolicy{}, err
+		}
+		return channelAlertPolicies([]ChannelAlertPolicy{before}, alerts)[0], nil
+	}
 	if _, err := tx.Exec(ctx, `
 		update channel_alert_policies
 		set target_url = $2,
@@ -398,6 +416,65 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 		}
 	}
 	return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s not found", channel)
+}
+
+func (s *PostgresStore) ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error) {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("begin approve notification policy change: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	change, err := notificationPolicyChangeTx(ctx, tx, id)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if change.Status != "PENDING" {
+		return ChannelAlertPolicy{}, fmt.Errorf("notification policy change %s is not pending", id)
+	}
+	before, err := channelAlertPolicyTx(ctx, tx, change.Channel)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		update channel_alert_policies
+		set target_url = $2,
+		    secret_ref = $3,
+		    max_attempts = $4,
+		    backoff_seconds = $5,
+		    updated_at = now()
+		where lower(channel) = lower($1)
+	`, change.Channel, change.TargetURL, change.SecretRef, change.MaxAttempts, change.BackoffSeconds); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("apply notification policy change: %w", err)
+	}
+	now := time.Now().UTC()
+	approvedBy := fallback(approver, "ops-lead")
+	if _, err := tx.Exec(ctx, `
+		update notification_policy_changes
+		set status = 'APPROVED',
+		    approved_by = $2,
+		    approved_at = $3
+		where id = $1
+	`, id, approvedBy, now); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("approve notification policy change: %w", err)
+	}
+	after, err := channelAlertPolicyTx(ctx, tx, change.Channel)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	event := newNotificationPolicyEvent(after.Channel, "APPROVE", approvedBy, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, change.Note), now.Format(time.RFC3339))
+	if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("commit approve notification policy change: %w", err)
+	}
+	alerts, err := s.listChannelAlerts()
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	return channelAlertPolicies([]ChannelAlertPolicy{after}, alerts)[0], nil
 }
 
 func (s *PostgresStore) channelNotification(id string) (ChannelNotification, error) {
@@ -989,6 +1066,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	policyChanges, err := s.listNotificationPolicyChanges()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -1034,6 +1115,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
 		PolicyEvents:     policyEvents,
+		PolicyChanges:    policyChanges,
 		Quality:          qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:      annotations,
 		ReviewTasks:      reviewTasks,
@@ -1472,6 +1554,96 @@ func insertNotificationPolicyEvent(ctx context.Context, tx pgx.Tx, event Notific
 		return fmt.Errorf("insert notification policy event: %w", err)
 	}
 	return nil
+}
+
+func insertNotificationPolicyChange(ctx context.Context, tx pgx.Tx, change NotificationPolicyChange) error {
+	createdAt, err := time.Parse(time.RFC3339, change.CreatedAt)
+	if err != nil {
+		createdAt = time.Now().UTC()
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into notification_policy_changes (id, channel, target_url, secret_ref, max_attempts, backoff_seconds, requested_by, status, note, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, change.ID, change.Channel, change.TargetURL, change.SecretRef, change.MaxAttempts, change.BackoffSeconds, change.RequestedBy, change.Status, change.Note, createdAt); err != nil {
+		return fmt.Errorf("insert notification policy change: %w", err)
+	}
+	return nil
+}
+
+func notificationPolicyChangeTx(ctx context.Context, q queryer, id string) (NotificationPolicyChange, error) {
+	var item NotificationPolicyChange
+	var createdAt time.Time
+	var approvedAt *time.Time
+	if err := q.QueryRow(ctx, `
+		select id, channel, target_url, secret_ref, max_attempts, backoff_seconds, requested_by, status, note, created_at, approved_by, approved_at
+		from notification_policy_changes
+		where id = $1
+	`, id).Scan(
+		&item.ID,
+		&item.Channel,
+		&item.TargetURL,
+		&item.SecretRef,
+		&item.MaxAttempts,
+		&item.BackoffSeconds,
+		&item.RequestedBy,
+		&item.Status,
+		&item.Note,
+		&createdAt,
+		&item.ApprovedBy,
+		&approvedAt,
+	); err != nil {
+		return NotificationPolicyChange{}, fmt.Errorf("load notification policy change: %w", err)
+	}
+	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	if approvedAt != nil {
+		item.ApprovedAt = approvedAt.UTC().Format(time.RFC3339)
+	}
+	return item, nil
+}
+
+func (s *PostgresStore) listNotificationPolicyChanges() ([]NotificationPolicyChange, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, channel, target_url, secret_ref, max_attempts, backoff_seconds, requested_by, status, note, created_at, approved_by, approved_at
+		from notification_policy_changes
+		order by created_at desc, id desc
+		limit 20
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list notification policy changes: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]NotificationPolicyChange, 0)
+	for rows.Next() {
+		var item NotificationPolicyChange
+		var createdAt time.Time
+		var approvedAt *time.Time
+		if err := rows.Scan(
+			&item.ID,
+			&item.Channel,
+			&item.TargetURL,
+			&item.SecretRef,
+			&item.MaxAttempts,
+			&item.BackoffSeconds,
+			&item.RequestedBy,
+			&item.Status,
+			&item.Note,
+			&createdAt,
+			&item.ApprovedBy,
+			&approvedAt,
+		); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		if approvedAt != nil {
+			item.ApprovedAt = approvedAt.UTC().Format(time.RFC3339)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func (s *PostgresStore) listNotificationPolicyEvents() ([]NotificationPolicyEvent, error) {
