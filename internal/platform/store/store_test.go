@@ -418,11 +418,11 @@ func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
 	if _, err := st.PublishCanaryRule("CANCEL_RISK_TRANSFER", "qa-lead", "未审批直接发布"); err == nil {
 		t.Fatal("expected publish to require approval gate")
 	}
-	approval, err := st.SubmitRuleApproval("CANCEL_RISK_TRANSFER", "qa-lead", "LOW", "3 条灰度样本通过", 3)
+	approval, err := st.SubmitRuleApproval("CANCEL_RISK_TRANSFER", "qa-lead", "LOW", "3 条灰度样本通过", []string{"sample_cancel_1", "sample_cancel_2", "sample_cancel_3"})
 	if err != nil {
 		t.Fatalf("submit rule approval: %v", err)
 	}
-	if approval.Status != "APPROVED" {
+	if approval.Status != "APPROVED" || approval.SampleCount != 3 || len(approval.SampleIDs) != 3 {
 		t.Fatalf("expected approved gate, got %#v", approval)
 	}
 

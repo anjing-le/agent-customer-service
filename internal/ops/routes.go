@@ -64,11 +64,11 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			return
 		}
 		var req struct {
-			Code        string `json:"code"`
-			Approver    string `json:"approver"`
-			RiskLevel   string `json:"riskLevel"`
-			SampleCount int    `json:"sampleCount"`
-			Note        string `json:"note"`
+			Code      string   `json:"code"`
+			Approver  string   `json:"approver"`
+			RiskLevel string   `json:"riskLevel"`
+			SampleIDs []string `json:"sampleIds"`
+			Note      string   `json:"note"`
 		}
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
@@ -78,7 +78,7 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			httpjson.BadRequest(w, "code is required")
 			return
 		}
-		approval, err := st.SubmitRuleApproval(req.Code, req.Approver, req.RiskLevel, req.Note, req.SampleCount)
+		approval, err := st.SubmitRuleApproval(req.Code, req.Approver, req.RiskLevel, req.Note, req.SampleIDs)
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return

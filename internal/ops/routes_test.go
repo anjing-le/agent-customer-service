@@ -84,14 +84,14 @@ func TestRuleReleaseRoutesPublishAndRollback(t *testing.T) {
 		t.Fatalf("expected approval gate error, got %s", blockedRec.Body.String())
 	}
 
-	approvalReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/approve", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","approver":"qa-lead","riskLevel":"LOW","sampleCount":3,"note":"灰度样本通过"}`))
+	approvalReq := httptest.NewRequest(http.MethodPost, "/api/ops/rules/approve", strings.NewReader(`{"code":"CANCEL_RISK_TRANSFER","approver":"qa-lead","riskLevel":"LOW","sampleIds":["sample_cancel_1","sample_cancel_2","sample_cancel_3"],"note":"灰度样本通过"}`))
 	approvalRec := httptest.NewRecorder()
 	mux.ServeHTTP(approvalRec, approvalReq)
 
 	if approvalRec.Code != http.StatusOK {
 		t.Fatalf("expected approval 200, got %d: %s", approvalRec.Code, approvalRec.Body.String())
 	}
-	if !strings.Contains(approvalRec.Body.String(), `"status":"APPROVED"`) {
+	if !strings.Contains(approvalRec.Body.String(), `"status":"APPROVED"`) || !strings.Contains(approvalRec.Body.String(), `"sampleCount":3`) {
 		t.Fatalf("expected approved gate, got %s", approvalRec.Body.String())
 	}
 

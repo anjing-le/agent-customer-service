@@ -1,0 +1,2 @@
+ALTER TABLE rule_approvals
+  ADD COLUMN IF NOT EXISTS sample_ids TEXT[] NOT NULL DEFAULT '{}';

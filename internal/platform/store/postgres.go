@@ -498,7 +498,7 @@ func (s *PostgresStore) CompareRuleVersions(content string) (RuleComparison, err
 	return compareRuleResults(content, current, canary), nil
 }
 
-func (s *PostgresStore) SubmitRuleApproval(code, approver, riskLevel, note string, sampleCount int) (RuleApproval, error) {
+func (s *PostgresStore) SubmitRuleApproval(code, approver, riskLevel, note string, sampleIDs []string) (RuleApproval, error) {
 	ctx := context.Background()
 	var exists bool
 	if err := s.pool.QueryRow(ctx, `
@@ -509,15 +509,15 @@ func (s *PostgresStore) SubmitRuleApproval(code, approver, riskLevel, note strin
 	if !exists {
 		return RuleApproval{}, fmt.Errorf("canary rule %s not found", code)
 	}
-	approval := newRuleApproval(code, approver, riskLevel, note, sampleCount, time.Now().UTC().Format(time.RFC3339))
+	approval := newRuleApproval(code, approver, riskLevel, note, sampleIDs, time.Now().UTC().Format(time.RFC3339))
 	createdAt, err := time.Parse(time.RFC3339, approval.CreatedAt)
 	if err != nil {
 		createdAt = time.Now().UTC()
 	}
 	if _, err := s.pool.Exec(ctx, `
-		insert into rule_approvals (id, rule_code, approver, risk_level, sample_count, status, note, created_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, approval.ID, approval.RuleCode, approval.Approver, approval.RiskLevel, approval.SampleCount, approval.Status, approval.Note, createdAt); err != nil {
+		insert into rule_approvals (id, rule_code, approver, risk_level, sample_ids, sample_count, status, note, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, approval.ID, approval.RuleCode, approval.Approver, approval.RiskLevel, approval.SampleIDs, approval.SampleCount, approval.Status, approval.Note, createdAt); err != nil {
 		return RuleApproval{}, fmt.Errorf("submit rule approval: %w", err)
 	}
 	return approval, nil
@@ -1001,7 +1001,7 @@ func (s *PostgresStore) recordRuleHit(code string) error {
 
 func (s *PostgresStore) listRuleApprovals() ([]RuleApproval, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, rule_code, approver, risk_level, sample_count, status, note, created_at
+		select id, rule_code, approver, risk_level, sample_ids, sample_count, status, note, created_at
 		from rule_approvals
 		order by created_at desc, id desc
 		limit 20
@@ -1015,7 +1015,7 @@ func (s *PostgresStore) listRuleApprovals() ([]RuleApproval, error) {
 	for rows.Next() {
 		var item RuleApproval
 		var createdAt time.Time
-		if err := rows.Scan(&item.ID, &item.RuleCode, &item.Approver, &item.RiskLevel, &item.SampleCount, &item.Status, &item.Note, &createdAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.RuleCode, &item.Approver, &item.RiskLevel, &item.SampleIDs, &item.SampleCount, &item.Status, &item.Note, &createdAt); err != nil {
 			return nil, err
 		}
 		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)

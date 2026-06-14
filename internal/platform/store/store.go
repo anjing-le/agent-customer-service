@@ -55,7 +55,7 @@ type Runtime interface {
 	CreateArticleFromGap(gapID, title, category, content string, tags []string) (KnowledgeArticle, error)
 	TestRule(content string) (RuleTestResult, error)
 	CompareRuleVersions(content string) (RuleComparison, error)
-	SubmitRuleApproval(code, approver, riskLevel, note string, sampleCount int) (RuleApproval, error)
+	SubmitRuleApproval(code, approver, riskLevel, note string, sampleIDs []string) (RuleApproval, error)
 	PublishCanaryRule(code, actor, note string) (RuleReleaseEvent, error)
 	RollbackRule(code, actor, note string) (RuleReleaseEvent, error)
 	ResolveTransferTicket(id, assignee, note string) (TransferTicket, error)
@@ -177,14 +177,15 @@ type RuleComparison struct {
 }
 
 type RuleApproval struct {
-	ID          string `json:"id"`
-	RuleCode    string `json:"ruleCode"`
-	Approver    string `json:"approver"`
-	RiskLevel   string `json:"riskLevel"`
-	SampleCount int    `json:"sampleCount"`
-	Status      string `json:"status"`
-	Note        string `json:"note"`
-	CreatedAt   string `json:"createdAt"`
+	ID          string   `json:"id"`
+	RuleCode    string   `json:"ruleCode"`
+	Approver    string   `json:"approver"`
+	RiskLevel   string   `json:"riskLevel"`
+	SampleIDs   []string `json:"sampleIds"`
+	SampleCount int      `json:"sampleCount"`
+	Status      string   `json:"status"`
+	Note        string   `json:"note"`
+	CreatedAt   string   `json:"createdAt"`
 }
 
 type RuleReleaseEvent struct {
@@ -685,13 +686,13 @@ func (s *Store) CompareRuleVersions(content string) (RuleComparison, error) {
 	return compareRuleResults(content, current, canary), nil
 }
 
-func (s *Store) SubmitRuleApproval(code, approver, riskLevel, note string, sampleCount int) (RuleApproval, error) {
+func (s *Store) SubmitRuleApproval(code, approver, riskLevel, note string, sampleIDs []string) (RuleApproval, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.ruleIndexLocked(code, "canary") < 0 {
 		return RuleApproval{}, fmt.Errorf("canary rule %s not found", code)
 	}
-	approval := newRuleApproval(code, approver, riskLevel, note, sampleCount, time.Now().UTC().Format(time.RFC3339))
+	approval := newRuleApproval(code, approver, riskLevel, note, sampleIDs, time.Now().UTC().Format(time.RFC3339))
 	s.ruleApprovals = append([]RuleApproval{approval}, s.ruleApprovals...)
 	return approval, nil
 }
@@ -1201,8 +1202,10 @@ func newRuleReleaseEvent(code, version, action, actor, note, createdAt string) R
 	}
 }
 
-func newRuleApproval(code, approver, riskLevel, note string, sampleCount int, createdAt string) RuleApproval {
+func newRuleApproval(code, approver, riskLevel, note string, sampleIDs []string, createdAt string) RuleApproval {
 	riskLevel = strings.ToUpper(fallback(riskLevel, "LOW"))
+	sampleIDs = normalizeSampleIDs(sampleIDs)
+	sampleCount := len(sampleIDs)
 	status := "REJECTED"
 	if sampleCount >= 3 && riskLevel != "HIGH" && riskLevel != "CRITICAL" {
 		status = "APPROVED"
@@ -1212,6 +1215,7 @@ func newRuleApproval(code, approver, riskLevel, note string, sampleCount int, cr
 		RuleCode:    code,
 		Approver:    fallback(approver, "qa-lead"),
 		RiskLevel:   riskLevel,
+		SampleIDs:   sampleIDs,
 		SampleCount: sampleCount,
 		Status:      status,
 		Note:        fallback(note, "规则发布审批"),
@@ -1226,6 +1230,20 @@ func hasApprovedRuleGate(approvals []RuleApproval, code string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeSampleIDs(sampleIDs []string) []string {
+	result := make([]string, 0, len(sampleIDs))
+	seen := map[string]bool{}
+	for _, id := range sampleIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		result = append(result, id)
+	}
+	return result
 }
 
 func nextPublishedVersion(version string) string {

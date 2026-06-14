@@ -335,7 +335,7 @@
         "code": "string",
         "approver": "string",
         "riskLevel": "LOW|MEDIUM|HIGH|CRITICAL",
-        "sampleCount": "number",
+        "sampleIds": "string[]",
         "note": "string"
       }
     },
@@ -500,12 +500,13 @@
       }
     },
     "RuleApproval": {
-      "required": ["id", "ruleCode", "approver", "riskLevel", "sampleCount", "status", "note", "createdAt"],
+      "required": ["id", "ruleCode", "approver", "riskLevel", "sampleIds", "sampleCount", "status", "note", "createdAt"],
       "fields": {
         "id": "string",
         "ruleCode": "string",
         "approver": "string",
         "riskLevel": "LOW|MEDIUM|HIGH|CRITICAL",
+        "sampleIds": "string[]",
         "sampleCount": "number",
         "status": "APPROVED|REJECTED",
         "note": "string",

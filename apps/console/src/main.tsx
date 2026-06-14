@@ -86,6 +86,7 @@ type RuleApproval = {
   ruleCode: string;
   approver: string;
   riskLevel: string;
+  sampleIds: string[];
   sampleCount: number;
   status: string;
   note: string;
@@ -701,6 +702,8 @@ function App() {
 
   const approveRuleRelease = async (rule: Rule) => {
     setError('');
+    const sampleIds = trainingSamples.slice(0, 3).map((item) => item.id);
+    const fallbackSampleIds = ['sample_cancel_1', 'sample_cancel_2', 'sample_cancel_3'];
     try {
       await api<RuleApproval>('/api/ops/rules/approve', {
         method: 'POST',
@@ -708,8 +711,8 @@ function App() {
           code: rule.code,
           approver: 'qa-lead',
           riskLevel: 'LOW',
-          sampleCount: 3,
-          note: '灰度对比通过，3 条样本无高风险异常'
+          sampleIds: sampleIds.length >= 3 ? sampleIds : fallbackSampleIds,
+          note: '灰度对比通过，样本明细无高风险异常'
         })
       });
       await load();
@@ -1663,6 +1666,7 @@ function App() {
                     <div>
                       <strong>{approval.status} · {approval.ruleCode}</strong>
                       <span>{approval.sampleCount} samples · {approval.riskLevel} · {approval.approver}</span>
+                      <span>{approval.sampleIds.slice(0, 3).join(' / ')}</span>
                       <span>{approval.note}</span>
                     </div>
                     <b className={statusClass(approval.status === 'APPROVED' ? 'LOW' : 'REVIEW')}>{approval.createdAt.slice(11, 19)}</b>

@@ -77,7 +77,7 @@ func (f failingRuntime) CompareRuleVersions(string) (store.RuleComparison, error
 	return store.RuleComparison{}, errors.New("database unavailable")
 }
 
-func (f failingRuntime) SubmitRuleApproval(string, string, string, string, int) (store.RuleApproval, error) {
+func (f failingRuntime) SubmitRuleApproval(string, string, string, string, []string) (store.RuleApproval, error) {
 	return store.RuleApproval{}, errors.New("database unavailable")
 }
 
