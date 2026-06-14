@@ -342,7 +342,7 @@ func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (Channel
 	return item, nil
 }
 
-func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) (ChannelAlertPolicy, error) {
+func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error) {
 	normalized := strings.TrimSpace(channel)
 	if normalized == "" {
 		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
@@ -351,7 +351,18 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 	secretRef = strings.TrimSpace(secretRef)
 	maxAttempts = normalizeMaxAttempts(maxAttempts)
 	backoffSeconds = normalizeBackoffSeconds(backoffSeconds)
-	if _, err := s.pool.Exec(context.Background(), `
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("begin update channel alert policy: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	before, err := channelAlertPolicyTx(ctx, tx, normalized)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if _, err := tx.Exec(ctx, `
 		update channel_alert_policies
 		set target_url = $2,
 		    secret_ref = $3,
@@ -361,6 +372,17 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 		where lower(channel) = lower($1)
 	`, normalized, targetURL, secretRef, maxAttempts, backoffSeconds); err != nil {
 		return ChannelAlertPolicy{}, fmt.Errorf("update channel alert policy: %w", err)
+	}
+	after, err := channelAlertPolicyTx(ctx, tx, normalized)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	event := newNotificationPolicyEvent(after.Channel, "UPDATE", actor, notificationPolicySummary(before), notificationPolicySummary(after), note, time.Now().UTC().Format(time.RFC3339))
+	if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("commit update channel alert policy: %w", err)
 	}
 	alerts, err := s.listChannelAlerts()
 	if err != nil {
@@ -963,6 +985,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	policyEvents, err := s.listNotificationPolicyEvents()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -1007,6 +1033,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		ChannelTrends:    channelTrends,
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
+		PolicyEvents:     policyEvents,
 		Quality:          qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:      annotations,
 		ReviewTasks:      reviewTasks,
@@ -1370,6 +1397,30 @@ func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]Chann
 	return s.listChannelAlertPoliciesTx(context.Background(), s.pool, alerts)
 }
 
+func channelAlertPolicyTx(ctx context.Context, q queryer, channel string) (ChannelAlertPolicy, error) {
+	var item ChannelAlertPolicy
+	if err := q.QueryRow(ctx, `
+		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, enabled
+		from channel_alert_policies
+		where lower(channel) = lower($1)
+	`, channel).Scan(
+		&item.Channel,
+		&item.Severity,
+		&item.Threshold,
+		&item.WindowMinutes,
+		&item.NotifyTarget,
+		&item.TargetURL,
+		&item.SecretRef,
+		&item.MaxAttempts,
+		&item.BackoffSeconds,
+		&item.Enabled,
+	); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("load channel alert policy: %w", err)
+	}
+	normalizeChannelAlertPolicy(&item)
+	return item, nil
+}
+
 func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q queryer, alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
 	rows, err := q.Query(ctx, `
 		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, enabled
@@ -1407,6 +1458,48 @@ func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q querye
 		policies = defaultChannelAlertPolicies()
 	}
 	return channelAlertPolicies(policies, alerts), nil
+}
+
+func insertNotificationPolicyEvent(ctx context.Context, tx pgx.Tx, event NotificationPolicyEvent) error {
+	createdAt, err := time.Parse(time.RFC3339, event.CreatedAt)
+	if err != nil {
+		createdAt = time.Now().UTC()
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into notification_policy_events (id, channel, action, actor, before_summary, after_summary, note, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, event.ID, event.Channel, event.Action, event.Actor, event.Before, event.After, event.Note, createdAt); err != nil {
+		return fmt.Errorf("insert notification policy event: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) listNotificationPolicyEvents() ([]NotificationPolicyEvent, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, channel, action, actor, before_summary, after_summary, note, created_at
+		from notification_policy_events
+		order by created_at desc, id desc
+		limit 20
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list notification policy events: %w", err)
+	}
+	defer rows.Close()
+
+	events := make([]NotificationPolicyEvent, 0)
+	for rows.Next() {
+		var item NotificationPolicyEvent
+		var createdAt time.Time
+		if err := rows.Scan(&item.ID, &item.Channel, &item.Action, &item.Actor, &item.Before, &item.After, &item.Note, &createdAt); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		events = append(events, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 func insertTriggeredNotifications(ctx context.Context, tx pgx.Tx, policies []ChannelAlertPolicy, createdAt string) error {

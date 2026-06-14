@@ -267,6 +267,8 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			SecretRef      string `json:"secretRef"`
 			MaxAttempts    int    `json:"maxAttempts"`
 			BackoffSeconds int    `json:"backoffSeconds"`
+			Actor          string `json:"actor"`
+			Note           string `json:"note"`
 		}
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
@@ -276,7 +278,7 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			httpjson.BadRequest(w, "channel is required")
 			return
 		}
-		policy, err := st.UpdateChannelAlertPolicy(req.Channel, req.TargetURL, req.SecretRef, req.MaxAttempts, req.BackoffSeconds)
+		policy, err := st.UpdateChannelAlertPolicy(req.Channel, req.TargetURL, req.SecretRef, req.MaxAttempts, req.BackoffSeconds, req.Actor, req.Note)
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return

@@ -546,7 +546,7 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 
 func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	st := NewSeedStore()
-	policy, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/marketplace", "ANJING_NOTIFICATION_CUSTOM_SECRET", 5, 45)
+	policy, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/marketplace", "ANJING_NOTIFICATION_CUSTOM_SECRET", 5, 45, "ops-a", "切换到生产通知目标")
 	if err != nil {
 		t.Fatalf("update channel alert policy: %v", err)
 	}
@@ -573,6 +573,12 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	}
 	if len(dashboard.Notifications) != 1 {
 		t.Fatalf("expected one configured notification, got %#v", dashboard.Notifications)
+	}
+	if len(dashboard.PolicyEvents) != 1 {
+		t.Fatalf("expected one policy audit event, got %#v", dashboard.PolicyEvents)
+	}
+	if dashboard.PolicyEvents[0].Actor != "ops-a" || !strings.Contains(dashboard.PolicyEvents[0].After, "ANJING_NOTIFICATION_CUSTOM_SECRET") {
+		t.Fatalf("expected policy audit event with actor and after summary, got %#v", dashboard.PolicyEvents[0])
 	}
 	notification := dashboard.Notifications[0]
 	if notification.TargetURL != "https://ops.example.com/hooks/marketplace" || notification.SecretRef != "ANJING_NOTIFICATION_CUSTOM_SECRET" {

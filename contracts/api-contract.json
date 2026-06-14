@@ -398,7 +398,9 @@
         "targetUrl": "string",
         "secretRef": "string",
         "maxAttempts": "number",
-        "backoffSeconds": "number"
+        "backoffSeconds": "number",
+        "actor": "string",
+        "note": "string"
       }
     },
     "SubmitAnnotationRequest": {
@@ -532,6 +534,19 @@
         "createdAt": "RFC3339 string"
       }
     },
+    "NotificationPolicyEvent": {
+      "required": ["id", "channel", "action", "actor", "before", "after", "note", "createdAt"],
+      "fields": {
+        "id": "string",
+        "channel": "string",
+        "action": "UPDATE",
+        "actor": "string",
+        "before": "redacted policy summary before change",
+        "after": "redacted policy summary after change",
+        "note": "string",
+        "createdAt": "RFC3339 string"
+      }
+    },
     "RuleReleaseObservation": {
       "required": ["ruleCode", "version", "releasedAt", "window", "ruleHits", "transferTickets", "lowScoreSamples", "averageReview", "riskLevel", "recommendation", "rollbackRecommended"],
       "fields": {
@@ -658,7 +673,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "notificationPolicyEvents", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -671,6 +686,7 @@
         "channelFailureTrends": "ChannelFailureTrend[]",
         "channelAlertPolicies": "ChannelAlertPolicy[]",
         "channelNotifications": "ChannelNotification[]",
+        "notificationPolicyEvents": "NotificationPolicyEvent[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]",
         "reviewTasks": "ReviewTask[]",

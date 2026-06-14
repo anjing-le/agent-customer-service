@@ -82,6 +82,16 @@ type RuleReleaseEvent = {
   note: string;
   createdAt: string;
 };
+type NotificationPolicyEvent = {
+  id: string;
+  channel: string;
+  action: string;
+  actor: string;
+  before: string;
+  after: string;
+  note: string;
+  createdAt: string;
+};
 type RuleReleaseObservation = {
   ruleCode: string;
   version: string;
@@ -380,6 +390,7 @@ type Dashboard = {
   channelFailureTrends: ChannelFailureTrend[] | null;
   channelAlertPolicies: ChannelAlertPolicy[] | null;
   channelNotifications: ChannelNotification[] | null;
+  notificationPolicyEvents: NotificationPolicyEvent[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
   reviewTasks: ReviewTask[] | null;
@@ -600,6 +611,7 @@ function App() {
   const channelFailureTrends = dashboard?.channelFailureTrends ?? [];
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
+  const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
@@ -911,7 +923,9 @@ function App() {
           targetUrl: draft.targetUrl,
           secretRef: draft.secretRef,
           maxAttempts: Number(draft.maxAttempts),
-          backoffSeconds: Number(draft.backoffSeconds)
+          backoffSeconds: Number(draft.backoffSeconds),
+          actor: 'ops-a',
+          note: '控制台更新通知目标配置'
         })
       });
       await load();
@@ -1582,6 +1596,21 @@ function App() {
               })}
               {channelAlertPolicies.length === 0 && <p className="empty">暂无通知策略</p>}
             </div>
+            {notificationPolicyEvents.length > 0 && (
+              <div className="policyEvents">
+                {notificationPolicyEvents.slice(0, 4).map((event) => (
+                  <article className="policyEvent" key={event.id}>
+                    <div>
+                      <strong>{event.channel} · {event.action}</strong>
+                      <span>{event.after}</span>
+                      <small>{event.before}</small>
+                      <small>{event.note}</small>
+                    </div>
+                    <b className="status">{event.actor} · {event.createdAt.slice(11, 19)}</b>
+                  </article>
+                ))}
+              </div>
+            )}
             <div className="panelDivider" />
             <div className="panelHeader compactHeader">
               <div>

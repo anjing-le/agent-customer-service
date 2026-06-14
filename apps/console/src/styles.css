@@ -567,6 +567,37 @@ input {
   margin-top: 6px;
 }
 
+.policyEvents {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.policyEvent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.policyEvent div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.policyEvent span,
+.policyEvent small {
+  overflow: hidden;
+  color: #64786d;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .timeline {
   display: grid;
   gap: 4px;

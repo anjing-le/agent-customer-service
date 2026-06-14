@@ -85,7 +85,7 @@ type Runtime interface {
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
-	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) (ChannelAlertPolicy, error)
+	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
@@ -119,6 +119,7 @@ type Store struct {
 	integrations    []ChannelIntegration
 	alertPolicies   []ChannelAlertPolicy
 	notifications   []ChannelNotification
+	policyEvents    []NotificationPolicyEvent
 	ruleApprovals   []RuleApproval
 	ruleEvents      []RuleReleaseEvent
 	annotations     []Annotation
@@ -253,6 +254,17 @@ type RuleReleaseObservation struct {
 	RollbackRecommended bool   `json:"rollbackRecommended"`
 }
 
+type NotificationPolicyEvent struct {
+	ID        string `json:"id"`
+	Channel   string `json:"channel"`
+	Action    string `json:"action"`
+	Actor     string `json:"actor"`
+	Before    string `json:"before"`
+	After     string `json:"after"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"createdAt"`
+}
+
 type TransferTicket struct {
 	ID             string          `json:"id"`
 	ConversationID string          `json:"conversationId"`
@@ -355,23 +367,24 @@ type TrainingSample struct {
 }
 
 type Dashboard struct {
-	Metrics          []Metric                 `json:"metrics"`
-	Conversations    []Conversation           `json:"conversations"`
-	KnowledgeGaps    []KnowledgeGap           `json:"knowledgeGaps"`
-	Rules            []Rule                   `json:"rules"`
-	Transfers        []TransferTicket         `json:"transfers"`
-	ChannelPolicies  []ChannelPolicy          `json:"channelPolicies"`
-	Integrations     []ChannelIntegration     `json:"integrations"`
-	ChannelAlerts    []ChannelAlert           `json:"channelAlerts"`
-	ChannelTrends    []ChannelFailureTrend    `json:"channelFailureTrends"`
-	AlertPolicies    []ChannelAlertPolicy     `json:"channelAlertPolicies"`
-	Notifications    []ChannelNotification    `json:"channelNotifications"`
-	Quality          QualitySummary           `json:"quality"`
-	Annotations      []Annotation             `json:"annotations"`
-	ReviewTasks      []ReviewTask             `json:"reviewTasks"`
-	RuleApprovals    []RuleApproval           `json:"ruleApprovals"`
-	RuleEvents       []RuleReleaseEvent       `json:"ruleEvents"`
-	RuleObservations []RuleReleaseObservation `json:"ruleObservations"`
+	Metrics          []Metric                  `json:"metrics"`
+	Conversations    []Conversation            `json:"conversations"`
+	KnowledgeGaps    []KnowledgeGap            `json:"knowledgeGaps"`
+	Rules            []Rule                    `json:"rules"`
+	Transfers        []TransferTicket          `json:"transfers"`
+	ChannelPolicies  []ChannelPolicy           `json:"channelPolicies"`
+	Integrations     []ChannelIntegration      `json:"integrations"`
+	ChannelAlerts    []ChannelAlert            `json:"channelAlerts"`
+	ChannelTrends    []ChannelFailureTrend     `json:"channelFailureTrends"`
+	AlertPolicies    []ChannelAlertPolicy      `json:"channelAlertPolicies"`
+	Notifications    []ChannelNotification     `json:"channelNotifications"`
+	PolicyEvents     []NotificationPolicyEvent `json:"notificationPolicyEvents"`
+	Quality          QualitySummary            `json:"quality"`
+	Annotations      []Annotation              `json:"annotations"`
+	ReviewTasks      []ReviewTask              `json:"reviewTasks"`
+	RuleApprovals    []RuleApproval            `json:"ruleApprovals"`
+	RuleEvents       []RuleReleaseEvent        `json:"ruleEvents"`
+	RuleObservations []RuleReleaseObservation  `json:"ruleObservations"`
 }
 
 type Metric struct {
@@ -635,7 +648,7 @@ func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
 	return nil
 }
 
-func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) (ChannelAlertPolicy, error) {
+func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	normalized := strings.TrimSpace(channel)
@@ -644,10 +657,19 @@ func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secre
 	}
 	for idx := range s.alertPolicies {
 		if strings.EqualFold(s.alertPolicies[idx].Channel, normalized) {
+			before := s.alertPolicies[idx]
+			normalizeChannelAlertPolicy(&before)
 			s.alertPolicies[idx].TargetURL = fallback(targetURL, notificationTargetURL(s.alertPolicies[idx].NotifyTarget))
 			s.alertPolicies[idx].SecretRef = fallback(secretRef, notificationSecretRef(s.alertPolicies[idx].NotifyTarget))
 			s.alertPolicies[idx].MaxAttempts = normalizeMaxAttempts(maxAttempts)
 			s.alertPolicies[idx].BackoffSeconds = normalizeBackoffSeconds(backoffSeconds)
+			after := s.alertPolicies[idx]
+			normalizeChannelAlertPolicy(&after)
+			event := newNotificationPolicyEvent(after.Channel, "UPDATE", actor, notificationPolicySummary(before), notificationPolicySummary(after), note, time.Now().UTC().Format(time.RFC3339))
+			s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
+			if len(s.policyEvents) > 30 {
+				s.policyEvents = s.policyEvents[:30]
+			}
 			alerts := channelAlerts(s.channelFailures)
 			return channelAlertPolicies([]ChannelAlertPolicy{s.alertPolicies[idx]}, alerts)[0], nil
 		}
@@ -960,6 +982,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelTrends:    channelFailureTrends(s.channelFailures, time.Now().UTC()),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
+		PolicyEvents:     append([]NotificationPolicyEvent(nil), s.policyEvents...),
 		Quality:          quality,
 		Annotations:      append([]Annotation(nil), s.annotations...),
 		ReviewTasks:      append([]ReviewTask(nil), s.reviewTasks...),
@@ -1316,6 +1339,24 @@ func newRuleReleaseEvent(code, version, action, actor, note, createdAt string) R
 		Note:      fallback(note, "规则发布动作已记录"),
 		CreatedAt: createdAt,
 	}
+}
+
+func newNotificationPolicyEvent(channel, action, actor, before, after, note, createdAt string) NotificationPolicyEvent {
+	return NotificationPolicyEvent{
+		ID:        fmt.Sprintf("notification_policy_event_%d", time.Now().UnixNano()),
+		Channel:   channel,
+		Action:    fallback(action, "UPDATE"),
+		Actor:     fallback(actor, "ops-a"),
+		Before:    before,
+		After:     after,
+		Note:      fallback(note, "通知策略配置已更新"),
+		CreatedAt: createdAt,
+	}
+}
+
+func notificationPolicySummary(policy ChannelAlertPolicy) string {
+	normalizeChannelAlertPolicy(&policy)
+	return fmt.Sprintf("targetUrl=%s secretRef=%s maxAttempts=%d backoffSeconds=%d", policy.TargetURL, policy.SecretRef, policy.MaxAttempts, policy.BackoffSeconds)
 }
 
 func newRuleApproval(code, approver, riskLevel, note string, sampleIDs []string, createdAt string) RuleApproval {
