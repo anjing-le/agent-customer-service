@@ -26,7 +26,8 @@
 | `ChannelAlert` | 渠道失败聚合，按渠道和错误码统计最近失败类型 | `Dashboard.channelAlerts` |
 | `ChannelFailureTrend` | 渠道失败趋势桶，按渠道和小时统计最近失败量 | `Dashboard.channelFailureTrends` |
 | `ChannelAlertPolicy` | 渠道失败通知策略，定义阈值、窗口、通知目标和当前触发状态 | `Dashboard.channelAlertPolicies` |
-| `ChannelNotification` | 渠道告警出站通知事件，记录目标 URL、secret ref、HMAC 签名、发送次数、退避重试、外部回执、死信原因和运营确认 | `Dashboard.channelNotifications` |
+| `ChannelNotification` | 渠道告警出站通知事件，记录目标 URL、secret ref、HMAC 签名、发送次数、退避重试、外部回执、投递审计摘要、死信原因和运营确认 | `Dashboard.channelNotifications` |
+| `NotificationDeliveryAudit` | 通知投递审计记录，只保存 attempt、目标、secret ref、签名预览、payload hash 和脱敏请求/响应摘要，不保存完整 signed payload 或密钥值 | `ChannelNotification.deliveryAudit` |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
 | `AnnotationDimensions` | 人工质检评分维度：证据贴合、安全性、帮助性 | `Annotation.dimensions` |

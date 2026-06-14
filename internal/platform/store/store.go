@@ -45,6 +45,17 @@ type NotificationDeliveryResult struct {
 	Error         string
 }
 
+type NotificationDeliveryAudit struct {
+	Attempt          int    `json:"attempt"`
+	TargetURL        string `json:"targetUrl"`
+	SecretRef        string `json:"secretRef"`
+	SignaturePreview string `json:"signaturePreview"`
+	PayloadHash      string `json:"payloadHash"`
+	RequestSummary   string `json:"requestSummary"`
+	ResponseSummary  string `json:"responseSummary"`
+	CreatedAt        string `json:"createdAt"`
+}
+
 type Option func(*Store)
 
 func WithReplyGenerator(generator ReplyGenerator) Option {
@@ -442,29 +453,30 @@ type ChannelAlertPolicy struct {
 }
 
 type ChannelNotification struct {
-	ID               string `json:"id"`
-	Channel          string `json:"channel"`
-	Severity         string `json:"severity"`
-	Target           string `json:"target"`
-	TargetURL        string `json:"targetUrl"`
-	SecretRef        string `json:"secretRef"`
-	Status           string `json:"status"`
-	Reason           string `json:"reason"`
-	Count            int    `json:"count"`
-	Attempts         int    `json:"attempts"`
-	MaxAttempts      int    `json:"maxAttempts"`
-	BackoffSeconds   int    `json:"backoffSeconds"`
-	NextRetryAt      string `json:"nextRetryAt,omitempty"`
-	Signature        string `json:"signature,omitempty"`
-	LastDispatchAt   string `json:"lastDispatchAt,omitempty"`
-	LastError        string `json:"lastError,omitempty"`
-	ReceiptStatus    string `json:"receiptStatus,omitempty"`
-	ReceiptBody      string `json:"receiptBody,omitempty"`
-	DeadLetterReason string `json:"deadLetterReason,omitempty"`
-	CreatedAt        string `json:"createdAt"`
-	AckedBy          string `json:"ackedBy,omitempty"`
-	AckNote          string `json:"ackNote,omitempty"`
-	AckedAt          string `json:"ackedAt,omitempty"`
+	ID               string                      `json:"id"`
+	Channel          string                      `json:"channel"`
+	Severity         string                      `json:"severity"`
+	Target           string                      `json:"target"`
+	TargetURL        string                      `json:"targetUrl"`
+	SecretRef        string                      `json:"secretRef"`
+	Status           string                      `json:"status"`
+	Reason           string                      `json:"reason"`
+	Count            int                         `json:"count"`
+	Attempts         int                         `json:"attempts"`
+	MaxAttempts      int                         `json:"maxAttempts"`
+	BackoffSeconds   int                         `json:"backoffSeconds"`
+	NextRetryAt      string                      `json:"nextRetryAt,omitempty"`
+	Signature        string                      `json:"signature,omitempty"`
+	LastDispatchAt   string                      `json:"lastDispatchAt,omitempty"`
+	LastError        string                      `json:"lastError,omitempty"`
+	ReceiptStatus    string                      `json:"receiptStatus,omitempty"`
+	ReceiptBody      string                      `json:"receiptBody,omitempty"`
+	DeliveryAudit    []NotificationDeliveryAudit `json:"deliveryAudit,omitempty"`
+	DeadLetterReason string                      `json:"deadLetterReason,omitempty"`
+	CreatedAt        string                      `json:"createdAt"`
+	AckedBy          string                      `json:"ackedBy,omitempty"`
+	AckNote          string                      `json:"ackNote,omitempty"`
+	AckedAt          string                      `json:"ackedAt,omitempty"`
 }
 
 func NewSeedStore(options ...Option) *Store {
@@ -1973,14 +1985,16 @@ func dispatchChannelNotification(notification ChannelNotification, outcome strin
 	notification.Attempts++
 	notification.LastDispatchAt = now.Format(time.RFC3339)
 	notification.Signature = signChannelNotification(notification)
+	payload := notificationPayload(notification)
 	result, err := delivery.DeliverChannelNotification(context.Background(), NotificationDeliveryRequest{
 		Notification:  notification,
 		Outcome:       outcome,
-		SignedPayload: notificationPayload(notification),
+		SignedPayload: payload,
 	})
 	if err != nil {
 		result = NotificationDeliveryResult{Error: err.Error(), ReceiptStatus: "500 DELIVERY_ERROR", ReceiptBody: err.Error()}
 	}
+	notification.DeliveryAudit = append(notification.DeliveryAudit, newNotificationDeliveryAudit(notification, payload, result, now))
 	if result.Accepted {
 		notification.Status = "SENT"
 		notification.LastError = ""
@@ -2013,6 +2027,47 @@ func signChannelNotification(notification ChannelNotification) string {
 
 func notificationPayload(notification ChannelNotification) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", notification.ID, notification.Channel, notification.Target, notification.TargetURL, notification.Count, notification.Attempts)
+}
+
+func newNotificationDeliveryAudit(notification ChannelNotification, payload string, result NotificationDeliveryResult, createdAt time.Time) NotificationDeliveryAudit {
+	return NotificationDeliveryAudit{
+		Attempt:          notification.Attempts,
+		TargetURL:        notification.TargetURL,
+		SecretRef:        notification.SecretRef,
+		SignaturePreview: signaturePreview(notification.Signature),
+		PayloadHash:      sha256Hex(payload),
+		RequestSummary:   fmt.Sprintf("POST %s channel=%s count=%d", notification.TargetURL, notification.Channel, notification.Count),
+		ResponseSummary:  redactedResponseSummary(result),
+		CreatedAt:        createdAt.Format(time.RFC3339),
+	}
+}
+
+func signaturePreview(signature string) string {
+	signature = strings.TrimSpace(signature)
+	if len(signature) <= 12 {
+		return signature
+	}
+	return signature[:12] + "..."
+}
+
+func sha256Hex(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
+
+func redactedResponseSummary(result NotificationDeliveryResult) string {
+	status := fallback(result.ReceiptStatus, "NO_STATUS")
+	body := strings.TrimSpace(result.ReceiptBody)
+	if len(body) > 80 {
+		body = body[:80] + "..."
+	}
+	if body == "" {
+		body = strings.TrimSpace(result.Error)
+	}
+	if body == "" {
+		return status
+	}
+	return status + " · " + body
 }
 
 func notificationSecret(secretRef string) string {

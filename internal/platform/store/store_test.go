@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -578,6 +579,16 @@ func TestDispatchChannelNotificationUsesDeliveryClientAndSecretRef(t *testing.T)
 	expectedSignature := signChannelNotification(client.requests[0].Notification)
 	if sent.Signature != expectedSignature {
 		t.Fatalf("expected env-secret signature %s, got %s", expectedSignature, sent.Signature)
+	}
+	if len(sent.DeliveryAudit) != 1 {
+		t.Fatalf("expected one delivery audit record, got %#v", sent.DeliveryAudit)
+	}
+	audit := sent.DeliveryAudit[0]
+	if audit.Attempt != 1 || audit.PayloadHash == "" || audit.SignaturePreview != expectedSignature[:12]+"..." {
+		t.Fatalf("expected redacted audit summary, got %#v", audit)
+	}
+	if strings.Contains(audit.RequestSummary, client.requests[0].SignedPayload) || strings.Contains(audit.ResponseSummary, expectedSignature) {
+		t.Fatalf("expected audit summary to avoid raw payload/signature, got %#v", audit)
 	}
 }
 

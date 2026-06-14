@@ -274,6 +274,14 @@ func TestDispatchChannelNotificationRouteRecordsReceipt(t *testing.T) {
 			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
 		}
 	}
+	for _, expected := range []string{`"deliveryAudit":[`, `"payloadHash":"`, `"signaturePreview":"`, `"requestSummary":"POST https://hooks.example.com/anjing/marketplace-oncall`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected audit field %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+	if strings.Contains(rec.Body.String(), "signedPayload") {
+		t.Fatalf("expected response to avoid raw signed payload, got %s", rec.Body.String())
+	}
 }
 
 func TestExportTrainingSamplesRouteReturnsLowScoreSamples(t *testing.T) {

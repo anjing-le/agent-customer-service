@@ -29,7 +29,7 @@
 | 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示 active/next secret ref、allowed origins、rate limit、签名窗口、replay 开关和轮换提示，不返回密钥值 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
-| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因；`ChannelAlert`、`ChannelFailureTrend`、`ChannelAlertPolicy`、`ChannelNotification` 聚合渠道失败类型、趋势、通知策略、目标 URL、secret ref、demo/HTTP delivery client、签名出站、退避重试、外部回执、死信和确认闭环 |
+| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因；`ChannelAlert`、`ChannelFailureTrend`、`ChannelAlertPolicy`、`ChannelNotification` 聚合渠道失败类型、趋势、通知策略、目标 URL、secret ref、demo/HTTP delivery client、签名出站、退避重试、外部回执、脱敏投递审计、死信和确认闭环 |
 | 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
 | 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |

@@ -333,9 +333,10 @@ func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (Channel
 		    last_error = $11,
 		    receipt_status = $12,
 		    receipt_body = $13,
-		    dead_letter_reason = $14
+		    delivery_audit = $14,
+		    dead_letter_reason = $15
 		where id = $1
-	`, item.ID, item.Status, item.Attempts, item.MaxAttempts, item.BackoffSeconds, nullableTime(item.NextRetryAt, nextRetryAt), item.TargetURL, item.SecretRef, item.Signature, lastDispatchAt, item.LastError, item.ReceiptStatus, item.ReceiptBody, item.DeadLetterReason); err != nil {
+	`, item.ID, item.Status, item.Attempts, item.MaxAttempts, item.BackoffSeconds, nullableTime(item.NextRetryAt, nextRetryAt), item.TargetURL, item.SecretRef, item.Signature, lastDispatchAt, item.LastError, item.ReceiptStatus, item.ReceiptBody, notificationDeliveryAuditJSON(item.DeliveryAudit), item.DeadLetterReason); err != nil {
 		return ChannelNotification{}, fmt.Errorf("dispatch channel notification: %w", err)
 	}
 	return item, nil
@@ -347,17 +348,19 @@ func (s *PostgresStore) channelNotification(id string) (ChannelNotification, err
 	var ackedAt *time.Time
 	var lastDispatchAt *time.Time
 	var nextRetryAt *time.Time
+	var deliveryAudit []byte
 	if err := s.pool.QueryRow(context.Background(), `
-		select id, channel, severity, target, target_url, secret_ref, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, dead_letter_reason, created_at, acked_by, ack_note, acked_at
+		select id, channel, severity, target, target_url, secret_ref, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, delivery_audit, dead_letter_reason, created_at, acked_by, ack_note, acked_at
 		from channel_notifications
 		where id = $1
 	`, id).Scan(
 		&item.ID, &item.Channel, &item.Severity, &item.Target, &item.TargetURL, &item.SecretRef, &item.Status, &item.Reason, &item.Count,
-		&item.Attempts, &item.MaxAttempts, &item.BackoffSeconds, &nextRetryAt, &item.Signature, &lastDispatchAt, &item.LastError, &item.ReceiptStatus, &item.ReceiptBody, &item.DeadLetterReason,
+		&item.Attempts, &item.MaxAttempts, &item.BackoffSeconds, &nextRetryAt, &item.Signature, &lastDispatchAt, &item.LastError, &item.ReceiptStatus, &item.ReceiptBody, &deliveryAudit, &item.DeadLetterReason,
 		&createdAt, &item.AckedBy, &item.AckNote, &ackedAt,
 	); err != nil {
 		return ChannelNotification{}, fmt.Errorf("load channel notification: %w", err)
 	}
+	item.DeliveryAudit = parseNotificationDeliveryAudit(deliveryAudit)
 	normalizeNotificationTimes(&item, createdAt, ackedAt, lastDispatchAt, nextRetryAt)
 	return item, nil
 }
@@ -1395,7 +1398,7 @@ func insertTriggeredNotifications(ctx context.Context, tx pgx.Tx, policies []Cha
 
 func (s *PostgresStore) listChannelNotifications() ([]ChannelNotification, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, channel, severity, target, target_url, secret_ref, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, dead_letter_reason, created_at, acked_by, ack_note, acked_at
+		select id, channel, severity, target, target_url, secret_ref, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, delivery_audit, dead_letter_reason, created_at, acked_by, ack_note, acked_at
 		from channel_notifications
 		order by created_at desc, id desc
 		limit 30
@@ -1412,13 +1415,15 @@ func (s *PostgresStore) listChannelNotifications() ([]ChannelNotification, error
 		var ackedAt *time.Time
 		var lastDispatchAt *time.Time
 		var nextRetryAt *time.Time
+		var deliveryAudit []byte
 		if err := rows.Scan(
 			&item.ID, &item.Channel, &item.Severity, &item.Target, &item.TargetURL, &item.SecretRef, &item.Status, &item.Reason, &item.Count,
-			&item.Attempts, &item.MaxAttempts, &item.BackoffSeconds, &nextRetryAt, &item.Signature, &lastDispatchAt, &item.LastError, &item.ReceiptStatus, &item.ReceiptBody, &item.DeadLetterReason,
+			&item.Attempts, &item.MaxAttempts, &item.BackoffSeconds, &nextRetryAt, &item.Signature, &lastDispatchAt, &item.LastError, &item.ReceiptStatus, &item.ReceiptBody, &deliveryAudit, &item.DeadLetterReason,
 			&createdAt, &item.AckedBy, &item.AckNote, &ackedAt,
 		); err != nil {
 			return nil, err
 		}
+		item.DeliveryAudit = parseNotificationDeliveryAudit(deliveryAudit)
 		normalizeNotificationTimes(&item, createdAt, ackedAt, lastDispatchAt, nextRetryAt)
 		items = append(items, item)
 	}
@@ -1458,6 +1463,28 @@ func normalizeNotificationTimes(item *ChannelNotification, createdAt time.Time, 
 	if item.BackoffSeconds <= 0 {
 		item.BackoffSeconds = 60
 	}
+}
+
+func notificationDeliveryAuditJSON(audit []NotificationDeliveryAudit) string {
+	if len(audit) == 0 {
+		return "[]"
+	}
+	data, err := json.Marshal(audit)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+func parseNotificationDeliveryAudit(data []byte) []NotificationDeliveryAudit {
+	if len(data) == 0 {
+		return nil
+	}
+	var audit []NotificationDeliveryAudit
+	if err := json.Unmarshal(data, &audit); err != nil {
+		return nil
+	}
+	return audit
 }
 
 func (s *PostgresStore) listRecentMessages() ([]Message, error) {

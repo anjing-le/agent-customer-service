@@ -715,11 +715,25 @@
         "lastError": "string",
         "receiptStatus": "string",
         "receiptBody": "string",
+        "deliveryAudit": "NotificationDeliveryAudit[]",
         "deadLetterReason": "string",
         "createdAt": "RFC3339 string",
         "ackedBy": "string",
         "ackNote": "string",
         "ackedAt": "RFC3339 string"
+      }
+    },
+    "NotificationDeliveryAudit": {
+      "required": ["attempt", "targetUrl", "secretRef", "signaturePreview", "payloadHash", "requestSummary", "responseSummary", "createdAt"],
+      "fields": {
+        "attempt": "number",
+        "targetUrl": "string",
+        "secretRef": "string",
+        "signaturePreview": "redacted HMAC prefix",
+        "payloadHash": "SHA-256 hex string of signed payload",
+        "requestSummary": "redacted outbound request summary",
+        "responseSummary": "redacted delivery response summary",
+        "createdAt": "RFC3339 string"
       }
     },
     "ChannelPolicy": {
