@@ -457,3 +457,66 @@ func TestExportTrainingSamplesRouteRejectsInvalidMaxScore(t *testing.T) {
 		t.Fatalf("expected validation error, got %s", rec.Body.String())
 	}
 }
+
+func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
+	st := store.NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("report-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record failure: %v", err)
+		}
+	}
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report/export?format=markdown", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
+		t.Fatalf("expected markdown content type, got %s", rec.Header().Get("Content-Type"))
+	}
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid"} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in markdown report, got %s", expected, rec.Body.String())
+		}
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report/export?format=csv", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Header().Get("Content-Type"), "text/csv") {
+		t.Fatalf("expected csv content type, got %s", rec.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(rec.Body.String(), "section,channel,status,code,count,owner,next_action,escalation") {
+		t.Fatalf("expected csv header, got %s", rec.Body.String())
+	}
+}
+
+func TestExportChannelOpsReportRouteRejectsInvalidFormat(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report/export?format=pdf", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "format must be markdown or csv") {
+		t.Fatalf("expected validation error, got %s", rec.Body.String())
+	}
+}

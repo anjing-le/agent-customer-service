@@ -254,6 +254,14 @@
       "path": "/api/ops/training-samples/export",
       "request": { "query": "ExportTrainingSamplesQuery" },
       "response": { "status": 200, "schema": "TrainingSample[]" }
+    },
+    {
+      "id": "exportChannelOpsReport",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-ops-report/export",
+      "request": { "query": "ExportChannelOpsReportQuery" },
+      "response": { "status": 200, "schema": "ChannelOpsReportExport" }
     }
   ],
   "schemas": {
@@ -483,6 +491,18 @@
     "ExportTrainingSamplesQuery": {
       "fields": {
         "maxScore": "number"
+      }
+    },
+    "ExportChannelOpsReportQuery": {
+      "fields": {
+        "format": "markdown|csv"
+      }
+    },
+    "ChannelOpsReportExport": {
+      "required": ["content"],
+      "fields": {
+        "content": "text/markdown or text/csv response body",
+        "contentType": "text/markdown|text/csv"
       }
     },
     "Conversation": {

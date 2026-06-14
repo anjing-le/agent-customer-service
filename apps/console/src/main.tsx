@@ -1190,39 +1190,16 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const downloadChannelOpsReport = () => {
-    const report = {
-      generatedAt: new Date().toISOString(),
-      window: 'last 24 hours',
-      summary: {
-        channelFailures: channelAlerts.reduce((sum, item) => sum + item.count, 0),
-        activeAlerts: channelAlertPolicies.filter((item) => item.active).length,
-        openNotifications: notificationStats.open,
-        retryingNotifications: notificationStats.retrying,
-        deadLetters: notificationStats.dead,
-        runbooks: channelRunbooks.length
-      },
-      alerts: channelAlerts,
-      trends: channelFailureTrends,
-      notificationStats,
-      runbooks: channelRunbooks,
-      notifications: channelNotifications.map((item) => ({
-        id: item.id,
-        channel: item.channel,
-        status: item.status,
-        target: item.target,
-        attempts: item.attempts,
-        maxAttempts: item.maxAttempts,
-        deadLetterReason: item.deadLetterReason,
-        ackedBy: item.ackedBy,
-        ackedAt: item.ackedAt
-      }))
-    };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const downloadChannelOpsReport = async (format: 'markdown' | 'csv') => {
+    const response = await fetch(`/api/ops/channel-ops-report/export?format=${format}`);
+    if (!response.ok) {
+      throw new Error('download channel ops report failed');
+    }
+    const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `agent-customer-service-channel-ops-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `agent-customer-service-channel-ops-${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'md'}`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -1679,7 +1656,10 @@ function App() {
               </div>
               <div className="headerActions">
                 <span className="status">{channelFailureTrends.length}</span>
-                <button className="tinyButton" onClick={downloadChannelOpsReport} title="导出运营日报">
+                <button className="tinyButton" onClick={() => downloadChannelOpsReport('markdown').catch((err) => setError(err instanceof Error ? err.message : 'download channel ops report failed'))} title="导出 Markdown 日报">
+                  <Download size={14} />
+                </button>
+                <button className="tinyButton" onClick={() => downloadChannelOpsReport('csv').catch((err) => setError(err instanceof Error ? err.message : 'download channel ops report failed'))} title="导出 CSV 日报">
                   <Download size={14} />
                 </button>
               </div>
