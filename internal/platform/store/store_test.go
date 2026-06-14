@@ -560,6 +560,9 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	if len(dashboard.PolicyChanges) != 1 || dashboard.PolicyChanges[0].Status != "PENDING" {
 		t.Fatalf("expected pending policy change, got %#v", dashboard.PolicyChanges)
 	}
+	if len(dashboard.PolicyChanges[0].Diff) == 0 || dashboard.PolicyChanges[0].CurrentSecretRef == "" {
+		t.Fatalf("expected policy change diff and current snapshot, got %#v", dashboard.PolicyChanges[0])
+	}
 	approved, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过")
 	if err != nil {
 		t.Fatalf("approve policy change: %v", err)
@@ -597,6 +600,20 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	}
 	if notification.MaxAttempts != 5 || notification.BackoffSeconds != 45 {
 		t.Fatalf("expected configured retry values, got %#v", notification)
+	}
+	rolledBack, err := st.RollbackChannelAlertPolicy("Marketplace", "ops-a", "回滚通知目标")
+	if err != nil {
+		t.Fatalf("rollback channel alert policy: %v", err)
+	}
+	if rolledBack.TargetURL == "https://ops.example.com/hooks/marketplace" || rolledBack.SecretRef == "ANJING_NOTIFICATION_CUSTOM_SECRET" {
+		t.Fatalf("expected rollback to previous delivery config, got %#v", rolledBack)
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if dashboard.PolicyEvents[0].Action != "ROLLBACK" {
+		t.Fatalf("expected rollback policy event, got %#v", dashboard.PolicyEvents[0])
 	}
 }
 

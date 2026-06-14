@@ -363,7 +363,7 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 		return ChannelAlertPolicy{}, err
 	}
 	if requiresNotificationPolicyApproval(before) {
-		change := newNotificationPolicyChange(before.Channel, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
+		change := newNotificationPolicyChange(before, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
 		if err := insertNotificationPolicyChange(ctx, tx, change); err != nil {
 			return ChannelAlertPolicy{}, err
 		}
@@ -570,6 +570,55 @@ func (s *PostgresStore) CancelNotificationPolicyChange(id string, actor string, 
 		return NotificationPolicyChange{}, fmt.Errorf("commit cancel notification policy change: %w", err)
 	}
 	return change, nil
+}
+
+func (s *PostgresStore) RollbackChannelAlertPolicy(channel string, actor string, note string) (ChannelAlertPolicy, error) {
+	normalized := strings.TrimSpace(channel)
+	if normalized == "" {
+		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
+	}
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("begin rollback channel alert policy: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	before, err := channelAlertPolicyTx(ctx, tx, normalized)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	rollback, err := latestApprovedNotificationPolicyChangeTx(ctx, tx, before.Channel)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		update channel_alert_policies
+		set target_url = $2,
+		    secret_ref = $3,
+		    max_attempts = $4,
+		    backoff_seconds = $5,
+		    updated_at = now()
+		where lower(channel) = lower($1)
+	`, before.Channel, rollback.CurrentTargetURL, rollback.CurrentSecretRef, normalizeMaxAttempts(rollback.CurrentMaxAttempts), normalizeBackoffSeconds(rollback.CurrentBackoffSeconds)); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("rollback channel alert policy: %w", err)
+	}
+	after, err := channelAlertPolicyTx(ctx, tx, before.Channel)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	event := newNotificationPolicyEvent(after.Channel, "ROLLBACK", fallback(actor, "ops-a"), notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, "通知目标已回滚到上一版"), time.Now().UTC().Format(time.RFC3339))
+	if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("commit rollback channel alert policy: %w", err)
+	}
+	alerts, err := s.listChannelAlerts()
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	return channelAlertPolicies([]ChannelAlertPolicy{after}, alerts)[0], nil
 }
 
 func (s *PostgresStore) channelNotification(id string) (ChannelNotification, error) {
@@ -1664,9 +1713,13 @@ func insertNotificationPolicyChange(ctx context.Context, tx pgx.Tx, change Notif
 		expiresAt = createdAt.Add(notificationPolicyChangeTTL())
 	}
 	if _, err := tx.Exec(ctx, `
-		insert into notification_policy_changes (id, channel, target_url, secret_ref, max_attempts, backoff_seconds, requested_by, status, note, created_at, expires_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-	`, change.ID, change.Channel, change.TargetURL, change.SecretRef, change.MaxAttempts, change.BackoffSeconds, change.RequestedBy, change.Status, change.Note, createdAt, expiresAt); err != nil {
+		insert into notification_policy_changes (
+			id, channel, target_url, secret_ref, max_attempts, backoff_seconds,
+			current_target_url, current_secret_ref, current_max_attempts, current_backoff_seconds,
+			requested_by, status, note, created_at, expires_at
+		)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+	`, change.ID, change.Channel, change.TargetURL, change.SecretRef, change.MaxAttempts, change.BackoffSeconds, change.CurrentTargetURL, change.CurrentSecretRef, change.CurrentMaxAttempts, change.CurrentBackoffSeconds, change.RequestedBy, change.Status, change.Note, createdAt, expiresAt); err != nil {
 		return fmt.Errorf("insert notification policy change: %w", err)
 	}
 	return nil
@@ -1678,7 +1731,9 @@ func notificationPolicyChangeTx(ctx context.Context, q queryer, id string) (Noti
 	var expiresAt time.Time
 	var approvedAt *time.Time
 	if err := q.QueryRow(ctx, `
-		select id, channel, target_url, secret_ref, max_attempts, backoff_seconds, requested_by, status, note, created_at, expires_at, approved_by, approved_at
+		select id, channel, target_url, secret_ref, max_attempts, backoff_seconds,
+		       current_target_url, current_secret_ref, current_max_attempts, current_backoff_seconds,
+		       requested_by, status, note, created_at, expires_at, approved_by, approved_at
 		from notification_policy_changes
 		where id = $1
 	`, id).Scan(
@@ -1688,6 +1743,10 @@ func notificationPolicyChangeTx(ctx context.Context, q queryer, id string) (Noti
 		&item.SecretRef,
 		&item.MaxAttempts,
 		&item.BackoffSeconds,
+		&item.CurrentTargetURL,
+		&item.CurrentSecretRef,
+		&item.CurrentMaxAttempts,
+		&item.CurrentBackoffSeconds,
 		&item.RequestedBy,
 		&item.Status,
 		&item.Note,
@@ -1700,15 +1759,48 @@ func notificationPolicyChangeTx(ctx context.Context, q queryer, id string) (Noti
 	}
 	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 	item.ExpiresAt = expiresAt.UTC().Format(time.RFC3339)
+	item.Diff = notificationPolicyDiff(item)
 	if approvedAt != nil {
 		item.ApprovedAt = approvedAt.UTC().Format(time.RFC3339)
 	}
 	return item, nil
 }
 
+func latestApprovedNotificationPolicyChangeTx(ctx context.Context, q queryer, channel string) (NotificationPolicyChange, error) {
+	rows, err := q.Query(ctx, `
+		select id
+		from notification_policy_changes
+		where lower(channel) = lower($1)
+		  and status = 'APPROVED'
+		  and current_target_url <> ''
+		  and current_secret_ref <> ''
+		order by approved_at desc nulls last, created_at desc, id desc
+		limit 1
+	`, channel)
+	if err != nil {
+		return NotificationPolicyChange{}, fmt.Errorf("list approved notification policy changes: %w", err)
+	}
+	defer rows.Close()
+	var id string
+	if rows.Next() {
+		if err := rows.Scan(&id); err != nil {
+			return NotificationPolicyChange{}, err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return NotificationPolicyChange{}, err
+	}
+	if strings.TrimSpace(id) == "" {
+		return NotificationPolicyChange{}, fmt.Errorf("channel alert policy %s has no approved change to rollback", channel)
+	}
+	return notificationPolicyChangeTx(ctx, q, id)
+}
+
 func (s *PostgresStore) listNotificationPolicyChanges() ([]NotificationPolicyChange, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, channel, target_url, secret_ref, max_attempts, backoff_seconds, requested_by, status, note, created_at, expires_at, approved_by, approved_at
+		select id, channel, target_url, secret_ref, max_attempts, backoff_seconds,
+		       current_target_url, current_secret_ref, current_max_attempts, current_backoff_seconds,
+		       requested_by, status, note, created_at, expires_at, approved_by, approved_at
 		from notification_policy_changes
 		order by created_at desc, id desc
 		limit 20
@@ -1731,6 +1823,10 @@ func (s *PostgresStore) listNotificationPolicyChanges() ([]NotificationPolicyCha
 			&item.SecretRef,
 			&item.MaxAttempts,
 			&item.BackoffSeconds,
+			&item.CurrentTargetURL,
+			&item.CurrentSecretRef,
+			&item.CurrentMaxAttempts,
+			&item.CurrentBackoffSeconds,
 			&item.RequestedBy,
 			&item.Status,
 			&item.Note,
@@ -1743,6 +1839,7 @@ func (s *PostgresStore) listNotificationPolicyChanges() ([]NotificationPolicyCha
 		}
 		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		item.ExpiresAt = expiresAt.UTC().Format(time.RFC3339)
+		item.Diff = notificationPolicyDiff(item)
 		if approvedAt != nil {
 			item.ApprovedAt = approvedAt.UTC().Format(time.RFC3339)
 		}

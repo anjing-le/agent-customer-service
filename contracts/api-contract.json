@@ -232,6 +232,14 @@
       "response": { "status": 200, "schema": "NotificationPolicyChange" }
     },
     {
+      "id": "rollbackChannelAlertPolicy",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-alert-policies/rollback",
+      "request": { "body": "RollbackChannelAlertPolicyRequest" },
+      "response": { "status": 200, "schema": "ChannelAlertPolicy" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -451,6 +459,14 @@
         "note": "string"
       }
     },
+    "RollbackChannelAlertPolicyRequest": {
+      "required": ["channel"],
+      "fields": {
+        "channel": "string",
+        "actor": "string",
+        "note": "string"
+      }
+    },
     "SubmitAnnotationRequest": {
       "required": ["messageId"],
       "fields": {
@@ -595,8 +611,16 @@
         "createdAt": "RFC3339 string"
       }
     },
+    "NotificationPolicyDiff": {
+      "required": ["field", "before", "after"],
+      "fields": {
+        "field": "targetUrl|secretRef|maxAttempts|backoffSeconds",
+        "before": "string",
+        "after": "string"
+      }
+    },
     "NotificationPolicyChange": {
-      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "requestedBy", "status", "note", "createdAt", "expiresAt"],
+      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "currentTargetUrl", "currentSecretRef", "currentMaxAttempts", "currentBackoffSeconds", "diff", "requestedBy", "status", "note", "createdAt", "expiresAt"],
       "fields": {
         "id": "string",
         "channel": "string",
@@ -604,6 +628,11 @@
         "secretRef": "string",
         "maxAttempts": "number",
         "backoffSeconds": "number",
+        "currentTargetUrl": "string",
+        "currentSecretRef": "string",
+        "currentMaxAttempts": "number",
+        "currentBackoffSeconds": "number",
+        "diff": "NotificationPolicyDiff[]",
         "requestedBy": "string",
         "status": "PENDING|APPROVED|REJECTED|CANCELED|EXPIRED",
         "note": "string",

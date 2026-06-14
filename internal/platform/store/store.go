@@ -89,6 +89,7 @@ type Runtime interface {
 	ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error)
 	RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error)
 	CancelNotificationPolicyChange(id string, actor string, note string) (NotificationPolicyChange, error)
+	RollbackChannelAlertPolicy(channel string, actor string, note string) (ChannelAlertPolicy, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
@@ -270,19 +271,30 @@ type NotificationPolicyEvent struct {
 }
 
 type NotificationPolicyChange struct {
-	ID             string `json:"id"`
-	Channel        string `json:"channel"`
-	TargetURL      string `json:"targetUrl"`
-	SecretRef      string `json:"secretRef"`
-	MaxAttempts    int    `json:"maxAttempts"`
-	BackoffSeconds int    `json:"backoffSeconds"`
-	RequestedBy    string `json:"requestedBy"`
-	Status         string `json:"status"`
-	Note           string `json:"note"`
-	CreatedAt      string `json:"createdAt"`
-	ExpiresAt      string `json:"expiresAt"`
-	ApprovedBy     string `json:"approvedBy,omitempty"`
-	ApprovedAt     string `json:"approvedAt,omitempty"`
+	ID                    string                   `json:"id"`
+	Channel               string                   `json:"channel"`
+	TargetURL             string                   `json:"targetUrl"`
+	SecretRef             string                   `json:"secretRef"`
+	MaxAttempts           int                      `json:"maxAttempts"`
+	BackoffSeconds        int                      `json:"backoffSeconds"`
+	CurrentTargetURL      string                   `json:"currentTargetUrl"`
+	CurrentSecretRef      string                   `json:"currentSecretRef"`
+	CurrentMaxAttempts    int                      `json:"currentMaxAttempts"`
+	CurrentBackoffSeconds int                      `json:"currentBackoffSeconds"`
+	Diff                  []NotificationPolicyDiff `json:"diff"`
+	RequestedBy           string                   `json:"requestedBy"`
+	Status                string                   `json:"status"`
+	Note                  string                   `json:"note"`
+	CreatedAt             string                   `json:"createdAt"`
+	ExpiresAt             string                   `json:"expiresAt"`
+	ApprovedBy            string                   `json:"approvedBy,omitempty"`
+	ApprovedAt            string                   `json:"approvedAt,omitempty"`
+}
+
+type NotificationPolicyDiff struct {
+	Field  string `json:"field"`
+	Before string `json:"before"`
+	After  string `json:"after"`
 }
 
 type TransferTicket struct {
@@ -681,7 +693,7 @@ func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secre
 			before := s.alertPolicies[idx]
 			normalizeChannelAlertPolicy(&before)
 			if requiresNotificationPolicyApproval(before) {
-				change := newNotificationPolicyChange(before.Channel, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
+				change := newNotificationPolicyChange(before, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
 				s.policyChanges = append([]NotificationPolicyChange{change}, s.policyChanges...)
 				event := newNotificationPolicyEvent(before.Channel, "REQUEST_APPROVAL", actor, notificationPolicySummary(before), notificationPolicyChangeSummary(change), note, time.Now().UTC().Format(time.RFC3339))
 				s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
@@ -787,6 +799,40 @@ func (s *Store) CancelNotificationPolicyChange(id string, actor string, note str
 		return s.policyChanges[changeIdx], nil
 	}
 	return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s not found", id)
+}
+
+func (s *Store) RollbackChannelAlertPolicy(channel string, actor string, note string) (ChannelAlertPolicy, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalized := strings.TrimSpace(channel)
+	if normalized == "" {
+		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
+	}
+	for policyIdx := range s.alertPolicies {
+		if !strings.EqualFold(s.alertPolicies[policyIdx].Channel, normalized) {
+			continue
+		}
+		rollback, ok := latestApprovedNotificationPolicyChange(s.policyChanges, s.alertPolicies[policyIdx].Channel)
+		if !ok {
+			return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s has no approved change to rollback", channel)
+		}
+		before := s.alertPolicies[policyIdx]
+		normalizeChannelAlertPolicy(&before)
+		s.alertPolicies[policyIdx].TargetURL = rollback.CurrentTargetURL
+		s.alertPolicies[policyIdx].SecretRef = rollback.CurrentSecretRef
+		s.alertPolicies[policyIdx].MaxAttempts = normalizeMaxAttempts(rollback.CurrentMaxAttempts)
+		s.alertPolicies[policyIdx].BackoffSeconds = normalizeBackoffSeconds(rollback.CurrentBackoffSeconds)
+		after := s.alertPolicies[policyIdx]
+		normalizeChannelAlertPolicy(&after)
+		now := time.Now().UTC().Format(time.RFC3339)
+		event := newNotificationPolicyEvent(after.Channel, "ROLLBACK", actor, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, "通知目标已回滚到上一版"), now)
+		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
+		if len(s.policyEvents) > 30 {
+			s.policyEvents = s.policyEvents[:30]
+		}
+		return channelAlertPolicies([]ChannelAlertPolicy{s.alertPolicies[policyIdx]}, channelAlerts(s.channelFailures))[0], nil
+	}
+	return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s not found", channel)
 }
 
 func (s *Store) DispatchChannelNotification(id, outcome string) (ChannelNotification, error) {
@@ -1468,24 +1514,42 @@ func newNotificationPolicyEvent(channel, action, actor, before, after, note, cre
 	}
 }
 
-func newNotificationPolicyChange(channel, targetURL, secretRef string, maxAttempts, backoffSeconds int, requestedBy, note, createdAt string) NotificationPolicyChange {
+func newNotificationPolicyChange(current ChannelAlertPolicy, targetURL, secretRef string, maxAttempts, backoffSeconds int, requestedBy, note, createdAt string) NotificationPolicyChange {
+	normalizeChannelAlertPolicy(&current)
 	createdTime, err := time.Parse(time.RFC3339, createdAt)
 	if err != nil {
 		createdTime = time.Now().UTC()
 		createdAt = createdTime.Format(time.RFC3339)
 	}
+	next := NotificationPolicyChange{
+		Channel:               current.Channel,
+		TargetURL:             strings.TrimSpace(targetURL),
+		SecretRef:             strings.TrimSpace(secretRef),
+		MaxAttempts:           normalizeMaxAttempts(maxAttempts),
+		BackoffSeconds:        normalizeBackoffSeconds(backoffSeconds),
+		CurrentTargetURL:      current.TargetURL,
+		CurrentSecretRef:      current.SecretRef,
+		CurrentMaxAttempts:    current.MaxAttempts,
+		CurrentBackoffSeconds: current.BackoffSeconds,
+	}
+	next.Diff = notificationPolicyDiff(next)
 	return NotificationPolicyChange{
-		ID:             fmt.Sprintf("notification_policy_change_%d", time.Now().UnixNano()),
-		Channel:        channel,
-		TargetURL:      strings.TrimSpace(targetURL),
-		SecretRef:      strings.TrimSpace(secretRef),
-		MaxAttempts:    normalizeMaxAttempts(maxAttempts),
-		BackoffSeconds: normalizeBackoffSeconds(backoffSeconds),
-		RequestedBy:    fallback(requestedBy, "ops-a"),
-		Status:         "PENDING",
-		Note:           fallback(note, "通知策略变更待审批"),
-		CreatedAt:      createdAt,
-		ExpiresAt:      createdTime.Add(notificationPolicyChangeTTL()).UTC().Format(time.RFC3339),
+		ID:                    fmt.Sprintf("notification_policy_change_%d", time.Now().UnixNano()),
+		Channel:               next.Channel,
+		TargetURL:             next.TargetURL,
+		SecretRef:             next.SecretRef,
+		MaxAttempts:           next.MaxAttempts,
+		BackoffSeconds:        next.BackoffSeconds,
+		CurrentTargetURL:      next.CurrentTargetURL,
+		CurrentSecretRef:      next.CurrentSecretRef,
+		CurrentMaxAttempts:    next.CurrentMaxAttempts,
+		CurrentBackoffSeconds: next.CurrentBackoffSeconds,
+		Diff:                  next.Diff,
+		RequestedBy:           fallback(requestedBy, "ops-a"),
+		Status:                "PENDING",
+		Note:                  fallback(note, "通知策略变更待审批"),
+		CreatedAt:             createdAt,
+		ExpiresAt:             createdTime.Add(notificationPolicyChangeTTL()).UTC().Format(time.RFC3339),
 	}
 }
 
@@ -1496,6 +1560,30 @@ func notificationPolicySummary(policy ChannelAlertPolicy) string {
 
 func notificationPolicyChangeSummary(change NotificationPolicyChange) string {
 	return fmt.Sprintf("targetUrl=%s secretRef=%s maxAttempts=%d backoffSeconds=%d", change.TargetURL, change.SecretRef, change.MaxAttempts, change.BackoffSeconds)
+}
+
+func notificationPolicyDiff(change NotificationPolicyChange) []NotificationPolicyDiff {
+	diffs := make([]NotificationPolicyDiff, 0, 4)
+	appendDiff := func(field, before, after string) {
+		if before != after {
+			diffs = append(diffs, NotificationPolicyDiff{Field: field, Before: before, After: after})
+		}
+	}
+	appendDiff("targetUrl", change.CurrentTargetURL, change.TargetURL)
+	appendDiff("secretRef", change.CurrentSecretRef, change.SecretRef)
+	appendDiff("maxAttempts", fmt.Sprintf("%d", normalizeMaxAttempts(change.CurrentMaxAttempts)), fmt.Sprintf("%d", normalizeMaxAttempts(change.MaxAttempts)))
+	appendDiff("backoffSeconds", fmt.Sprintf("%d", normalizeBackoffSeconds(change.CurrentBackoffSeconds)), fmt.Sprintf("%d", normalizeBackoffSeconds(change.BackoffSeconds)))
+	return diffs
+}
+
+func latestApprovedNotificationPolicyChange(changes []NotificationPolicyChange, channel string) (NotificationPolicyChange, bool) {
+	for _, change := range changes {
+		if change.Status == "APPROVED" && strings.EqualFold(change.Channel, channel) && strings.TrimSpace(change.CurrentTargetURL) != "" && strings.TrimSpace(change.CurrentSecretRef) != "" {
+			change.Diff = notificationPolicyDiff(change)
+			return change, true
+		}
+	}
+	return NotificationPolicyChange{}, false
 }
 
 func notificationPolicyChangeTTL() time.Duration {

@@ -230,6 +230,17 @@ func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
 			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
 		}
 	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/rollback", strings.NewReader(`{"channel":"Marketplace","actor":"ops-a","note":"回滚通知目标"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), `"secretRef":"ANJING_NOTIFICATION_CUSTOM_SECRET"`) {
+		t.Fatalf("expected rollback response to restore previous secret ref, got %s", rec.Body.String())
+	}
 }
 
 func TestRejectChannelAlertPolicyChangeRoute(t *testing.T) {

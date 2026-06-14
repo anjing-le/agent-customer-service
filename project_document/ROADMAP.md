@@ -42,7 +42,7 @@
 - 已支持 active/next secret ref 双密钥轮换窗口，控制台不暴露密钥值。
 - 已支持渠道来源白名单，声明 `Origin` 或 `X-Channel-Origin` 时必须命中 `allowedOrigins`。
 - 已支持渠道每分钟频率限制，超过 `rateLimitPerMinute` 返回 `channel_rate_limited`。
-- 已支持渠道通知出站治理，包含通知目标配置、target URL、secret ref 签名、高风险变更审批/拒绝/撤销/过期、配置变更审计、退避重试、外部回执、死信、确认、脱敏投递审计和控制台筛选。
+- 已支持渠道通知出站治理，包含通知目标配置、target URL、secret ref 签名、高风险变更审批/拒绝/撤销/过期、字段级 diff、通知目标回滚、配置变更审计、退避重试、外部回执、死信、确认、脱敏投递审计和控制台筛选。
 - 下一步补更细的真实平台回调协议差异和渠道验签样例集。
 
 ## V3: 生产化扩展

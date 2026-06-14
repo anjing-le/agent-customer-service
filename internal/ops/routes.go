@@ -361,6 +361,31 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, change)
 	})
 
+	mux.HandleFunc("/api/ops/channel-alert-policies/rollback", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Channel string `json:"channel"`
+			Actor   string `json:"actor"`
+			Note    string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.Channel == "" {
+			httpjson.BadRequest(w, "channel is required")
+			return
+		}
+		policy, err := st.RollbackChannelAlertPolicy(req.Channel, req.Actor, req.Note)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, policy)
+	})
+
 	mux.HandleFunc("/api/ops/annotations/submit", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

@@ -93,6 +93,11 @@ type NotificationPolicyEvent = {
   note: string;
   createdAt: string;
 };
+type NotificationPolicyDiff = {
+  field: string;
+  before: string;
+  after: string;
+};
 type NotificationPolicyChange = {
   id: string;
   channel: string;
@@ -100,6 +105,11 @@ type NotificationPolicyChange = {
   secretRef: string;
   maxAttempts: number;
   backoffSeconds: number;
+  currentTargetUrl: string;
+  currentSecretRef: string;
+  currentMaxAttempts: number;
+  currentBackoffSeconds: number;
+  diff: NotificationPolicyDiff[];
   requestedBy: string;
   status: string;
   note: string;
@@ -952,6 +962,19 @@ function App() {
     }
   };
 
+  const rollbackChannelAlertPolicy = async (policy: ChannelAlertPolicy) => {
+    setError('');
+    try {
+      await api<ChannelAlertPolicy>('/api/ops/channel-alert-policies/rollback', {
+        method: 'POST',
+        body: JSON.stringify({ channel: policy.channel, actor: 'ops-a', note: '通知目标回滚到上一版' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'rollback notification policy failed');
+    }
+  };
+
   const approveNotificationPolicyChange = async (change: NotificationPolicyChange) => {
     setError('');
     try {
@@ -1647,6 +1670,9 @@ function App() {
                       <button className="tinyButton" onClick={() => updateChannelAlertPolicy(policy)} title="保存通知目标">
                         <Save size={14} />
                       </button>
+                      <button className="tinyButton" onClick={() => rollbackChannelAlertPolicy(policy)} title="回滚通知目标">
+                        <RefreshCcw size={14} />
+                      </button>
                     </div>
                   </article>
                 );
@@ -1663,6 +1689,13 @@ function App() {
                       <small>{change.maxAttempts} attempts · {change.backoffSeconds}s backoff</small>
                       <small>{change.requestedBy} · expires {change.expiresAt.slice(11, 19)}</small>
                       <small>{change.note}</small>
+                      {change.diff.length > 0 && (
+                        <div className="policyDiffs">
+                          {change.diff.map((item) => (
+                            <small key={`${change.id}-${item.field}`}>{item.field}: {item.before}{' -> '}{item.after}</small>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="gapActions">
                       <button className="tinyButton" onClick={() => approveNotificationPolicyChange(change)} title="批准通知目标变更">
