@@ -535,6 +535,12 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if len(dashboard.Notifications) != 1 || dashboard.Notifications[0].Status != "OPEN" {
 		t.Fatalf("expected one open notification, got %#v", dashboard.Notifications)
 	}
+	if len(dashboard.ChannelRunbooks) != 1 || dashboard.ChannelRunbooks[0].Status != "DISPATCH" {
+		t.Fatalf("expected dispatch runbook, got %#v", dashboard.ChannelRunbooks)
+	}
+	if dashboard.ChannelRunbooks[0].FailureCode != "channel_signature_invalid" || len(dashboard.ChannelRunbooks[0].Steps) == 0 {
+		t.Fatalf("expected runbook failure code and steps, got %#v", dashboard.ChannelRunbooks[0])
+	}
 	acked, err := st.AcknowledgeChannelNotification(dashboard.Notifications[0].ID, "ops-a", "已通知渠道负责人")
 	if err != nil {
 		t.Fatalf("ack notification: %v", err)

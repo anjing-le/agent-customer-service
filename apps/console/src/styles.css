@@ -789,6 +789,47 @@ input {
   font-weight: 800;
 }
 
+.runbookList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.runbookItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.runbookItem div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.runbookItem span,
+.runbookItem small {
+  overflow: hidden;
+  color: #53695f;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runbookSteps {
+  margin-top: 2px;
+}
+
+.runbookSteps small {
+  white-space: normal;
+}
+
 .alertRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -363,6 +363,9 @@ func TestDispatchChannelNotificationRouteRetriesAndDeadLetters(t *testing.T) {
 	if finalDashboard.Notifications[0].Status != "DEAD_LETTER" || finalDashboard.Notifications[0].Attempts != 3 {
 		t.Fatalf("expected dead letter notification, got %#v", finalDashboard.Notifications[0])
 	}
+	if len(finalDashboard.ChannelRunbooks) != 1 || finalDashboard.ChannelRunbooks[0].Status != "ESCALATE" {
+		t.Fatalf("expected escalate runbook, got %#v", finalDashboard.ChannelRunbooks)
+	}
 }
 
 func TestDispatchChannelNotificationRouteRecordsReceipt(t *testing.T) {

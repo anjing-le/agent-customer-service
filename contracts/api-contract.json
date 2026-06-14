@@ -771,7 +771,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -784,6 +784,7 @@
         "channelFailureTrends": "ChannelFailureTrend[]",
         "channelAlertPolicies": "ChannelAlertPolicy[]",
         "channelNotifications": "ChannelNotification[]",
+        "channelRunbooks": "ChannelRunbook[]",
         "notificationPolicyEvents": "NotificationPolicyEvent[]",
         "notificationPolicyChanges": "NotificationPolicyChange[]",
         "quality": "QualitySummary",
@@ -858,6 +859,21 @@
         "ackedBy": "string",
         "ackNote": "string",
         "ackedAt": "RFC3339 string"
+      }
+    },
+    "ChannelRunbook": {
+      "required": ["channel", "severity", "status", "failureCode", "owner", "nextAction", "escalation", "steps"],
+      "fields": {
+        "channel": "string",
+        "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+        "status": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "failureCode": "string",
+        "owner": "string",
+        "nextAction": "string",
+        "escalation": "string",
+        "notificationId": "string",
+        "notificationState": "OPEN|RETRYING|DEAD_LETTER|SENT|ACKED",
+        "steps": "string[]"
       }
     },
     "NotificationDeliveryAudit": {

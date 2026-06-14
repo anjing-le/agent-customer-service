@@ -411,6 +411,7 @@ type Dashboard struct {
 	ChannelTrends    []ChannelFailureTrend      `json:"channelFailureTrends"`
 	AlertPolicies    []ChannelAlertPolicy       `json:"channelAlertPolicies"`
 	Notifications    []ChannelNotification      `json:"channelNotifications"`
+	ChannelRunbooks  []ChannelRunbook           `json:"channelRunbooks"`
 	PolicyEvents     []NotificationPolicyEvent  `json:"notificationPolicyEvents"`
 	PolicyChanges    []NotificationPolicyChange `json:"notificationPolicyChanges"`
 	Quality          QualitySummary             `json:"quality"`
@@ -425,6 +426,19 @@ type Metric struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
 	Note  string `json:"note"`
+}
+
+type ChannelRunbook struct {
+	Channel           string   `json:"channel"`
+	Severity          string   `json:"severity"`
+	Status            string   `json:"status"`
+	FailureCode       string   `json:"failureCode"`
+	Owner             string   `json:"owner"`
+	NextAction        string   `json:"nextAction"`
+	Escalation        string   `json:"escalation"`
+	NotificationID    string   `json:"notificationId,omitempty"`
+	NotificationState string   `json:"notificationState,omitempty"`
+	Steps             []string `json:"steps"`
 }
 
 type QualitySummary struct {
@@ -1160,6 +1174,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelTrends:    channelFailureTrends(s.channelFailures, time.Now().UTC()),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
+		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications),
 		PolicyEvents:     append([]NotificationPolicyEvent(nil), s.policyEvents...),
 		PolicyChanges:    append([]NotificationPolicyChange(nil), s.policyChanges...),
 		Quality:          quality,
@@ -2557,6 +2572,80 @@ func channelAlertCount(alerts []ChannelAlert) int {
 		total += alert.Count
 	}
 	return total
+}
+
+func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notifications []ChannelNotification) []ChannelRunbook {
+	runbooks := make([]ChannelRunbook, 0)
+	for _, policy := range policies {
+		if !policy.Active {
+			continue
+		}
+		alert := latestChannelAlert(alerts, policy.Channel)
+		notification := latestChannelNotification(notifications, policy.Channel)
+		status := "MONITOR"
+		nextAction := "继续观察渠道失败趋势"
+		escalation := "失败数持续增长时升级给渠道 owner"
+		steps := []string{
+			"确认失败码、来源和最近触发时间",
+			"核对渠道协议矩阵中的签名头、时间窗和 replay key",
+			"检查通知目标、secret ref 和最近一次投递审计",
+		}
+		if notification.ID != "" {
+			switch notification.Status {
+			case "OPEN":
+				status = "DISPATCH"
+				nextAction = "发送出站通知并记录投递审计"
+				steps = append(steps, "点击发送通知，确认目标 webhook 可达")
+			case "RETRYING":
+				status = "RETRY"
+				nextAction = "等待退避重试或手动再次投递"
+				steps = append(steps, "查看 nextRetryAt、lastError 和 response summary")
+			case "DEAD_LETTER":
+				status = "ESCALATE"
+				nextAction = "升级到渠道 owner 并确认死信"
+				escalation = "通知连续失败已进入死信，需人工处理 webhook 或 secret"
+				steps = append(steps, "带上 deadLetterReason、payload hash 和签名预览升级处理")
+			case "SENT":
+				status = "ACK"
+				nextAction = "等待运营确认告警已处理"
+				steps = append(steps, "确认外部回执后点击确认告警")
+			case "ACKED":
+				status = "DONE"
+				nextAction = "处置已确认，保留审计记录"
+			}
+		}
+		runbooks = append(runbooks, ChannelRunbook{
+			Channel:           policy.Channel,
+			Severity:          policy.Severity,
+			Status:            status,
+			FailureCode:       alert.Code,
+			Owner:             policy.NotifyTarget,
+			NextAction:        nextAction,
+			Escalation:        escalation,
+			NotificationID:    notification.ID,
+			NotificationState: notification.Status,
+			Steps:             steps,
+		})
+	}
+	return runbooks
+}
+
+func latestChannelAlert(alerts []ChannelAlert, channel string) ChannelAlert {
+	for _, alert := range alerts {
+		if strings.EqualFold(alert.Channel, channel) {
+			return alert
+		}
+	}
+	return ChannelAlert{Channel: channel, Code: "channel_failure"}
+}
+
+func latestChannelNotification(notifications []ChannelNotification, channel string) ChannelNotification {
+	for _, notification := range notifications {
+		if strings.EqualFold(notification.Channel, channel) {
+			return notification
+		}
+	}
+	return ChannelNotification{}
 }
 
 func openGapCount(gaps []KnowledgeGap) int {

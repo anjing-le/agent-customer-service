@@ -345,6 +345,18 @@ type ChannelNotification = {
   ackNote?: string;
   ackedAt?: string;
 };
+type ChannelRunbook = {
+  channel: string;
+  severity: string;
+  status: string;
+  failureCode: string;
+  owner: string;
+  nextAction: string;
+  escalation: string;
+  notificationId?: string;
+  notificationState?: string;
+  steps: string[];
+};
 type ChannelProtocolExample = {
   id: string;
   channel: string;
@@ -433,6 +445,7 @@ type Dashboard = {
   channelFailureTrends: ChannelFailureTrend[] | null;
   channelAlertPolicies: ChannelAlertPolicy[] | null;
   channelNotifications: ChannelNotification[] | null;
+  channelRunbooks: ChannelRunbook[] | null;
   notificationPolicyEvents: NotificationPolicyEvent[] | null;
   notificationPolicyChanges: NotificationPolicyChange[] | null;
   quality: QualitySummary;
@@ -655,6 +668,7 @@ function App() {
   const channelFailureTrends = dashboard?.channelFailureTrends ?? [];
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
+  const channelRunbooks = dashboard?.channelRunbooks ?? [];
   const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
   const notificationPolicyChanges = dashboard?.notificationPolicyChanges ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
@@ -1766,6 +1780,35 @@ function App() {
                 ))}
               </div>
             )}
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">处置 Runbook</p>
+                <h2>失败处理</h2>
+              </div>
+              <span className="status warning">{channelRunbooks.length}</span>
+            </div>
+            <div className="runbookList">
+              {channelRunbooks.slice(0, 4).map((item) => (
+                <article className="runbookItem" key={`${item.channel}-${item.status}`}>
+                  <div>
+                    <strong>{item.channel} · {item.status}</strong>
+                    <span>{item.failureCode} · {item.owner}</span>
+                    <small>{item.nextAction}</small>
+                    <small>{item.escalation}</small>
+                    <div className="runbookSteps">
+                      {item.steps.slice(0, 4).map((step) => (
+                        <small key={`${item.channel}-${step}`}>{step}</small>
+                      ))}
+                    </div>
+                  </div>
+                  <b className={statusClass(item.status === 'ESCALATE' ? 'HIGH' : item.status === 'RETRY' ? 'MEDIUM' : 'LOW')}>
+                    {item.notificationState || item.severity}
+                  </b>
+                </article>
+              ))}
+              {channelRunbooks.length === 0 && <p className="empty">暂无处置 Runbook</p>}
+            </div>
             <div className="panelDivider" />
             <div className="panelHeader compactHeader">
               <div>
