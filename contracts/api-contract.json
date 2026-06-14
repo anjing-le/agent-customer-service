@@ -262,6 +262,30 @@
       "path": "/api/ops/channel-ops-report/export",
       "request": { "query": "ExportChannelOpsReportQuery" },
       "response": { "status": 200, "schema": "ChannelOpsReportExport" }
+    },
+    {
+      "id": "listChannelOpsReports",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-ops-reports",
+      "request": { "query": "ListChannelOpsReportsQuery" },
+      "response": { "status": 200, "schema": "ChannelOpsReport[]" }
+    },
+    {
+      "id": "generateChannelOpsReport",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-ops-reports/generate",
+      "request": { "body": "GenerateChannelOpsReportRequest" },
+      "response": { "status": 201, "schema": "ChannelOpsReport" }
+    },
+    {
+      "id": "exportSavedChannelOpsReport",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-ops-reports/export",
+      "request": { "query": "ExportSavedChannelOpsReportQuery" },
+      "response": { "status": 200, "schema": "ChannelOpsReportExport" }
     }
   ],
   "schemas": {
@@ -498,11 +522,48 @@
         "format": "markdown|csv"
       }
     },
+    "ListChannelOpsReportsQuery": {
+      "fields": {
+        "limit": "number"
+      }
+    },
+    "GenerateChannelOpsReportRequest": {
+      "fields": {
+        "format": "markdown|csv"
+      }
+    },
+    "ExportSavedChannelOpsReportQuery": {
+      "required": ["id"],
+      "fields": {
+        "id": "string"
+      }
+    },
     "ChannelOpsReportExport": {
       "required": ["content"],
       "fields": {
         "content": "text/markdown or text/csv response body",
         "contentType": "text/markdown|text/csv"
+      }
+    },
+    "ChannelOpsReport": {
+      "required": ["id", "format", "contentType", "summary", "generatedAt"],
+      "fields": {
+        "id": "string",
+        "format": "markdown|csv",
+        "contentType": "text/markdown|text/csv",
+        "content": "string omitted from list responses",
+        "summary": "ChannelOpsReportSummary",
+        "generatedAt": "RFC3339 string"
+      }
+    },
+    "ChannelOpsReportSummary": {
+      "fields": {
+        "failureCount": "number",
+        "activeRunbooks": "number",
+        "openNotifications": "number",
+        "retrying": "number",
+        "deadLetters": "number",
+        "channels": "string[]"
       }
     },
     "Conversation": {

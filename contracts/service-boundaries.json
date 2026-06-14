@@ -77,7 +77,10 @@
         { "name": "rollbackChannelAlertPolicy", "path": "/api/ops/channel-alert-policies/rollback", "methods": ["POST"] },
         { "name": "submitAnnotation", "path": "/api/ops/annotations/submit", "methods": ["POST"] },
         { "name": "exportTrainingSamples", "path": "/api/ops/training-samples/export", "methods": ["GET"] },
-        { "name": "exportChannelOpsReport", "path": "/api/ops/channel-ops-report/export", "methods": ["GET"] }
+        { "name": "exportChannelOpsReport", "path": "/api/ops/channel-ops-report/export", "methods": ["GET"] },
+        { "name": "listChannelOpsReports", "path": "/api/ops/channel-ops-reports", "methods": ["GET"] },
+        { "name": "generateChannelOpsReport", "path": "/api/ops/channel-ops-reports/generate", "methods": ["POST"] },
+        { "name": "exportSavedChannelOpsReport", "path": "/api/ops/channel-ops-reports/export", "methods": ["GET"] }
       ]
     }
   ]

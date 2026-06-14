@@ -520,3 +520,97 @@ func TestExportChannelOpsReportRouteRejectsInvalidFormat(t *testing.T) {
 		t.Fatalf("expected validation error, got %s", rec.Body.String())
 	}
 }
+
+func TestChannelOpsReportHistoryRoutesGenerateListAndExport(t *testing.T) {
+	st := store.NewSeedStore()
+	if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+		Channel:           "App",
+		Code:              "channel_rate_limited",
+		Reason:            "渠道限流",
+		ExternalMessageID: "history-1",
+		Origin:            "app://agent-customer-service",
+	}); err != nil {
+		t.Fatalf("record failure: %v", err)
+	}
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	generateReq := httptest.NewRequest(http.MethodPost, "/api/ops/channel-ops-reports/generate", strings.NewReader(`{"format":"markdown"}`))
+	generateRec := httptest.NewRecorder()
+	mux.ServeHTTP(generateRec, generateReq)
+
+	if generateRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", generateRec.Code, generateRec.Body.String())
+	}
+	for _, expected := range []string{`"format":"markdown"`, `"contentType":"text/markdown; charset=utf-8"`, `"failureCount":1`, "# Agent Customer Service Channel Ops Report"} {
+		if !strings.Contains(generateRec.Body.String(), expected) {
+			t.Fatalf("expected %s in generated report, got %s", expected, generateRec.Body.String())
+		}
+	}
+	reportID := generatedReportID(generateRec.Body.String())
+	if reportID == "" {
+		t.Fatalf("expected generated report id, got %s", generateRec.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-reports?limit=5", nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	for _, expected := range []string{`"id":"` + reportID + `"`, `"failureCount":1`} {
+		if !strings.Contains(listRec.Body.String(), expected) {
+			t.Fatalf("expected %s in report list, got %s", expected, listRec.Body.String())
+		}
+	}
+	if strings.Contains(listRec.Body.String(), "# Agent Customer Service Channel Ops Report") {
+		t.Fatalf("expected list response to omit report content, got %s", listRec.Body.String())
+	}
+
+	exportReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-reports/export?id="+reportID, nil)
+	exportRec := httptest.NewRecorder()
+	mux.ServeHTTP(exportRec, exportReq)
+
+	if exportRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", exportRec.Code, exportRec.Body.String())
+	}
+	if !strings.Contains(exportRec.Header().Get("Content-Type"), "text/markdown") {
+		t.Fatalf("expected markdown content type, got %s", exportRec.Header().Get("Content-Type"))
+	}
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "App", "channel_rate_limited"} {
+		if !strings.Contains(exportRec.Body.String(), expected) {
+			t.Fatalf("expected %s in exported history report, got %s", expected, exportRec.Body.String())
+		}
+	}
+}
+
+func TestGenerateChannelOpsReportRouteRejectsInvalidFormat(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-ops-reports/generate", strings.NewReader(`{"format":"pdf"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "format must be markdown or csv") {
+		t.Fatalf("expected validation error, got %s", rec.Body.String())
+	}
+}
+
+func generatedReportID(body string) string {
+	const marker = `"id":"`
+	start := strings.Index(body, marker)
+	if start < 0 {
+		return ""
+	}
+	start += len(marker)
+	end := strings.Index(body[start:], `"`)
+	if end < 0 {
+		return ""
+	}
+	return body[start : start+end]
+}

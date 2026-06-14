@@ -133,6 +133,18 @@ func (f failingRuntime) ExportTrainingSamples(int) ([]store.TrainingSample, erro
 	return nil, errors.New("database unavailable")
 }
 
+func (f failingRuntime) SaveChannelOpsReport(store.ChannelOpsReport) (store.ChannelOpsReport, error) {
+	return store.ChannelOpsReport{}, errors.New("database unavailable")
+}
+
+func (f failingRuntime) ListChannelOpsReports(int) ([]store.ChannelOpsReport, error) {
+	return nil, errors.New("database unavailable")
+}
+
+func (f failingRuntime) ChannelOpsReport(string) (store.ChannelOpsReport, error) {
+	return store.ChannelOpsReport{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) Dashboard() (store.Dashboard, error) {
 	return store.Dashboard{}, errors.New("database unavailable")
 }

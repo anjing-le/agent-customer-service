@@ -107,6 +107,9 @@ type Runtime interface {
 	CompleteReviewTask(id string) (ReviewTask, error)
 	SubmitAnnotation(messageID, reviewer, verdict, note string, dimensions AnnotationDimensions, tags []string) (Annotation, error)
 	ExportTrainingSamples(maxScore int) ([]TrainingSample, error)
+	SaveChannelOpsReport(report ChannelOpsReport) (ChannelOpsReport, error)
+	ListChannelOpsReports(limit int) ([]ChannelOpsReport, error)
+	ChannelOpsReport(id string) (ChannelOpsReport, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -123,6 +126,7 @@ type Store struct {
 	integrations    []ChannelIntegration
 	alertPolicies   []ChannelAlertPolicy
 	notifications   []ChannelNotification
+	channelReports  []ChannelOpsReport
 	policyEvents    []NotificationPolicyEvent
 	policyChanges   []NotificationPolicyChange
 	ruleApprovals   []RuleApproval
@@ -420,6 +424,24 @@ type Dashboard struct {
 	RuleApprovals    []RuleApproval             `json:"ruleApprovals"`
 	RuleEvents       []RuleReleaseEvent         `json:"ruleEvents"`
 	RuleObservations []RuleReleaseObservation   `json:"ruleObservations"`
+}
+
+type ChannelOpsReport struct {
+	ID          string                  `json:"id"`
+	Format      string                  `json:"format"`
+	ContentType string                  `json:"contentType"`
+	Content     string                  `json:"content,omitempty"`
+	Summary     ChannelOpsReportSummary `json:"summary"`
+	GeneratedAt string                  `json:"generatedAt"`
+}
+
+type ChannelOpsReportSummary struct {
+	FailureCount      int      `json:"failureCount"`
+	ActiveRunbooks    int      `json:"activeRunbooks"`
+	OpenNotifications int      `json:"openNotifications"`
+	Retrying          int      `json:"retrying"`
+	DeadLetters       int      `json:"deadLetters"`
+	Channels          []string `json:"channels"`
 }
 
 type Metric struct {
@@ -1123,6 +1145,42 @@ func (s *Store) ExportTrainingSamples(maxScore int) ([]TrainingSample, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return trainingSamples(s.annotations, s.messages, s.conversations, normalizeMaxScore(maxScore)), nil
+}
+
+func (s *Store) SaveChannelOpsReport(report ChannelOpsReport) (ChannelOpsReport, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalizeChannelOpsReport(&report)
+	s.channelReports = append([]ChannelOpsReport{report}, s.channelReports...)
+	if len(s.channelReports) > 30 {
+		s.channelReports = s.channelReports[:30]
+	}
+	return report, nil
+}
+
+func (s *Store) ListChannelOpsReports(limit int) ([]ChannelOpsReport, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit = normalizeReportLimit(limit)
+	items := append([]ChannelOpsReport(nil), s.channelReports...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	for idx := range items {
+		items[idx].Content = ""
+	}
+	return items, nil
+}
+
+func (s *Store) ChannelOpsReport(id string) (ChannelOpsReport, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, item := range s.channelReports {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return ChannelOpsReport{}, fmt.Errorf("channel ops report %s not found", id)
 }
 
 func (s *Store) Dashboard() (Dashboard, error) {
@@ -2137,6 +2195,40 @@ func normalizeMaxScore(maxScore int) int {
 		return 100
 	}
 	return maxScore
+}
+
+func normalizeReportLimit(limit int) int {
+	if limit <= 0 {
+		return 10
+	}
+	if limit > 30 {
+		return 30
+	}
+	return limit
+}
+
+func normalizeChannelOpsReport(report *ChannelOpsReport) {
+	now := time.Now().UTC()
+	if strings.TrimSpace(report.ID) == "" {
+		report.ID = fmt.Sprintf("channel_ops_%d", now.UnixNano())
+	}
+	report.Format = strings.ToLower(strings.TrimSpace(report.Format))
+	if report.Format == "md" {
+		report.Format = "markdown"
+	}
+	if report.Format == "" {
+		report.Format = "markdown"
+	}
+	if strings.TrimSpace(report.ContentType) == "" {
+		if report.Format == "csv" {
+			report.ContentType = "text/csv; charset=utf-8"
+		} else {
+			report.ContentType = "text/markdown; charset=utf-8"
+		}
+	}
+	if strings.TrimSpace(report.GeneratedAt) == "" {
+		report.GeneratedAt = now.Format(time.RFC3339)
+	}
 }
 
 func trainingSamples(annotations []Annotation, messages []Message, conversations []Conversation, maxScore int) []TrainingSample {

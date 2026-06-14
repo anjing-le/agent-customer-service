@@ -430,6 +430,22 @@ type ChannelFailureResult = {
   code: string;
   reason: string;
 };
+type ChannelOpsReportSummary = {
+  failureCount: number;
+  activeRunbooks: number;
+  openNotifications: number;
+  retrying: number;
+  deadLetters: number;
+  channels: string[];
+};
+type ChannelOpsReport = {
+  id: string;
+  format: 'markdown' | 'csv';
+  contentType: string;
+  content?: string;
+  summary: ChannelOpsReportSummary;
+  generatedAt: string;
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
@@ -644,6 +660,8 @@ function App() {
   const [annotationNote, setAnnotationNote] = useState('证据充分，回复安全，可作为教学正样本。');
   const [annotationSaving, setAnnotationSaving] = useState(false);
   const [trainingSamples, setTrainingSamples] = useState<TrainingSample[]>([]);
+  const [channelOpsReports, setChannelOpsReports] = useState<ChannelOpsReport[]>([]);
+  const [reportGenerating, setReportGenerating] = useState('');
   const [channelDemoSending, setChannelDemoSending] = useState('');
   const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
   const [channelFailureSending, setChannelFailureSending] = useState('');
@@ -726,14 +744,16 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData, sampleData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData, reportData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
         api<KnowledgeArticle[]>('/api/knowledge/articles'),
-        api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80')
+        api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
+        api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6')
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData);
       setTrainingSamples(sampleData);
+      setChannelOpsReports(reportData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1200,6 +1220,36 @@ function App() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `agent-customer-service-channel-ops-${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'md'}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const generateChannelOpsReport = async (format: 'markdown' | 'csv') => {
+    setReportGenerating(format);
+    setError('');
+    try {
+      const report = await api<ChannelOpsReport>('/api/ops/channel-ops-reports/generate', {
+        method: 'POST',
+        body: JSON.stringify({ format })
+      });
+      setChannelOpsReports((current) => [report, ...current.filter((item) => item.id !== report.id)].slice(0, 6));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'generate channel ops report failed');
+    } finally {
+      setReportGenerating('');
+    }
+  };
+
+  const downloadSavedChannelOpsReport = async (report: ChannelOpsReport) => {
+    const response = await fetch(`/api/ops/channel-ops-reports/export?id=${encodeURIComponent(report.id)}`);
+    if (!response.ok) {
+      throw new Error('download saved channel ops report failed');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-ops-${report.generatedAt.slice(0, 10)}.${report.format === 'csv' ? 'csv' : 'md'}`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -1678,6 +1728,36 @@ function App() {
                 </article>
               ))}
               {channelFailureTrends.length === 0 && <p className="empty">暂无失败趋势</p>}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">日报留存</p>
+                <h2>渠道运营</h2>
+              </div>
+              <div className="headerActions">
+                <button className="tinyButton" disabled={reportGenerating === 'markdown'} onClick={() => void generateChannelOpsReport('markdown')} title="生成 Markdown 日报">
+                  <Save size={14} />
+                </button>
+                <button className="tinyButton" disabled={reportGenerating === 'csv'} onClick={() => void generateChannelOpsReport('csv')} title="生成 CSV 日报">
+                  <Save size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="tableList compactList">
+              {channelOpsReports.map((report) => (
+                <article className="tableRow" key={report.id}>
+                  <div>
+                    <strong>{report.format.toUpperCase()} · {report.generatedAt.slice(0, 16).replace('T', ' ')}</strong>
+                    <span>{report.summary.failureCount} failures · {report.summary.activeRunbooks} runbooks · {report.summary.openNotifications + report.summary.retrying} open notices</span>
+                    <span>{report.summary.channels.length > 0 ? report.summary.channels.join(' / ') : 'ALL channels'}</span>
+                  </div>
+                  <button className="tinyButton" onClick={() => downloadSavedChannelOpsReport(report).catch((err) => setError(err instanceof Error ? err.message : 'download saved channel ops report failed'))} title="下载历史日报">
+                    <Download size={14} />
+                  </button>
+                </article>
+              ))}
+              {channelOpsReports.length === 0 && <p className="empty">暂无历史日报</p>}
             </div>
             <div className="panelDivider" />
             <div className="panelHeader compactHeader">

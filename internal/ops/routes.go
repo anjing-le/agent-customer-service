@@ -59,6 +59,65 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		}
 	})
 
+	mux.HandleFunc("/api/ops/channel-ops-reports", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		reports, err := st.ListChannelOpsReports(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, reports)
+	})
+
+	mux.HandleFunc("/api/ops/channel-ops-reports/generate", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Format string `json:"format"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		dashboard, err := st.Dashboard()
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		report, err := buildChannelOpsReport(dashboard, req.Format, time.Now().UTC())
+		if err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		report, err = st.SaveChannelOpsReport(report)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.Created(w, report)
+	})
+
+	mux.HandleFunc("/api/ops/channel-ops-reports/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		id := strings.TrimSpace(r.URL.Query().Get("id"))
+		if id == "" {
+			httpjson.BadRequest(w, "id is required")
+			return
+		}
+		report, err := st.ChannelOpsReport(id)
+		if err != nil {
+			httpjson.Fail(w, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+		writeChannelOpsReport(w, report)
+	})
+
 	mux.HandleFunc("/api/ops/rules/test", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return
@@ -474,6 +533,88 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		}
 		httpjson.OK(w, samples)
 	})
+}
+
+func buildChannelOpsReport(dashboard store.Dashboard, format string, generatedAt time.Time) (store.ChannelOpsReport, error) {
+	format = strings.ToLower(strings.TrimSpace(format))
+	if format == "" {
+		format = "markdown"
+	}
+	if format == "md" {
+		format = "markdown"
+	}
+	report := store.ChannelOpsReport{
+		ID:          fmt.Sprintf("channel_ops_%d", generatedAt.UnixNano()),
+		Format:      format,
+		Summary:     channelOpsReportSummary(dashboard),
+		GeneratedAt: generatedAt.UTC().Format(time.RFC3339),
+	}
+	switch format {
+	case "markdown":
+		report.ContentType = "text/markdown; charset=utf-8"
+		report.Content = renderChannelOpsReportMarkdown(dashboard, generatedAt)
+	case "csv":
+		content, err := renderChannelOpsReportCSV(dashboard)
+		if err != nil {
+			return store.ChannelOpsReport{}, err
+		}
+		report.ContentType = "text/csv; charset=utf-8"
+		report.Content = string(content)
+	default:
+		return store.ChannelOpsReport{}, fmt.Errorf("format must be markdown or csv")
+	}
+	return report, nil
+}
+
+func writeChannelOpsReport(w http.ResponseWriter, report store.ChannelOpsReport) {
+	contentType := strings.TrimSpace(report.ContentType)
+	if contentType == "" {
+		contentType = "text/markdown; charset=utf-8"
+		if report.Format == "csv" {
+			contentType = "text/csv; charset=utf-8"
+		}
+	}
+	extension := "md"
+	if report.Format == "csv" {
+		extension = "csv"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="agent-customer-service-channel-ops-%s.%s"`, report.ID, extension))
+	_, _ = w.Write([]byte(report.Content))
+}
+
+func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSummary {
+	summary := store.ChannelOpsReportSummary{}
+	seenChannels := map[string]bool{}
+	for _, alert := range dashboard.ChannelAlerts {
+		summary.FailureCount += alert.Count
+		if alert.Channel != "" && !seenChannels[alert.Channel] {
+			seenChannels[alert.Channel] = true
+			summary.Channels = append(summary.Channels, alert.Channel)
+		}
+	}
+	summary.ActiveRunbooks = len(dashboard.ChannelRunbooks)
+	for _, runbook := range dashboard.ChannelRunbooks {
+		if runbook.Channel != "" && !seenChannels[runbook.Channel] {
+			seenChannels[runbook.Channel] = true
+			summary.Channels = append(summary.Channels, runbook.Channel)
+		}
+	}
+	for _, notification := range dashboard.Notifications {
+		switch notification.Status {
+		case "OPEN":
+			summary.OpenNotifications++
+		case "RETRYING":
+			summary.Retrying++
+		case "DEAD_LETTER":
+			summary.DeadLetters++
+		}
+		if notification.Channel != "" && !seenChannels[notification.Channel] {
+			seenChannels[notification.Channel] = true
+			summary.Channels = append(summary.Channels, notification.Channel)
+		}
+	}
+	return summary
 }
 
 func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.Time) string {

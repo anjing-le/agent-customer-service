@@ -1157,6 +1157,60 @@ func (s *PostgresStore) ExportTrainingSamples(maxScore int) ([]TrainingSample, e
 	return samples, nil
 }
 
+func (s *PostgresStore) SaveChannelOpsReport(report ChannelOpsReport) (ChannelOpsReport, error) {
+	normalizeChannelOpsReport(&report)
+	generatedAt, err := time.Parse(time.RFC3339, report.GeneratedAt)
+	if err != nil {
+		generatedAt = time.Now().UTC()
+		report.GeneratedAt = generatedAt.Format(time.RFC3339)
+	}
+	summary, err := json.Marshal(report.Summary)
+	if err != nil {
+		return ChannelOpsReport{}, fmt.Errorf("encode channel ops report summary: %w", err)
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into channel_ops_reports (id, format, content_type, content, summary, generated_at)
+		values ($1, $2, $3, $4, $5, $6)
+	`, report.ID, report.Format, report.ContentType, report.Content, summary, generatedAt); err != nil {
+		return ChannelOpsReport{}, fmt.Errorf("save channel ops report: %w", err)
+	}
+	return report, nil
+}
+
+func (s *PostgresStore) ListChannelOpsReports(limit int) ([]ChannelOpsReport, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, format, content_type, '' as content, summary, generated_at
+		from channel_ops_reports
+		order by generated_at desc, id desc
+		limit $1
+	`, normalizeReportLimit(limit))
+	if err != nil {
+		return nil, fmt.Errorf("list channel ops reports: %w", err)
+	}
+	defer rows.Close()
+	return scanChannelOpsReports(rows)
+}
+
+func (s *PostgresStore) ChannelOpsReport(id string) (ChannelOpsReport, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, format, content_type, content, summary, generated_at
+		from channel_ops_reports
+		where id = $1
+	`, id)
+	if err != nil {
+		return ChannelOpsReport{}, fmt.Errorf("load channel ops report: %w", err)
+	}
+	defer rows.Close()
+	items, err := scanChannelOpsReports(rows)
+	if err != nil {
+		return ChannelOpsReport{}, err
+	}
+	if len(items) == 0 {
+		return ChannelOpsReport{}, fmt.Errorf("channel ops report %s not found", id)
+	}
+	return items[0], nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err := s.expireNotificationPolicyChanges(); err != nil {
 		return Dashboard{}, err
@@ -2196,6 +2250,29 @@ func scanReviewTask(row reviewTaskScanner) (ReviewTask, error) {
 		item.CompletedAt = completedAt.UTC().Format(time.RFC3339)
 	}
 	return item, nil
+}
+
+func scanChannelOpsReports(rows pgx.Rows) ([]ChannelOpsReport, error) {
+	items := make([]ChannelOpsReport, 0)
+	for rows.Next() {
+		var item ChannelOpsReport
+		var summary []byte
+		var generatedAt time.Time
+		if err := rows.Scan(&item.ID, &item.Format, &item.ContentType, &item.Content, &summary, &generatedAt); err != nil {
+			return nil, fmt.Errorf("scan channel ops report: %w", err)
+		}
+		if len(summary) > 0 && string(summary) != "{}" {
+			if err := json.Unmarshal(summary, &item.Summary); err != nil {
+				return nil, fmt.Errorf("decode channel ops report summary: %w", err)
+			}
+		}
+		item.GeneratedAt = generatedAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func scanMessages(rows pgx.Rows) ([]Message, error) {

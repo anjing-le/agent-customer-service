@@ -518,6 +518,11 @@ input {
   border-top: 0;
 }
 
+.compactList {
+  max-height: 260px;
+  overflow: auto;
+}
+
 .tableRow div {
   display: grid;
   min-width: 0;
