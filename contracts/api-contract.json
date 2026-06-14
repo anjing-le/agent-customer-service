@@ -192,6 +192,14 @@
       "response": { "status": 200, "schema": "ChannelNotification" }
     },
     {
+      "id": "dispatchChannelNotification",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-notifications/dispatch",
+      "request": { "body": "DispatchChannelNotificationRequest" },
+      "response": { "status": 200, "schema": "ChannelNotification" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -366,6 +374,13 @@
         "id": "string",
         "actor": "string",
         "note": "string"
+      }
+    },
+    "DispatchChannelNotificationRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string",
+        "outcome": "SUCCESS|webhook_timeout|webhook_5xx"
       }
     },
     "SubmitAnnotationRequest": {
@@ -680,15 +695,21 @@
       }
     },
     "ChannelNotification": {
-      "required": ["id", "channel", "severity", "target", "status", "reason", "count", "createdAt"],
+      "required": ["id", "channel", "severity", "target", "status", "reason", "count", "attempts", "maxAttempts", "createdAt"],
       "fields": {
         "id": "string",
         "channel": "string",
         "severity": "LOW|MEDIUM|HIGH|CRITICAL",
         "target": "string",
-        "status": "OPEN|ACKED",
+        "status": "OPEN|RETRYING|SENT|DEAD_LETTER|ACKED",
         "reason": "string",
         "count": "number",
+        "attempts": "number",
+        "maxAttempts": "number",
+        "signature": "HMAC-SHA256 hex string",
+        "lastDispatchAt": "RFC3339 string",
+        "lastError": "string",
+        "deadLetterReason": "string",
         "createdAt": "RFC3339 string",
         "ackedBy": "string",
         "ackNote": "string",

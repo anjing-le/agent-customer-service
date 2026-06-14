@@ -2,6 +2,9 @@ package store
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -47,6 +50,7 @@ type Runtime interface {
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
+	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
@@ -413,17 +417,23 @@ type ChannelAlertPolicy struct {
 }
 
 type ChannelNotification struct {
-	ID        string `json:"id"`
-	Channel   string `json:"channel"`
-	Severity  string `json:"severity"`
-	Target    string `json:"target"`
-	Status    string `json:"status"`
-	Reason    string `json:"reason"`
-	Count     int    `json:"count"`
-	CreatedAt string `json:"createdAt"`
-	AckedBy   string `json:"ackedBy,omitempty"`
-	AckNote   string `json:"ackNote,omitempty"`
-	AckedAt   string `json:"ackedAt,omitempty"`
+	ID               string `json:"id"`
+	Channel          string `json:"channel"`
+	Severity         string `json:"severity"`
+	Target           string `json:"target"`
+	Status           string `json:"status"`
+	Reason           string `json:"reason"`
+	Count            int    `json:"count"`
+	Attempts         int    `json:"attempts"`
+	MaxAttempts      int    `json:"maxAttempts"`
+	Signature        string `json:"signature,omitempty"`
+	LastDispatchAt   string `json:"lastDispatchAt,omitempty"`
+	LastError        string `json:"lastError,omitempty"`
+	DeadLetterReason string `json:"deadLetterReason,omitempty"`
+	CreatedAt        string `json:"createdAt"`
+	AckedBy          string `json:"ackedBy,omitempty"`
+	AckNote          string `json:"ackNote,omitempty"`
+	AckedAt          string `json:"ackedAt,omitempty"`
 }
 
 func NewSeedStore(options ...Option) *Store {
@@ -575,6 +585,18 @@ func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
 	policies := channelAlertPolicies(s.alertPolicies, alerts)
 	s.notifications = appendTriggeredNotifications(s.notifications, policies, event.CreatedAt)
 	return nil
+}
+
+func (s *Store) DispatchChannelNotification(id, outcome string) (ChannelNotification, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx := range s.notifications {
+		if s.notifications[idx].ID == id {
+			s.notifications[idx] = dispatchChannelNotification(s.notifications[idx], outcome, time.Now().UTC())
+			return s.notifications[idx], nil
+		}
+	}
+	return ChannelNotification{}, fmt.Errorf("channel notification %s not found", id)
 }
 
 func (s *Store) AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error) {
@@ -1873,7 +1895,7 @@ func appendTriggeredNotifications(existing []ChannelNotification, policies []Cha
 
 func hasOpenChannelNotification(items []ChannelNotification, channel string) bool {
 	for _, item := range items {
-		if item.Channel == channel && item.Status == "OPEN" {
+		if item.Channel == channel && (item.Status == "OPEN" || item.Status == "RETRYING") {
 			return true
 		}
 	}
@@ -1882,15 +1904,49 @@ func hasOpenChannelNotification(items []ChannelNotification, channel string) boo
 
 func newChannelNotification(policy ChannelAlertPolicy, createdAt string) ChannelNotification {
 	return ChannelNotification{
-		ID:        fmt.Sprintf("channel_notice_%d", time.Now().UnixNano()),
-		Channel:   policy.Channel,
-		Severity:  policy.Severity,
-		Target:    policy.NotifyTarget,
-		Status:    "OPEN",
-		Reason:    fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
-		Count:     policy.CurrentCount,
-		CreatedAt: fallback(createdAt, time.Now().UTC().Format(time.RFC3339)),
+		ID:          fmt.Sprintf("channel_notice_%d", time.Now().UnixNano()),
+		Channel:     policy.Channel,
+		Severity:    policy.Severity,
+		Target:      policy.NotifyTarget,
+		Status:      "OPEN",
+		Reason:      fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
+		Count:       policy.CurrentCount,
+		MaxAttempts: 3,
+		CreatedAt:   fallback(createdAt, time.Now().UTC().Format(time.RFC3339)),
 	}
+}
+
+func dispatchChannelNotification(notification ChannelNotification, outcome string, now time.Time) ChannelNotification {
+	if notification.MaxAttempts <= 0 {
+		notification.MaxAttempts = 3
+	}
+	if notification.Status == "ACKED" || notification.Status == "SENT" || notification.Status == "DEAD_LETTER" {
+		return notification
+	}
+	notification.Attempts++
+	notification.LastDispatchAt = now.Format(time.RFC3339)
+	notification.Signature = signChannelNotification(notification)
+	if strings.EqualFold(outcome, "SUCCESS") {
+		notification.Status = "SENT"
+		notification.LastError = ""
+		notification.DeadLetterReason = ""
+		return notification
+	}
+	notification.LastError = fallback(outcome, "webhook_timeout")
+	if notification.Attempts >= notification.MaxAttempts {
+		notification.Status = "DEAD_LETTER"
+		notification.DeadLetterReason = fmt.Sprintf("failed after %d signed webhook attempts", notification.Attempts)
+		return notification
+	}
+	notification.Status = "RETRYING"
+	return notification
+}
+
+func signChannelNotification(notification ChannelNotification) string {
+	payload := fmt.Sprintf("%s|%s|%s|%d|%d", notification.ID, notification.Channel, notification.Target, notification.Count, notification.Attempts)
+	mac := hmac.New(sha256.New, []byte("anjing-notification-demo-secret"))
+	_, _ = mac.Write([]byte(payload))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func activeAlertPolicies(policies []ChannelAlertPolicy) int {

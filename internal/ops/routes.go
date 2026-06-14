@@ -233,6 +233,30 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, notification)
 	})
 
+	mux.HandleFunc("/api/ops/channel-notifications/dispatch", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			ID      string `json:"id"`
+			Outcome string `json:"outcome"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.ID == "" {
+			httpjson.BadRequest(w, "id is required")
+			return
+		}
+		notification, err := st.DispatchChannelNotification(req.ID, req.Outcome)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, notification)
+	})
+
 	mux.HandleFunc("/api/ops/annotations/submit", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

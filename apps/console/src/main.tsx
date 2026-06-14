@@ -270,6 +270,12 @@ type ChannelNotification = {
   status: string;
   reason: string;
   count: number;
+  attempts: number;
+  maxAttempts: number;
+  signature?: string;
+  lastDispatchAt?: string;
+  lastError?: string;
+  deadLetterReason?: string;
   createdAt: string;
   ackedBy?: string;
   ackNote?: string;
@@ -814,6 +820,19 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ack notification failed');
+    }
+  };
+
+  const dispatchChannelNotification = async (notification: ChannelNotification, outcome: 'SUCCESS' | 'webhook_timeout') => {
+    setError('');
+    try {
+      await api<ChannelNotification>('/api/ops/channel-notifications/dispatch', {
+        method: 'POST',
+        body: JSON.stringify({ id: notification.id, outcome })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'dispatch notification failed');
     }
   };
 
@@ -1440,11 +1459,25 @@ function App() {
                   <div>
                     <strong>{item.channel} · {item.target}</strong>
                     <span>{item.reason}</span>
+                    <span>{item.attempts}/{item.maxAttempts} attempts{item.lastDispatchAt ? ` · ${item.lastDispatchAt.slice(11, 19)}` : ''}</span>
+                    {item.signature && <span>sig {item.signature.slice(0, 12)}...</span>}
+                    {item.lastError && <span>{item.lastError}</span>}
+                    {item.deadLetterReason && <span>{item.deadLetterReason}</span>}
                     {item.ackedBy && <span>{item.ackedBy} · {item.ackNote}</span>}
                   </div>
                   <div className="gapActions">
-                    <b className={statusClass(item.status === 'OPEN' ? 'HIGH' : 'LOW')}>{item.status}</b>
-                    {item.status === 'OPEN' && (
+                    <b className={statusClass(item.status === 'DEAD_LETTER' ? 'HIGH' : item.status === 'RETRYING' ? 'MEDIUM' : 'LOW')}>{item.status}</b>
+                    {(item.status === 'OPEN' || item.status === 'RETRYING') && (
+                      <>
+                        <button className="tinyButton" onClick={() => dispatchChannelNotification(item, 'SUCCESS')} title="发送通知">
+                          <Send size={14} />
+                        </button>
+                        <button className="tinyButton" onClick={() => dispatchChannelNotification(item, 'webhook_timeout')} title="模拟失败重试">
+                          <RefreshCcw size={14} />
+                        </button>
+                      </>
+                    )}
+                    {(item.status === 'OPEN' || item.status === 'RETRYING' || item.status === 'DEAD_LETTER' || item.status === 'SENT') && (
                       <button className="tinyButton" onClick={() => acknowledgeChannelNotification(item)} title="确认告警">
                         <CheckCircle2 size={14} />
                       </button>

@@ -195,6 +195,49 @@ func TestAcknowledgeChannelNotificationRoute(t *testing.T) {
 	}
 }
 
+func TestDispatchChannelNotificationRouteRetriesAndDeadLetters(t *testing.T) {
+	st := store.NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("dead-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	notificationID := dashboard.Notifications[0].ID
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	for idx := 0; idx < 3; idx++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-notifications/dispatch", strings.NewReader(`{"id":"`+notificationID+`","outcome":"webhook_timeout"}`))
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), `"signature":"`) {
+			t.Fatalf("expected signed dispatch, got %s", rec.Body.String())
+		}
+	}
+	finalDashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if finalDashboard.Notifications[0].Status != "DEAD_LETTER" || finalDashboard.Notifications[0].Attempts != 3 {
+		t.Fatalf("expected dead letter notification, got %#v", finalDashboard.Notifications[0])
+	}
+}
+
 func TestExportTrainingSamplesRouteReturnsLowScoreSamples(t *testing.T) {
 	st := store.NewSeedStore()
 	result, err := st.SendMessage("conv_demo_refund", "这个商品能不能开发票？")
