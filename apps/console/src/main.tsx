@@ -81,6 +81,19 @@ type RuleReleaseEvent = {
   note: string;
   createdAt: string;
 };
+type RuleReleaseObservation = {
+  ruleCode: string;
+  version: string;
+  releasedAt: string;
+  window: string;
+  ruleHits: number;
+  transferTickets: number;
+  lowScoreSamples: number;
+  averageReview: number;
+  riskLevel: string;
+  recommendation: string;
+  rollbackRecommended: boolean;
+};
 type RuleApproval = {
   id: string;
   ruleCode: string;
@@ -326,6 +339,7 @@ type Dashboard = {
   rules: Rule[] | null;
   ruleApprovals: RuleApproval[] | null;
   ruleEvents: RuleReleaseEvent[] | null;
+  ruleObservations: RuleReleaseObservation[] | null;
   transfers: TransferTicket[] | null;
   channelPolicies: ChannelPolicy[] | null;
   integrations: ChannelIntegration[] | null;
@@ -539,6 +553,7 @@ function App() {
   const rules = dashboard?.rules ?? [];
   const ruleApprovals = dashboard?.ruleApprovals ?? [];
   const ruleEvents = dashboard?.ruleEvents ?? [];
+  const ruleObservations = dashboard?.ruleObservations ?? [];
   const transfers = dashboard?.transfers ?? [];
   const annotations = dashboard?.annotations ?? [];
   const reviewTasks = dashboard?.reviewTasks ?? [];
@@ -1700,6 +1715,25 @@ function App() {
                       <span>{event.note}</span>
                     </div>
                     <b className={statusClass(event.action === 'ROLLBACK' ? 'REVIEW' : 'LOW')}>{event.createdAt.slice(11, 19)}</b>
+                  </article>
+                ))}
+              </div>
+            )}
+            {ruleObservations.length > 0 && (
+              <div className="ruleEvents">
+                {ruleObservations.slice(0, 3).map((observation) => (
+                  <article className="eventRow releaseObservation" key={`${observation.ruleCode}-${observation.version}`}>
+                    <div>
+                      <strong>{observation.ruleCode} · {observation.version}</strong>
+                      <span>{observation.window} window · {observation.ruleHits} hits · {observation.transferTickets} transfers</span>
+                      <div className="observationMetrics">
+                        <span>{observation.lowScoreSamples} low-score samples</span>
+                        <span>{observation.averageReview || 'n/a'} review avg</span>
+                        <span>{observation.rollbackRecommended ? 'rollback suggested' : 'watching'}</span>
+                      </div>
+                      <span>{observation.recommendation}</span>
+                    </div>
+                    <b className={statusClass(observation.riskLevel)}>{observation.riskLevel}</b>
                   </article>
                 ))}
               </div>

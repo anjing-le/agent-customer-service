@@ -894,6 +894,23 @@ textarea {
   color: #426153;
 }
 
+.releaseObservation {
+  border-left: 4px solid #356d9d;
+}
+
+.observationMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.observationMetrics span {
+  padding: 6px 8px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
 .empty {
   color: #6d7d74;
   line-height: 1.7;
@@ -941,5 +958,9 @@ textarea {
 
   .approvalSample {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .observationMetrics {
+    grid-template-columns: 1fr;
   }
 }

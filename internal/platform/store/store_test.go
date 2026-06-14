@@ -441,6 +441,33 @@ func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
 	if result.RuleCode != "CANCEL_RISK_TRANSFER" {
 		t.Fatalf("expected published rule to become active, got %#v", result)
 	}
+	for idx := 0; idx < 3; idx++ {
+		reply, err := st.SendMessage("conv_demo_refund", fmt.Sprintf("我想取消订单，退款争议需要确认 %d", idx))
+		if err != nil {
+			t.Fatalf("send post-release message: %v", err)
+		}
+		if _, err := st.SubmitAnnotation(reply.AgentMessage.ID, "qa-lead", "FAIL", "发布后低分样本", AnnotationDimensions{
+			Groundedness: 2,
+			Safety:       2,
+			Helpfulness:  2,
+		}, []string{"rule_release_observation"}); err != nil {
+			t.Fatalf("submit post-release annotation: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.RuleObservations) != 1 {
+		t.Fatalf("expected one rule observation, got %#v", dashboard.RuleObservations)
+	}
+	observation := dashboard.RuleObservations[0]
+	if observation.RuleCode != "CANCEL_RISK_TRANSFER" || observation.RiskLevel != "HIGH" || !observation.RollbackRecommended {
+		t.Fatalf("expected high-risk rollback observation, got %#v", observation)
+	}
+	if observation.RuleHits < 4 || observation.LowScoreSamples < 3 || observation.TransferTickets < 3 {
+		t.Fatalf("expected post-release samples and transfers, got %#v", observation)
+	}
 
 	rolledBack, err := st.RollbackRule("CANCEL_RISK_TRANSFER", "qa-lead", "发布后人工压力过高，回滚")
 	if err != nil {
@@ -449,7 +476,7 @@ func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
 	if rolledBack.Action != "ROLLBACK" {
 		t.Fatalf("expected rollback event, got %#v", rolledBack)
 	}
-	dashboard, err := st.Dashboard()
+	dashboard, err = st.Dashboard()
 	if err != nil {
 		t.Fatalf("dashboard: %v", err)
 	}

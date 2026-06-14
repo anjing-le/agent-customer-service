@@ -198,6 +198,20 @@ type RuleReleaseEvent struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+type RuleReleaseObservation struct {
+	RuleCode            string `json:"ruleCode"`
+	Version             string `json:"version"`
+	ReleasedAt          string `json:"releasedAt"`
+	Window              string `json:"window"`
+	RuleHits            int    `json:"ruleHits"`
+	TransferTickets     int    `json:"transferTickets"`
+	LowScoreSamples     int    `json:"lowScoreSamples"`
+	AverageReview       int    `json:"averageReview"`
+	RiskLevel           string `json:"riskLevel"`
+	Recommendation      string `json:"recommendation"`
+	RollbackRecommended bool   `json:"rollbackRecommended"`
+}
+
 type TransferTicket struct {
 	ID             string          `json:"id"`
 	ConversationID string          `json:"conversationId"`
@@ -300,22 +314,23 @@ type TrainingSample struct {
 }
 
 type Dashboard struct {
-	Metrics         []Metric              `json:"metrics"`
-	Conversations   []Conversation        `json:"conversations"`
-	KnowledgeGaps   []KnowledgeGap        `json:"knowledgeGaps"`
-	Rules           []Rule                `json:"rules"`
-	Transfers       []TransferTicket      `json:"transfers"`
-	ChannelPolicies []ChannelPolicy       `json:"channelPolicies"`
-	Integrations    []ChannelIntegration  `json:"integrations"`
-	ChannelAlerts   []ChannelAlert        `json:"channelAlerts"`
-	ChannelTrends   []ChannelFailureTrend `json:"channelFailureTrends"`
-	AlertPolicies   []ChannelAlertPolicy  `json:"channelAlertPolicies"`
-	Notifications   []ChannelNotification `json:"channelNotifications"`
-	Quality         QualitySummary        `json:"quality"`
-	Annotations     []Annotation          `json:"annotations"`
-	ReviewTasks     []ReviewTask          `json:"reviewTasks"`
-	RuleApprovals   []RuleApproval        `json:"ruleApprovals"`
-	RuleEvents      []RuleReleaseEvent    `json:"ruleEvents"`
+	Metrics          []Metric                 `json:"metrics"`
+	Conversations    []Conversation           `json:"conversations"`
+	KnowledgeGaps    []KnowledgeGap           `json:"knowledgeGaps"`
+	Rules            []Rule                   `json:"rules"`
+	Transfers        []TransferTicket         `json:"transfers"`
+	ChannelPolicies  []ChannelPolicy          `json:"channelPolicies"`
+	Integrations     []ChannelIntegration     `json:"integrations"`
+	ChannelAlerts    []ChannelAlert           `json:"channelAlerts"`
+	ChannelTrends    []ChannelFailureTrend    `json:"channelFailureTrends"`
+	AlertPolicies    []ChannelAlertPolicy     `json:"channelAlertPolicies"`
+	Notifications    []ChannelNotification    `json:"channelNotifications"`
+	Quality          QualitySummary           `json:"quality"`
+	Annotations      []Annotation             `json:"annotations"`
+	ReviewTasks      []ReviewTask             `json:"reviewTasks"`
+	RuleApprovals    []RuleApproval           `json:"ruleApprovals"`
+	RuleEvents       []RuleReleaseEvent       `json:"ruleEvents"`
+	RuleObservations []RuleReleaseObservation `json:"ruleObservations"`
 }
 
 type Metric struct {
@@ -505,10 +520,11 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 	userMessage := Message{ID: fmt.Sprintf("msg_%d_user", time.Now().UnixNano()), ConversationID: conversationID, Role: "user", Content: content, Engine: "customer", Safe: true, CreatedAt: now}
 	evidence := s.searchLocked(content)
 	history := s.messagesLocked(conversationID)
+	ruleResult := evaluateRules(content, evidence, rulesByStage(s.rules, "active"))
 	generator := s.generator
 	s.mu.Unlock()
 
-	agentMessage, gap := agentReply(generator, conversationID, content, evidence, history, now)
+	agentMessage, gap := agentReply(generator, conversationID, content, evidence, history, ruleResult, now)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -516,9 +532,10 @@ func (s *Store) SendMessage(conversationID, content string) (SendMessageResult, 
 		s.gaps = append([]KnowledgeGap{*gap}, s.gaps...)
 	}
 	s.messages = append(s.messages, userMessage, agentMessage)
-	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
+	if shouldCreateTransfer(agentMessage.FallbackReason) {
 		s.tickets = append([]TransferTicket{newTransferTicket(conversationID, channel, content, now)}, s.tickets...)
 	}
+	s.recordRuleHitLocked(ruleResult.RuleCode, now)
 	s.reviewTasks = append([]ReviewTask{newReviewTask(agentMessage.ID, conversationID, channel, reviewPriority(agentMessage), reviewReason(agentMessage), now)}, s.reviewTasks...)
 
 	conv := s.touchConversationLocked(conversationID, content, evidence, gap)
@@ -839,21 +856,22 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			{Label: "Active alerts", Value: fmt.Sprintf("%d", activeAlertPolicies(alertPolicies)), Note: "notification policies triggered"},
 			{Label: "Review tasks", Value: fmt.Sprintf("%d", openReviews), Note: "assistant replies awaiting QA"},
 		},
-		Conversations:   append([]Conversation(nil), s.conversations...),
-		KnowledgeGaps:   append([]KnowledgeGap(nil), s.gaps...),
-		Rules:           append([]Rule(nil), s.rules...),
-		Transfers:       transfers,
-		ChannelPolicies: append([]ChannelPolicy(nil), s.channelPolicies...),
-		Integrations:    append([]ChannelIntegration(nil), s.integrations...),
-		ChannelAlerts:   channelAlerts,
-		ChannelTrends:   channelFailureTrends(s.channelFailures, time.Now().UTC()),
-		AlertPolicies:   alertPolicies,
-		Notifications:   append([]ChannelNotification(nil), s.notifications...),
-		Quality:         quality,
-		Annotations:     append([]Annotation(nil), s.annotations...),
-		ReviewTasks:     append([]ReviewTask(nil), s.reviewTasks...),
-		RuleApprovals:   append([]RuleApproval(nil), s.ruleApprovals...),
-		RuleEvents:      append([]RuleReleaseEvent(nil), s.ruleEvents...),
+		Conversations:    append([]Conversation(nil), s.conversations...),
+		KnowledgeGaps:    append([]KnowledgeGap(nil), s.gaps...),
+		Rules:            append([]Rule(nil), s.rules...),
+		Transfers:        transfers,
+		ChannelPolicies:  append([]ChannelPolicy(nil), s.channelPolicies...),
+		Integrations:     append([]ChannelIntegration(nil), s.integrations...),
+		ChannelAlerts:    channelAlerts,
+		ChannelTrends:    channelFailureTrends(s.channelFailures, time.Now().UTC()),
+		AlertPolicies:    alertPolicies,
+		Notifications:    append([]ChannelNotification(nil), s.notifications...),
+		Quality:          quality,
+		Annotations:      append([]Annotation(nil), s.annotations...),
+		ReviewTasks:      append([]ReviewTask(nil), s.reviewTasks...),
+		RuleApprovals:    append([]RuleApproval(nil), s.ruleApprovals...),
+		RuleEvents:       append([]RuleReleaseEvent(nil), s.ruleEvents...),
+		RuleObservations: ruleReleaseObservations(s.ruleEvents, s.rules, transfers, s.annotations, time.Now().UTC()),
 	}, nil
 }
 
@@ -890,12 +908,12 @@ func (s *Store) searchLocked(query string) []KnowledgeArticle {
 	return matches
 }
 
-func agentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, now string) (Message, *KnowledgeGap) {
-	if shouldTransfer(content) {
+func agentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, ruleResult RuleTestResult, now string) (Message, *KnowledgeGap) {
+	if ruleResult.Action == "recommend_human_transfer" {
 		return Message{
 			ID: fmt.Sprintf("msg_%d_agent", time.Now().UnixNano()), ConversationID: conversationID, Role: "assistant",
 			Content: "我已经为你转接人工客服，并保留当前对话上下文。人工客服接手前，我不会编造处理结果。",
-			Engine:  "rule", Safe: true, FallbackReason: "TRANSFER_THRESHOLD", CreatedAt: now,
+			Engine:  "rule", Safe: true, FallbackReason: fallback(ruleResult.RuleCode, "TRANSFER_THRESHOLD"), CreatedAt: now,
 			Trace: newAgentTrace("human_transfer", evidence, history),
 		}, nil
 	}
@@ -1050,6 +1068,10 @@ func (s *Store) touchConversationLocked(conversationID, content string, evidence
 func shouldTransfer(content string) bool {
 	text := strings.ToLower(content)
 	return strings.Contains(text, "人工") || strings.Contains(text, "投诉") || strings.Contains(text, "法律") || strings.Contains(text, "催")
+}
+
+func shouldCreateTransfer(reason string) bool {
+	return reason == "TRANSFER_THRESHOLD" || reason == "CANCEL_RISK_TRANSFER"
 }
 
 func enabledRules(rules []Rule) int {
@@ -1230,6 +1252,120 @@ func hasApprovedRuleGate(approvals []RuleApproval, code string) bool {
 		}
 	}
 	return false
+}
+
+func ruleReleaseObservations(events []RuleReleaseEvent, rules []Rule, tickets []TransferTicket, annotations []Annotation, now time.Time) []RuleReleaseObservation {
+	observations := make([]RuleReleaseObservation, 0)
+	seen := map[string]bool{}
+	for _, event := range events {
+		if event.Action != "PUBLISH" || seen[event.RuleCode] {
+			continue
+		}
+		seen[event.RuleCode] = true
+		releasedAt, ok := parseRFC3339(event.CreatedAt)
+		if !ok {
+			releasedAt = now
+		}
+		rule := ruleByCodeAndVersion(rules, event.RuleCode, event.Version)
+		transferCount := countTransfersSince(tickets, releasedAt)
+		lowScoreCount, averageReview := annotationStatsSince(annotations, releasedAt)
+		riskLevel, rollbackRecommended, recommendation := releaseRecommendation(rule.HitCount, transferCount, lowScoreCount, averageReview)
+		observations = append(observations, RuleReleaseObservation{
+			RuleCode:            event.RuleCode,
+			Version:             event.Version,
+			ReleasedAt:          event.CreatedAt,
+			Window:              observationWindow(releasedAt, now),
+			RuleHits:            rule.HitCount,
+			TransferTickets:     transferCount,
+			LowScoreSamples:     lowScoreCount,
+			AverageReview:       averageReview,
+			RiskLevel:           riskLevel,
+			Recommendation:      recommendation,
+			RollbackRecommended: rollbackRecommended,
+		})
+	}
+	return observations
+}
+
+func ruleByCodeAndVersion(rules []Rule, code, version string) Rule {
+	for _, rule := range rules {
+		if rule.Code == code && rule.Version == version {
+			return rule
+		}
+	}
+	for _, rule := range rules {
+		if rule.Code == code {
+			return rule
+		}
+	}
+	return Rule{Code: code, Version: version}
+}
+
+func countTransfersSince(tickets []TransferTicket, since time.Time) int {
+	count := 0
+	for _, ticket := range tickets {
+		createdAt, ok := parseRFC3339(ticket.CreatedAt)
+		if ok && !createdAt.Before(since) {
+			count++
+		}
+	}
+	return count
+}
+
+func annotationStatsSince(annotations []Annotation, since time.Time) (int, int) {
+	lowScoreCount := 0
+	totalScore := 0
+	reviewed := 0
+	for _, annotation := range annotations {
+		createdAt, ok := parseRFC3339(annotation.CreatedAt)
+		if !ok || createdAt.Before(since) {
+			continue
+		}
+		reviewed++
+		totalScore += annotation.Score
+		if needsReview(annotation, 80) {
+			lowScoreCount++
+		}
+	}
+	if reviewed == 0 {
+		return lowScoreCount, 0
+	}
+	return lowScoreCount, totalScore / reviewed
+}
+
+func releaseRecommendation(ruleHits, transferCount, lowScoreCount, averageReview int) (string, bool, string) {
+	if lowScoreCount >= 3 || transferCount >= 5 || (averageReview > 0 && averageReview < 60) {
+		return "HIGH", true, "建议暂停放量并回滚，发布后低分样本或人工压力已经超过课堂阈值。"
+	}
+	if lowScoreCount > 0 || transferCount >= 2 || (averageReview > 0 && averageReview < 75) {
+		return "MEDIUM", false, "建议继续小流量观察，优先复盘低分样本和转人工原因。"
+	}
+	if ruleHits == 0 {
+		return "LOW", false, "已发布但暂无命中，保持观察并等待真实流量。"
+	}
+	return "LOW", false, "发布后指标稳定，可以继续观察或逐步放量。"
+}
+
+func observationWindow(since, now time.Time) string {
+	if now.Before(since) {
+		return "0m"
+	}
+	duration := now.Sub(since)
+	if duration < time.Hour {
+		return fmt.Sprintf("%dm", int(duration.Minutes()))
+	}
+	if duration < 24*time.Hour {
+		return fmt.Sprintf("%dh", int(duration.Hours()))
+	}
+	return fmt.Sprintf("%dd", int(duration.Hours()/24))
+}
+
+func parseRFC3339(value string) (time.Time, bool) {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
 }
 
 func normalizeSampleIDs(sampleIDs []string) []string {

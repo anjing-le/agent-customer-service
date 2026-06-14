@@ -499,6 +499,22 @@
         "createdAt": "RFC3339 string"
       }
     },
+    "RuleReleaseObservation": {
+      "required": ["ruleCode", "version", "releasedAt", "window", "ruleHits", "transferTickets", "lowScoreSamples", "averageReview", "riskLevel", "recommendation", "rollbackRecommended"],
+      "fields": {
+        "ruleCode": "string",
+        "version": "string",
+        "releasedAt": "RFC3339 string",
+        "window": "string",
+        "ruleHits": "number",
+        "transferTickets": "number",
+        "lowScoreSamples": "number",
+        "averageReview": "number",
+        "riskLevel": "LOW|MEDIUM|HIGH",
+        "recommendation": "string",
+        "rollbackRecommended": "boolean"
+      }
+    },
     "RuleApproval": {
       "required": ["id", "ruleCode", "approver", "riskLevel", "sampleIds", "sampleCount", "status", "note", "createdAt"],
       "fields": {
@@ -609,7 +625,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -626,7 +642,8 @@
         "annotations": "Annotation[]",
         "reviewTasks": "ReviewTask[]",
         "ruleApprovals": "RuleApproval[]",
-        "ruleEvents": "RuleReleaseEvent[]"
+        "ruleEvents": "RuleReleaseEvent[]",
+        "ruleObservations": "RuleReleaseObservation[]"
       }
     },
     "ChannelAlert": {

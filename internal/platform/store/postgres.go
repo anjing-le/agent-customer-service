@@ -129,11 +129,16 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 	if err != nil {
 		return SendMessageResult{}, err
 	}
+	rules, err := s.listRules()
+	if err != nil {
+		return SendMessageResult{}, err
+	}
+	ruleResult := evaluateRules(content, evidence, rulesByStage(rules, "active"))
 	history, err := s.ListMessages(conversationID)
 	if err != nil {
 		return SendMessageResult{}, err
 	}
-	agentMessage, gap := postgresAgentReply(s.generator, conversationID, content, evidence, history, now)
+	agentMessage, gap := postgresAgentReply(s.generator, conversationID, content, evidence, history, ruleResult, now)
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -153,7 +158,7 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 	`, agentMessage.ID, agentMessage.ConversationID, agentMessage.Role, agentMessage.Content, agentMessage.Engine, agentMessage.Safe, agentMessage.FallbackReason, agentMessage.EvidenceIDs, now, messageTraceJSON(agentMessage.Trace)); err != nil {
 		return SendMessageResult{}, fmt.Errorf("insert agent message: %w", err)
 	}
-	if agentMessage.FallbackReason == "TRANSFER_THRESHOLD" {
+	if shouldCreateTransfer(agentMessage.FallbackReason) {
 		ticket := newTransferTicket(conversationID, channel, content, now.Format(time.RFC3339))
 		if _, err := tx.Exec(ctx, `
 			insert into transfer_tickets (id, conversation_id, channel, question, reason, priority, status, created_at)
@@ -176,6 +181,18 @@ func (s *PostgresStore) SendMessage(conversationID, content string) (SendMessage
 			values ($1, $2, $3, $4, $5, $6, $7)
 		`, gap.ID, gap.ConversationID, gap.Question, gap.Reason, gap.Status, gap.Priority, now); err != nil {
 			return SendMessageResult{}, fmt.Errorf("insert knowledge gap: %w", err)
+		}
+	}
+	if strings.TrimSpace(ruleResult.RuleCode) != "" {
+		if _, err := tx.Exec(ctx, `
+			update agent_rules
+			set hit_count = hit_count + 1,
+			    last_hit_at = now(),
+			    updated_at = now()
+			where code = $1
+			  and stage = 'active'
+		`, ruleResult.RuleCode); err != nil {
+			return SendMessageResult{}, fmt.Errorf("record rule hit: %w", err)
 		}
 	}
 
@@ -891,21 +908,22 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			{Label: "Active alerts", Value: fmt.Sprintf("%d", activeAlertPolicies(alertPolicies)), Note: "notification policies triggered"},
 			{Label: "Review tasks", Value: fmt.Sprintf("%d", openReviews), Note: "assistant replies awaiting QA"},
 		},
-		Conversations:   conversations,
-		KnowledgeGaps:   gaps,
-		Rules:           rules,
-		Transfers:       transfers,
-		ChannelPolicies: channelPolicies,
-		Integrations:    integrations,
-		ChannelAlerts:   channelAlerts,
-		ChannelTrends:   channelTrends,
-		AlertPolicies:   alertPolicies,
-		Notifications:   notifications,
-		Quality:         qualitySummary(messages, gaps, transfers, annotations),
-		Annotations:     annotations,
-		ReviewTasks:     reviewTasks,
-		RuleApprovals:   ruleApprovals,
-		RuleEvents:      ruleEvents,
+		Conversations:    conversations,
+		KnowledgeGaps:    gaps,
+		Rules:            rules,
+		Transfers:        transfers,
+		ChannelPolicies:  channelPolicies,
+		Integrations:     integrations,
+		ChannelAlerts:    channelAlerts,
+		ChannelTrends:    channelTrends,
+		AlertPolicies:    alertPolicies,
+		Notifications:    notifications,
+		Quality:          qualitySummary(messages, gaps, transfers, annotations),
+		Annotations:      annotations,
+		ReviewTasks:      reviewTasks,
+		RuleApprovals:    ruleApprovals,
+		RuleEvents:       ruleEvents,
+		RuleObservations: ruleReleaseObservations(ruleEvents, rules, transfers, annotations, time.Now().UTC()),
 	}, nil
 }
 
@@ -1535,12 +1553,12 @@ func scanKnowledge(rows pgx.Rows) ([]KnowledgeArticle, error) {
 	return items, nil
 }
 
-func postgresAgentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, now time.Time) (Message, *KnowledgeGap) {
-	if shouldTransfer(content) {
+func postgresAgentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, ruleResult RuleTestResult, now time.Time) (Message, *KnowledgeGap) {
+	if ruleResult.Action == "recommend_human_transfer" {
 		return Message{
 			ID: fmt.Sprintf("msg_%d_agent", now.UnixNano()), ConversationID: conversationID, Role: "assistant",
 			Content: "我已经为你转接人工客服，并保留当前对话上下文。人工客服接手前，我不会编造处理结果。",
-			Engine:  "rule", Safe: true, FallbackReason: "TRANSFER_THRESHOLD", CreatedAt: now.Format(time.RFC3339),
+			Engine:  "rule", Safe: true, FallbackReason: fallback(ruleResult.RuleCode, "TRANSFER_THRESHOLD"), CreatedAt: now.Format(time.RFC3339),
 			Trace: newAgentTrace("human_transfer", evidence, history),
 		}, nil
 	}

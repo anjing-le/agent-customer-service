@@ -45,7 +45,7 @@ Go API 当前响应格式：
 - `/api/knowledge/search`: 知识检索。
 - `/api/knowledge/gaps/resolve`: 关闭知识缺口。
 - `/api/knowledge/gaps/create-article`: 由知识缺口生成知识。
-- `/api/ops/dashboard`: 运行看板。
+- `/api/ops/dashboard`: 运行看板，包含规则发布后的 `RuleReleaseObservation[]` 观测摘要和回滚建议。
 - `/api/ops/rules/test`: 规则测试。
 - `/api/ops/rules/compare`: 对比 active 与 canary 规则版本的处置差异。
 - `/api/ops/rules/approve`: 提交 canary 发布审批门禁，记录样本 ID 明细、自动样本数和风险等级；控制台会用 `sampleIds` 关联 `/api/ops/training-samples/export` 的复盘样本详情。
@@ -64,7 +64,7 @@ Go API 当前响应格式：
 - endpoint id、业务边界、method、path
 - query/body request schema
 - response status 和 data schema
-- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`RuleComparison`、`RuleApproval`、`RuleReleaseEvent`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`ReviewTask`、`Annotation`、`TrainingSample`、`QualitySummary`；`ChannelIntegration` 只暴露 active/next secret ref、allowed origins 和 rate limit，不暴露密钥值。
+- 客服 Agent 领域对象字段，例如 `Conversation`、`Message`、`ChannelInboundRequest`、`WeChatInboundRequest`、`AppInboundRequest`、`MarketplaceInboundRequest`、`AgentTrace`、`KnowledgeArticle`、`KnowledgeGap`、`RuleComparison`、`RuleApproval`、`RuleReleaseEvent`、`RuleReleaseObservation`、`TransferTicket`、`TransferEvent`、`ChannelPolicy`、`ChannelIntegration`、`ReviewTask`、`Annotation`、`TrainingSample`、`QualitySummary`；`ChannelIntegration` 只暴露 active/next secret ref、allowed origins 和 rate limit，不暴露密钥值。
 
 新增或修改接口时，需要同时更新：
 
