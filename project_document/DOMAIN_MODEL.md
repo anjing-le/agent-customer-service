@@ -25,7 +25,7 @@
 | `ChannelIntegration` | 渠道接入配置的非敏感视图，记录 active/next secret ref、allowed origins、rate limit、签名窗口和 replay 开关 | seed store 或 PostgreSQL |
 | `ChannelAlert` | 渠道失败聚合，按渠道和错误码统计最近失败类型 | `Dashboard.channelAlerts` |
 | `ChannelFailureTrend` | 渠道失败趋势桶，按渠道和小时统计最近失败量 | `Dashboard.channelFailureTrends` |
-| `ChannelAlertPolicy` | 渠道失败通知策略，定义阈值、窗口、通知目标和当前触发状态 | `Dashboard.channelAlertPolicies` |
+| `ChannelAlertPolicy` | 渠道失败通知策略，定义阈值、窗口、通知目标、target URL、secret ref、重试参数和当前触发状态 | `Dashboard.channelAlertPolicies` |
 | `ChannelNotification` | 渠道告警出站通知事件，记录目标 URL、secret ref、HMAC 签名、发送次数、退避重试、外部回执、投递审计摘要、死信原因和运营确认 | `Dashboard.channelNotifications` |
 | `NotificationDeliveryAudit` | 通知投递审计记录，只保存 attempt、目标、secret ref、签名预览、payload hash 和脱敏请求/响应摘要，不保存完整 signed payload 或密钥值 | `ChannelNotification.deliveryAudit` |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |

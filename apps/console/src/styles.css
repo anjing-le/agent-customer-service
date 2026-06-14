@@ -16,6 +16,7 @@ body {
 }
 
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -341,6 +342,16 @@ textarea {
   line-height: 1.6;
 }
 
+input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #cbd9d2;
+  border-radius: 6px;
+  color: #18211d;
+  background: #ffffff;
+}
+
 .compactInput {
   min-height: 88px;
 }
@@ -547,6 +558,13 @@ textarea {
   font-size: 12px;
   line-height: 1.45;
   white-space: normal;
+}
+
+.policyConfig {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(180px, 1.1fr) minmax(72px, 0.4fr) minmax(88px, 0.5fr);
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .timeline {
@@ -1001,5 +1019,9 @@ textarea {
 
   .notificationSummary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .policyConfig {
+    grid-template-columns: 1fr;
   }
 }

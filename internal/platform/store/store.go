@@ -85,6 +85,7 @@ type Runtime interface {
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
+	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) (ChannelAlertPolicy, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
@@ -446,6 +447,10 @@ type ChannelAlertPolicy struct {
 	Threshold       int    `json:"threshold"`
 	WindowMinutes   int    `json:"windowMinutes"`
 	NotifyTarget    string `json:"notifyTarget"`
+	TargetURL       string `json:"targetUrl"`
+	SecretRef       string `json:"secretRef"`
+	MaxAttempts     int    `json:"maxAttempts"`
+	BackoffSeconds  int    `json:"backoffSeconds"`
 	Enabled         bool   `json:"enabled"`
 	Active          bool   `json:"active"`
 	CurrentCount    int    `json:"currentCount"`
@@ -628,6 +633,26 @@ func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
 	policies := channelAlertPolicies(s.alertPolicies, alerts)
 	s.notifications = appendTriggeredNotifications(s.notifications, policies, event.CreatedAt)
 	return nil
+}
+
+func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) (ChannelAlertPolicy, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalized := strings.TrimSpace(channel)
+	if normalized == "" {
+		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
+	}
+	for idx := range s.alertPolicies {
+		if strings.EqualFold(s.alertPolicies[idx].Channel, normalized) {
+			s.alertPolicies[idx].TargetURL = fallback(targetURL, notificationTargetURL(s.alertPolicies[idx].NotifyTarget))
+			s.alertPolicies[idx].SecretRef = fallback(secretRef, notificationSecretRef(s.alertPolicies[idx].NotifyTarget))
+			s.alertPolicies[idx].MaxAttempts = normalizeMaxAttempts(maxAttempts)
+			s.alertPolicies[idx].BackoffSeconds = normalizeBackoffSeconds(backoffSeconds)
+			alerts := channelAlerts(s.channelFailures)
+			return channelAlertPolicies([]ChannelAlertPolicy{s.alertPolicies[idx]}, alerts)[0], nil
+		}
+	}
+	return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s not found", channel)
 }
 
 func (s *Store) DispatchChannelNotification(id, outcome string) (ChannelNotification, error) {
@@ -1568,10 +1593,25 @@ func defaultChannelIntegrations(now string) []ChannelIntegration {
 
 func defaultChannelAlertPolicies() []ChannelAlertPolicy {
 	return []ChannelAlertPolicy{
-		{Channel: "Web", Severity: "MEDIUM", Threshold: 8, WindowMinutes: 60, NotifyTarget: "ops-webhook", Enabled: true},
-		{Channel: "WeChat", Severity: "HIGH", Threshold: 5, WindowMinutes: 60, NotifyTarget: "wechat-oncall", Enabled: true},
-		{Channel: "App", Severity: "MEDIUM", Threshold: 6, WindowMinutes: 60, NotifyTarget: "app-oncall", Enabled: true},
-		{Channel: "Marketplace", Severity: "HIGH", Threshold: 3, WindowMinutes: 60, NotifyTarget: "marketplace-oncall", Enabled: true},
+		newDefaultChannelAlertPolicy("Web", "MEDIUM", 8, 60, "ops-webhook"),
+		newDefaultChannelAlertPolicy("WeChat", "HIGH", 5, 60, "wechat-oncall"),
+		newDefaultChannelAlertPolicy("App", "MEDIUM", 6, 60, "app-oncall"),
+		newDefaultChannelAlertPolicy("Marketplace", "HIGH", 3, 60, "marketplace-oncall"),
+	}
+}
+
+func newDefaultChannelAlertPolicy(channel, severity string, threshold, windowMinutes int, target string) ChannelAlertPolicy {
+	return ChannelAlertPolicy{
+		Channel:        channel,
+		Severity:       severity,
+		Threshold:      threshold,
+		WindowMinutes:  windowMinutes,
+		NotifyTarget:   target,
+		TargetURL:      notificationTargetURL(target),
+		SecretRef:      notificationSecretRef(target),
+		MaxAttempts:    3,
+		BackoffSeconds: 60,
+		Enabled:        true,
 	}
 }
 
@@ -1909,6 +1949,7 @@ func channelAlertPolicies(policies []ChannelAlertPolicy, alerts []ChannelAlert) 
 	result := make([]ChannelAlertPolicy, 0, len(policies))
 	for _, policy := range policies {
 		item := policy
+		normalizeChannelAlertPolicy(&item)
 		for _, alert := range alerts {
 			if alert.Channel == item.Channel {
 				item.CurrentCount += alert.Count
@@ -1950,20 +1991,54 @@ func hasOpenChannelNotification(items []ChannelNotification, channel string) boo
 }
 
 func newChannelNotification(policy ChannelAlertPolicy, createdAt string) ChannelNotification {
+	normalizeChannelAlertPolicy(&policy)
 	return ChannelNotification{
 		ID:             fmt.Sprintf("channel_notice_%d", time.Now().UnixNano()),
 		Channel:        policy.Channel,
 		Severity:       policy.Severity,
 		Target:         policy.NotifyTarget,
-		TargetURL:      notificationTargetURL(policy.NotifyTarget),
-		SecretRef:      notificationSecretRef(policy.NotifyTarget),
+		TargetURL:      policy.TargetURL,
+		SecretRef:      policy.SecretRef,
 		Status:         "OPEN",
 		Reason:         fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
 		Count:          policy.CurrentCount,
-		MaxAttempts:    3,
-		BackoffSeconds: 60,
+		MaxAttempts:    policy.MaxAttempts,
+		BackoffSeconds: policy.BackoffSeconds,
 		CreatedAt:      fallback(createdAt, time.Now().UTC().Format(time.RFC3339)),
 	}
+}
+
+func normalizeChannelAlertPolicy(policy *ChannelAlertPolicy) {
+	if policy == nil {
+		return
+	}
+	if strings.TrimSpace(policy.NotifyTarget) == "" {
+		policy.NotifyTarget = "ops-webhook"
+	}
+	policy.TargetURL = fallback(policy.TargetURL, notificationTargetURL(policy.NotifyTarget))
+	policy.SecretRef = fallback(policy.SecretRef, notificationSecretRef(policy.NotifyTarget))
+	policy.MaxAttempts = normalizeMaxAttempts(policy.MaxAttempts)
+	policy.BackoffSeconds = normalizeBackoffSeconds(policy.BackoffSeconds)
+}
+
+func normalizeMaxAttempts(value int) int {
+	if value <= 0 {
+		return 3
+	}
+	if value > 10 {
+		return 10
+	}
+	return value
+}
+
+func normalizeBackoffSeconds(value int) int {
+	if value <= 0 {
+		return 60
+	}
+	if value > 3600 {
+		return 3600
+	}
+	return value
 }
 
 func dispatchChannelNotification(notification ChannelNotification, outcome string, delivery NotificationDeliveryClient, now time.Time) ChannelNotification {

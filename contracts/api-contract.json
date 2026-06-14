@@ -200,6 +200,14 @@
       "response": { "status": 200, "schema": "ChannelNotification" }
     },
     {
+      "id": "updateChannelAlertPolicy",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-alert-policies/update",
+      "request": { "body": "UpdateChannelAlertPolicyRequest" },
+      "response": { "status": 200, "schema": "ChannelAlertPolicy" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -381,6 +389,16 @@
       "fields": {
         "id": "string",
         "outcome": "SUCCESS|webhook_timeout|webhook_5xx"
+      }
+    },
+    "UpdateChannelAlertPolicyRequest": {
+      "required": ["channel", "targetUrl", "secretRef"],
+      "fields": {
+        "channel": "string",
+        "targetUrl": "string",
+        "secretRef": "string",
+        "maxAttempts": "number",
+        "backoffSeconds": "number"
       }
     },
     "SubmitAnnotationRequest": {
@@ -681,13 +699,17 @@
       }
     },
     "ChannelAlertPolicy": {
-      "required": ["channel", "severity", "threshold", "windowMinutes", "notifyTarget", "enabled", "active", "currentCount"],
+      "required": ["channel", "severity", "threshold", "windowMinutes", "notifyTarget", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "enabled", "active", "currentCount"],
       "fields": {
         "channel": "string",
         "severity": "LOW|MEDIUM|HIGH|CRITICAL",
         "threshold": "number",
         "windowMinutes": "number",
         "notifyTarget": "string",
+        "targetUrl": "string",
+        "secretRef": "string",
+        "maxAttempts": "number",
+        "backoffSeconds": "number",
         "enabled": "boolean",
         "active": "boolean",
         "currentCount": "number",

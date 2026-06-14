@@ -257,6 +257,33 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 		httpjson.OK(w, notification)
 	})
 
+	mux.HandleFunc("/api/ops/channel-alert-policies/update", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Channel        string `json:"channel"`
+			TargetURL      string `json:"targetUrl"`
+			SecretRef      string `json:"secretRef"`
+			MaxAttempts    int    `json:"maxAttempts"`
+			BackoffSeconds int    `json:"backoffSeconds"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if req.Channel == "" {
+			httpjson.BadRequest(w, "channel is required")
+			return
+		}
+		policy, err := st.UpdateChannelAlertPolicy(req.Channel, req.TargetURL, req.SecretRef, req.MaxAttempts, req.BackoffSeconds)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, policy)
+	})
+
 	mux.HandleFunc("/api/ops/annotations/submit", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

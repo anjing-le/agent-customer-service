@@ -90,7 +90,7 @@ Go API 当前响应格式：
 
 React 控制台的渠道接入区域也直接读取这份样例，展示 endpoint、来源头、secret ref、签名外部会话 ID 和预期状态码，并可用 demo secret 发送演示请求。请求成功后，控制台展示 Agent 回复、trace、证据标题和 fallback reason，便于课堂解释不同渠道如何归一到同一条可靠 Agent 链路。
 
-控制台还会读取 `errorExamples`，提供来源不匹配、签名错误、过期 timestamp、重复消息和限流等失败演示，展示 `status + error.code`。Dashboard 会聚合 `ChannelAlert[]`、`ChannelFailureTrend[]`、`ChannelAlertPolicy[]` 和 `ChannelNotification[]`，用于说明系统为什么不会盲收外部请求，以及失败如何进入运营监控、通知策略、目标解析、secret ref 签名、delivery client、退避重试、外部回执、投递审计、死信和确认闭环。`ChannelNotification.deliveryAudit` 只返回 payload hash、签名预览和脱敏请求/响应摘要，不返回完整 signed payload 或密钥值。
+控制台还会读取 `errorExamples`，提供来源不匹配、签名错误、过期 timestamp、重复消息和限流等失败演示，展示 `status + error.code`。Dashboard 会聚合 `ChannelAlert[]`、`ChannelFailureTrend[]`、`ChannelAlertPolicy[]` 和 `ChannelNotification[]`，用于说明系统为什么不会盲收外部请求，以及失败如何进入运营监控、通知策略、目标解析、secret ref 签名、delivery client、退避重试、外部回执、投递审计、死信和确认闭环。`/api/ops/channel-alert-policies/update` 支持调整 target URL、secret ref、max attempts 和 backoff seconds，后续新通知会继承该配置。`ChannelNotification.deliveryAudit` 只返回 payload hash、签名预览和脱敏请求/响应摘要，不返回完整 signed payload 或密钥值。
 
 `contracts/channel-protocol-matrix.json` 补充真实渠道差异表，说明各 adapter 的外部会话键、消息幂等键、客户字段、内容字段、时间字段、来源白名单、secret ref、replay key、rate limit 和关键失败码。控制台会把这张矩阵展示为“协议差异”，让字段映射和可靠性边界可以直接对照。
 

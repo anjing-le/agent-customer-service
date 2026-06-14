@@ -195,6 +195,24 @@ func TestAcknowledgeChannelNotificationRoute(t *testing.T) {
 	}
 }
 
+func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
+	mux := http.NewServeMux()
+	Register(mux, store.NewSeedStore())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/update", strings.NewReader(`{"channel":"Marketplace","targetUrl":"https://ops.example.com/hooks/marketplace","secretRef":"ANJING_NOTIFICATION_CUSTOM_SECRET","maxAttempts":4,"backoffSeconds":30}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"targetUrl":"https://ops.example.com/hooks/marketplace"`, `"secretRef":"ANJING_NOTIFICATION_CUSTOM_SECRET"`, `"maxAttempts":4`, `"backoffSeconds":30`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
 func TestDispatchChannelNotificationRouteRetriesAndDeadLetters(t *testing.T) {
 	st := store.NewSeedStore()
 	for idx := 0; idx < 3; idx++ {

@@ -544,6 +544,45 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	}
 }
 
+func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
+	st := NewSeedStore()
+	policy, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/marketplace", "ANJING_NOTIFICATION_CUSTOM_SECRET", 5, 45)
+	if err != nil {
+		t.Fatalf("update channel alert policy: %v", err)
+	}
+	if policy.TargetURL != "https://ops.example.com/hooks/marketplace" || policy.SecretRef != "ANJING_NOTIFICATION_CUSTOM_SECRET" {
+		t.Fatalf("expected updated delivery config, got %#v", policy)
+	}
+	if policy.MaxAttempts != 5 || policy.BackoffSeconds != 45 {
+		t.Fatalf("expected updated retry config, got %#v", policy)
+	}
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("configured-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record channel failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.Notifications) != 1 {
+		t.Fatalf("expected one configured notification, got %#v", dashboard.Notifications)
+	}
+	notification := dashboard.Notifications[0]
+	if notification.TargetURL != "https://ops.example.com/hooks/marketplace" || notification.SecretRef != "ANJING_NOTIFICATION_CUSTOM_SECRET" {
+		t.Fatalf("expected configured notification target, got %#v", notification)
+	}
+	if notification.MaxAttempts != 5 || notification.BackoffSeconds != 45 {
+		t.Fatalf("expected configured retry values, got %#v", notification)
+	}
+}
+
 func TestDispatchChannelNotificationUsesDeliveryClientAndSecretRef(t *testing.T) {
 	t.Setenv("ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET", "custom-notification-secret")
 	client := &recordingDeliveryClient{}

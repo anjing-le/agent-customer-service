@@ -70,6 +70,7 @@
         { "name": "completeReviewTask", "path": "/api/ops/review-tasks/complete", "methods": ["POST"] },
         { "name": "ackChannelNotification", "path": "/api/ops/channel-notifications/ack", "methods": ["POST"] },
         { "name": "dispatchChannelNotification", "path": "/api/ops/channel-notifications/dispatch", "methods": ["POST"] },
+        { "name": "updateChannelAlertPolicy", "path": "/api/ops/channel-alert-policies/update", "methods": ["POST"] },
         { "name": "submitAnnotation", "path": "/api/ops/annotations/submit", "methods": ["POST"] },
         { "name": "exportTrainingSamples", "path": "/api/ops/training-samples/export", "methods": ["GET"] }
       ]

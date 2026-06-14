@@ -342,6 +342,42 @@ func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (Channel
 	return item, nil
 }
 
+func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) (ChannelAlertPolicy, error) {
+	normalized := strings.TrimSpace(channel)
+	if normalized == "" {
+		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
+	}
+	targetURL = strings.TrimSpace(targetURL)
+	secretRef = strings.TrimSpace(secretRef)
+	maxAttempts = normalizeMaxAttempts(maxAttempts)
+	backoffSeconds = normalizeBackoffSeconds(backoffSeconds)
+	if _, err := s.pool.Exec(context.Background(), `
+		update channel_alert_policies
+		set target_url = $2,
+		    secret_ref = $3,
+		    max_attempts = $4,
+		    backoff_seconds = $5,
+		    updated_at = now()
+		where lower(channel) = lower($1)
+	`, normalized, targetURL, secretRef, maxAttempts, backoffSeconds); err != nil {
+		return ChannelAlertPolicy{}, fmt.Errorf("update channel alert policy: %w", err)
+	}
+	alerts, err := s.listChannelAlerts()
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	policies, err := s.listChannelAlertPolicies(alerts)
+	if err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	for _, policy := range policies {
+		if strings.EqualFold(policy.Channel, normalized) {
+			return policy, nil
+		}
+	}
+	return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s not found", channel)
+}
+
 func (s *PostgresStore) channelNotification(id string) (ChannelNotification, error) {
 	var item ChannelNotification
 	var createdAt time.Time
@@ -1336,7 +1372,7 @@ func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]Chann
 
 func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q queryer, alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
 	rows, err := q.Query(ctx, `
-		select channel, severity, threshold, window_minutes, notify_target, enabled
+		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, enabled
 		from channel_alert_policies
 		order by channel
 	`)
@@ -1348,7 +1384,18 @@ func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q querye
 	policies := make([]ChannelAlertPolicy, 0)
 	for rows.Next() {
 		var item ChannelAlertPolicy
-		if err := rows.Scan(&item.Channel, &item.Severity, &item.Threshold, &item.WindowMinutes, &item.NotifyTarget, &item.Enabled); err != nil {
+		if err := rows.Scan(
+			&item.Channel,
+			&item.Severity,
+			&item.Threshold,
+			&item.WindowMinutes,
+			&item.NotifyTarget,
+			&item.TargetURL,
+			&item.SecretRef,
+			&item.MaxAttempts,
+			&item.BackoffSeconds,
+			&item.Enabled,
+		); err != nil {
 			return nil, err
 		}
 		policies = append(policies, item)

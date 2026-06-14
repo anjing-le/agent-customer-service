@@ -12,6 +12,7 @@ import {
   FilePlus2,
   MessageSquareText,
   RefreshCcw,
+  Save,
   ShieldCheck,
   Download,
   UserRoundCheck
@@ -257,10 +258,20 @@ type ChannelAlertPolicy = {
   threshold: number;
   windowMinutes: number;
   notifyTarget: string;
+  targetUrl: string;
+  secretRef: string;
+  maxAttempts: number;
+  backoffSeconds: number;
   enabled: boolean;
   active: boolean;
   currentCount: number;
   lastTriggeredAt?: string;
+};
+type NotificationPolicyDraft = {
+  targetUrl: string;
+  secretRef: string;
+  maxAttempts: number;
+  backoffSeconds: number;
 };
 type ChannelNotification = {
   id: string;
@@ -572,6 +583,7 @@ function App() {
   const [notificationStatusFilter, setNotificationStatusFilter] = useState<'ALL' | 'OPEN' | 'RETRYING' | 'SENT' | 'DEAD_LETTER' | 'ACKED'>('ALL');
   const [notificationChannelFilter, setNotificationChannelFilter] = useState('ALL');
   const [expandedNotificationId, setExpandedNotificationId] = useState('');
+  const [notificationPolicyDrafts, setNotificationPolicyDrafts] = useState<Record<string, NotificationPolicyDraft>>({});
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
@@ -665,6 +677,19 @@ function App() {
       setSelectedConversationId(conversations[0].id);
     }
   }, [conversations, selectedConversationId]);
+
+  useEffect(() => {
+    const nextDrafts = Object.fromEntries(channelAlertPolicies.map((policy) => [
+      policy.channel,
+      {
+        targetUrl: policy.targetUrl,
+        secretRef: policy.secretRef,
+        maxAttempts: policy.maxAttempts,
+        backoffSeconds: policy.backoffSeconds
+      }
+    ]));
+    setNotificationPolicyDrafts(nextDrafts);
+  }, [dashboard?.channelAlertPolicies]);
 
   const loadMessages = async (conversationId: string) => {
     if (!conversationId) {
@@ -869,6 +894,29 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'dispatch notification failed');
+    }
+  };
+
+  const updateChannelAlertPolicy = async (policy: ChannelAlertPolicy) => {
+    const draft = notificationPolicyDrafts[policy.channel];
+    if (!draft) {
+      return;
+    }
+    setError('');
+    try {
+      await api<ChannelAlertPolicy>('/api/ops/channel-alert-policies/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          channel: policy.channel,
+          targetUrl: draft.targetUrl,
+          secretRef: draft.secretRef,
+          maxAttempts: Number(draft.maxAttempts),
+          backoffSeconds: Number(draft.backoffSeconds)
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'update notification policy failed');
     }
   };
 
@@ -1466,19 +1514,72 @@ function App() {
               <span className="status warning">{channelAlertPolicies.filter((item) => item.active).length}</span>
             </div>
             <div className="tableList">
-              {channelAlertPolicies.map((policy) => (
-                <article className="tableRow" key={policy.channel}>
-                  <div>
-                    <strong>{policy.channel} · {policy.notifyTarget}</strong>
-                    <span>{policy.currentCount}/{policy.threshold} in {policy.windowMinutes}m</span>
-                    {policy.lastTriggeredAt && <span>{policy.lastTriggeredAt.slice(11, 19)}</span>}
-                  </div>
-                  <div>
-                    <em>{policy.severity}</em>
-                    <b className={statusClass(policy.active ? 'HIGH' : 'LOW')}>{policy.active ? 'ACTIVE' : 'READY'}</b>
-                  </div>
-                </article>
-              ))}
+              {channelAlertPolicies.map((policy) => {
+                const draft = notificationPolicyDrafts[policy.channel] ?? {
+                  targetUrl: policy.targetUrl,
+                  secretRef: policy.secretRef,
+                  maxAttempts: policy.maxAttempts,
+                  backoffSeconds: policy.backoffSeconds
+                };
+                return (
+                  <article className="tableRow" key={policy.channel}>
+                    <div>
+                      <strong>{policy.channel} · {policy.notifyTarget}</strong>
+                      <span>{policy.currentCount}/{policy.threshold} in {policy.windowMinutes}m</span>
+                      <span>{policy.targetUrl} · {policy.secretRef}</span>
+                      <span>{policy.maxAttempts} attempts · {policy.backoffSeconds}s base backoff</span>
+                      {policy.lastTriggeredAt && <span>{policy.lastTriggeredAt.slice(11, 19)}</span>}
+                      <div className="policyConfig">
+                        <input
+                          aria-label={`${policy.channel} target URL`}
+                          value={draft.targetUrl}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, targetUrl: event.target.value }
+                          }))}
+                        />
+                        <input
+                          aria-label={`${policy.channel} secret ref`}
+                          value={draft.secretRef}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, secretRef: event.target.value }
+                          }))}
+                        />
+                        <input
+                          aria-label={`${policy.channel} max attempts`}
+                          min={1}
+                          max={10}
+                          type="number"
+                          value={draft.maxAttempts}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, maxAttempts: Number(event.target.value) }
+                          }))}
+                        />
+                        <input
+                          aria-label={`${policy.channel} backoff seconds`}
+                          min={1}
+                          max={3600}
+                          type="number"
+                          value={draft.backoffSeconds}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, backoffSeconds: Number(event.target.value) }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="gapActions">
+                      <em>{policy.severity}</em>
+                      <b className={statusClass(policy.active ? 'HIGH' : 'LOW')}>{policy.active ? 'ACTIVE' : 'READY'}</b>
+                      <button className="tinyButton" onClick={() => updateChannelAlertPolicy(policy)} title="保存通知目标">
+                        <Save size={14} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
               {channelAlertPolicies.length === 0 && <p className="empty">暂无通知策略</p>}
             </div>
             <div className="panelDivider" />
