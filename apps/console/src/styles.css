@@ -514,6 +514,41 @@ textarea {
   gap: 6px;
 }
 
+.notificationSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.notificationSummary span {
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 1px solid #d9e3de;
+  border-radius: 6px;
+  color: #426153;
+  background: #f7fbf8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.auditTrail {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #d9e3de;
+  border-radius: 6px;
+  background: #f7fbf8;
+}
+
+.auditTrail small {
+  color: #4d665a;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
 .timeline {
   display: grid;
   gap: 4px;
@@ -962,5 +997,9 @@ textarea {
 
   .observationMetrics {
     grid-template-columns: 1fr;
+  }
+
+  .notificationSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

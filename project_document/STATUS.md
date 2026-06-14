@@ -15,7 +15,7 @@
 | 知识 API | Runtime connected | 知识列表、关键词检索、知识缺口关闭、缺口生成知识，支持 seed 和 PostgreSQL |
 | 运营 API | Runtime connected | 运营指标、会话队列、知识缺口、规则测试、人工队列 |
 | 错误边界 | Runtime connected | Store 接口显式返回 error，路由层统一转 `store_error` JSON envelope |
-| 前端控制台 | Runtime workspace | React/Vite 控制台已按客服坐席与运营工作台重新组织，并展示证据、缺口和规则护栏 |
+| 前端控制台 | Runtime workspace | React/Vite 控制台已按客服坐席与运营工作台重新组织，并展示证据、缺口、规则护栏、渠道失败和通知投递治理 |
 | 数据底座 | Runtime connected | `infra/postgres/migrations` 定义核心表和 demo seed；配置 `ANJING_DATABASE_URL` 后 API 切到 PostgreSQL store |
 | 本地数据库 | Ready | `infra/local/docker-compose.yml`、`pnpm db:*` 脚本和可选 Postgres 集成测试已接入 |
 | 知识运营闭环 | Runtime connected | 缺口支持关闭，支持由缺口生成可信知识条目并回写为已处理 |
@@ -45,5 +45,5 @@
 
 ## 下一步
 
-1. 增加通知事件的真实外部 webhook adapter。
-2. 补通知 delivery 的请求/响应审计日志和脱敏展示。
+1. 增加通知目标配置的运行时管理，支持按渠道调整 webhook target 和 secret ref。
+2. 补更细的真实平台回调协议差异和渠道验签样例集。

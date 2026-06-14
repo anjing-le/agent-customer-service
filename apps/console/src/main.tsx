@@ -569,6 +569,9 @@ function App() {
   const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
   const [channelFailureSending, setChannelFailureSending] = useState('');
   const [channelFailureResult, setChannelFailureResult] = useState<ChannelFailureResult | null>(null);
+  const [notificationStatusFilter, setNotificationStatusFilter] = useState<'ALL' | 'OPEN' | 'RETRYING' | 'SENT' | 'DEAD_LETTER' | 'ACKED'>('ALL');
+  const [notificationChannelFilter, setNotificationChannelFilter] = useState('ALL');
+  const [expandedNotificationId, setExpandedNotificationId] = useState('');
 
   const conversations = dashboard?.conversations ?? [];
   const gaps = dashboard?.knowledgeGaps ?? [];
@@ -588,6 +591,23 @@ function App() {
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
+  const notificationChannels = Array.from(new Set(channelNotifications.map((item) => item.channel))).sort();
+  const notificationStatusOptions = ['ALL', 'OPEN', 'RETRYING', 'SENT', 'DEAD_LETTER', 'ACKED'] as const;
+  const visibleNotifications = channelNotifications.filter((item) => {
+    if (notificationStatusFilter !== 'ALL' && item.status !== notificationStatusFilter) {
+      return false;
+    }
+    if (notificationChannelFilter !== 'ALL' && item.channel !== notificationChannelFilter) {
+      return false;
+    }
+    return true;
+  });
+  const notificationStats = {
+    open: channelNotifications.filter((item) => item.status === 'OPEN').length,
+    retrying: channelNotifications.filter((item) => item.status === 'RETRYING').length,
+    dead: channelNotifications.filter((item) => item.status === 'DEAD_LETTER').length,
+    audited: channelNotifications.filter((item) => (item.deliveryAudit?.length ?? 0) > 0).length
+  };
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
     if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
@@ -1465,13 +1485,42 @@ function App() {
             <div className="panelHeader compactHeader">
               <div>
                 <p className="sectionLabel">通知事件</p>
-                <h2>出站模拟</h2>
+                <h2>出站治理</h2>
               </div>
-              <span className="status warning">{channelNotifications.filter((item) => item.status === 'OPEN').length}</span>
+              <span className="status warning">{visibleNotifications.length}/{channelNotifications.length}</span>
+            </div>
+            <div className="notificationSummary">
+              <span>OPEN {notificationStats.open}</span>
+              <span>RETRYING {notificationStats.retrying}</span>
+              <span>DEAD {notificationStats.dead}</span>
+              <span>AUDITED {notificationStats.audited}</span>
+            </div>
+            <div className="filterRow">
+              {notificationStatusOptions.map((item) => (
+                <button
+                  className={notificationStatusFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => setNotificationStatusFilter(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="filterRow">
+              {['ALL', ...notificationChannels].map((item) => (
+                <button
+                  className={notificationChannelFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => setNotificationChannelFilter(item)}
+                >
+                  {item}
+                </button>
+              ))}
             </div>
             <div className="tableList">
-              {channelNotifications.slice(0, 5).map((item) => {
+              {visibleNotifications.slice(0, 8).map((item) => {
                 const latestAudit = item.deliveryAudit?.[item.deliveryAudit.length - 1];
+                const expanded = expandedNotificationId === item.id;
                 return (
                   <article className="tableRow" key={item.id}>
                     <div>
@@ -1488,9 +1537,28 @@ function App() {
                       {item.lastError && <span>{item.lastError}</span>}
                       {item.deadLetterReason && <span>{item.deadLetterReason}</span>}
                       {item.ackedBy && <span>{item.ackedBy} · {item.ackNote}</span>}
+                      {expanded && (
+                        <div className="auditTrail">
+                          {(item.deliveryAudit ?? []).map((audit) => (
+                            <small key={`${item.id}-${audit.attempt}-${audit.createdAt}`}>
+                              #{audit.attempt} · {audit.createdAt.slice(11, 19)} · {audit.payloadHash.slice(0, 12)} · {audit.signaturePreview}<br />
+                              {audit.requestSummary}<br />
+                              {audit.responseSummary}
+                            </small>
+                          ))}
+                          {(item.deliveryAudit?.length ?? 0) === 0 && <small>暂无投递审计记录</small>}
+                        </div>
+                      )}
                     </div>
                     <div className="gapActions">
                       <b className={statusClass(item.status === 'DEAD_LETTER' ? 'HIGH' : item.status === 'RETRYING' ? 'MEDIUM' : 'LOW')}>{item.status}</b>
+                      <button
+                        className="tinyButton"
+                        onClick={() => setExpandedNotificationId(expanded ? '' : item.id)}
+                        title="查看投递审计"
+                      >
+                        <FileSearch size={14} />
+                      </button>
                       {(item.status === 'OPEN' || item.status === 'RETRYING') && (
                         <>
                           <button className="tinyButton" onClick={() => dispatchChannelNotification(item, 'SUCCESS')} title="发送通知">
@@ -1510,7 +1578,7 @@ function App() {
                   </article>
                 );
               })}
-              {channelNotifications.length === 0 && <p className="empty">暂无通知事件</p>}
+              {visibleNotifications.length === 0 && <p className="empty">暂无通知事件</p>}
             </div>
           </section>
 
