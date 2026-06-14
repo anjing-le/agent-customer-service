@@ -2,6 +2,50 @@
   "version": "0.2.0",
   "signatureAlgorithm": "HMAC-SHA256",
   "canonicalPayload": ["channel", "externalConversationId", "timestamp", "content"],
+  "platformSignatureProfiles": [
+    {
+      "id": "wechat-official-callback",
+      "channel": "WeChat",
+      "adapterEndpoint": "POST /api/channels/wechat/inbound",
+      "signatureHeader": "X-WX-Signature",
+      "timestampHeader": "X-WX-Timestamp",
+      "replayHeader": "X-WX-Msg-ID",
+      "canonicalPayload": ["openId", "msgId", "timestamp", "text"],
+      "sampleCanonicalPayload": ["wx-open-adapter-example", "wechat-adapter-msg-example-1", "2026-06-14T03:10:00Z", "这个商品能不能开发票？"],
+      "demoSecret": "wechat-demo-secret",
+      "sampleSignature": "2c7680a911e3f401651628b884eaac6fd28acb5e3cc4265233396df0a2568942",
+      "retrySemantics": "WeChat may retry the same msgId; replay protection must prefer msgId over signed payload.",
+      "failureCodes": ["invalid_signature", "stale_signature", "duplicate_inbound"]
+    },
+    {
+      "id": "app-mobile-sdk-callback",
+      "channel": "App",
+      "adapterEndpoint": "POST /api/channels/app/inbound",
+      "signatureHeader": "X-App-Signature",
+      "timestampHeader": "X-App-Sent-At",
+      "replayHeader": "X-App-Message-ID",
+      "canonicalPayload": ["deviceId", "messageId", "sentAt", "body"],
+      "sampleCanonicalPayload": ["device-example-1", "app-msg-example-1", "2026-06-14T03:10:00Z", "订单状态在哪里看？"],
+      "demoSecret": "app-demo-secret",
+      "sampleSignature": "f81820e1abe6a2e22217e4e6ac991e6e251e54e08325dd24a1eb71730a1acd05",
+      "retrySemantics": "The mobile SDK may resend after network loss; messageId is stable across retries.",
+      "failureCodes": ["channel_rate_limited", "stale_signature", "duplicate_inbound"]
+    },
+    {
+      "id": "marketplace-order-message-callback",
+      "channel": "Marketplace",
+      "adapterEndpoint": "POST /api/channels/marketplace/inbound",
+      "signatureHeader": "X-Marketplace-Signature",
+      "timestampHeader": "X-Marketplace-Occurred-At",
+      "replayHeader": "X-Marketplace-Event-ID",
+      "canonicalPayload": ["buyerId", "eventId", "occurredAt", "message"],
+      "sampleCanonicalPayload": ["buyer-example-1", "market-event-example-1", "2026-06-14T03:10:00Z", "可以修改收货地址吗？"],
+      "demoSecret": "marketplace-demo-secret",
+      "sampleSignature": "84f30a369be67f265c4fa242b385c2a845dd5e9c2b160cafaede2fccd7e9f9dd",
+      "retrySemantics": "Marketplace retries order events at least once; eventId is the settlement-safe idempotency key.",
+      "failureCodes": ["invalid_signature", "invalid_timestamp", "duplicate_inbound"]
+    }
+  ],
   "examples": [
     {
       "id": "wechat-standard-inbound",

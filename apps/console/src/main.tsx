@@ -364,10 +364,23 @@ type ChannelProtocolExample = {
     envelope: string;
   };
 };
+type ChannelSignatureProfile = {
+  id: string;
+  channel: string;
+  adapterEndpoint: string;
+  signatureHeader: string;
+  timestampHeader: string;
+  replayHeader: string;
+  canonicalPayload: string[];
+  sampleSignature: string;
+  retrySemantics: string;
+  failureCodes: string[];
+};
 type ChannelProtocolMatrixRow = {
   channel: string;
   adapterEndpoint: string;
   successExampleId: string;
+  signatureProfileId: string;
   conversationKey: string;
   messageKey: string;
   customerField: string;
@@ -375,8 +388,11 @@ type ChannelProtocolMatrixRow = {
   timestampField: string;
   origin: string;
   secretRef: string;
+  signatureHeader: string;
+  timestampHeader: string;
   replayKey: string;
   rateLimit: string;
+  retrySemantics: string;
   errors: string[];
 };
 type ChannelErrorExample = {
@@ -642,6 +658,7 @@ function App() {
   const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
   const notificationPolicyChanges = dashboard?.notificationPolicyChanges ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
+  const signatureProfiles = channelProtocolExamples.platformSignatureProfiles as unknown as ChannelSignatureProfile[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
   const notificationChannels = Array.from(new Set(channelNotifications.map((item) => item.channel))).sort();
@@ -1476,6 +1493,13 @@ function App() {
                     <strong>{example.channel}</strong>
                     <span>{example.endpoint}</span>
                     <span>{example.headers['X-Channel-Origin']}</span>
+                    {signatureProfiles.find((profile) => profile.adapterEndpoint === example.endpoint) && (
+                      <span>
+                        {signatureProfiles.find((profile) => profile.adapterEndpoint === example.endpoint)?.signatureHeader}
+                        {' · '}
+                        {signatureProfiles.find((profile) => profile.adapterEndpoint === example.endpoint)?.replayHeader}
+                      </span>
+                    )}
                     {channelDemoResult?.exampleId === example.id && (
                       <div className="protocolTrace">
                         <small>{channelDemoResult.reply}</small>
@@ -1494,6 +1518,9 @@ function App() {
                   <div className="protocolMeta">
                     <span>{example.secretRef}</span>
                     <span>{example.signatureInput.externalConversationId}</span>
+                    {signatureProfiles.find((profile) => profile.adapterEndpoint === example.endpoint) && (
+                      <span>sig {signatureProfiles.find((profile) => profile.adapterEndpoint === example.endpoint)?.sampleSignature.slice(0, 12)}...</span>
+                    )}
                     <div className="protocolActions">
                       <button
                         className="tinyButton"
@@ -1524,15 +1551,18 @@ function App() {
                     <strong>{row.channel}</strong>
                     <span>{row.adapterEndpoint}</span>
                     <span>{row.conversationKey} / {row.messageKey} / {row.timestampField}</span>
+                    <span>{row.signatureHeader} / {row.timestampHeader}</span>
                   </div>
                   <div>
                     <span>{row.origin}</span>
                     <span>{row.replayKey}</span>
                     <span>{row.rateLimit}</span>
+                    <span>{row.retrySemantics}</span>
                   </div>
                   <div>
                     <span>{row.contentField} to content</span>
                     <span>{row.customerField} to customer</span>
+                    <span>{signatureProfiles.find((profile) => profile.id === row.signatureProfileId)?.canonicalPayload.join(' + ')}</span>
                     <span>{row.errors.slice(0, 3).join(' / ')}</span>
                   </div>
                 </article>

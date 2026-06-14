@@ -673,7 +673,7 @@ input {
 
 .protocolExample {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.75fr);
   gap: 12px;
   padding: 10px;
   border: 1px solid #edf2ef;
@@ -719,6 +719,7 @@ input {
 
 .protocolMeta {
   justify-items: end;
+  overflow: hidden;
 }
 
 .protocolActions {

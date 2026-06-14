@@ -14,6 +14,7 @@ const matrix = JSON.parse(fs.readFileSync(matrixPath, 'utf8'));
 const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
 const endpointKeys = new Set((contract.endpoints || []).map((endpoint) => `${endpoint.method} ${endpoint.path}`));
 const exampleIDs = new Set((examples.examples || []).map((example) => example.id));
+const profileIDs = new Set((examples.platformSignatureProfiles || []).map((profile) => profile.id));
 const knownErrorCodes = new Set();
 
 for (const endpoint of contract.endpoints || []) {
@@ -59,6 +60,33 @@ for (const item of examples.examples || []) {
   }
 }
 
+for (const profile of examples.platformSignatureProfiles || []) {
+  if (!endpointKeys.has(profile.adapterEndpoint)) {
+    fail(`${profile.id} references unknown endpoint ${profile.adapterEndpoint}`);
+  }
+  for (const field of ['signatureHeader', 'timestampHeader', 'replayHeader']) {
+    if (!String(profile[field] || '').startsWith('X-')) {
+      fail(`${profile.id} must declare ${field} as an X-* header`);
+    }
+  }
+  if (!Array.isArray(profile.canonicalPayload) || profile.canonicalPayload.length < 4) {
+    fail(`${profile.id} must declare a canonicalPayload with at least four fields`);
+  }
+  if (!Array.isArray(profile.sampleCanonicalPayload) || profile.sampleCanonicalPayload.length !== profile.canonicalPayload.length) {
+    fail(`${profile.id} sampleCanonicalPayload must match canonicalPayload length`);
+  }
+  const payload = profile.sampleCanonicalPayload.map((value) => String(value || '').trim()).join('\n');
+  const expected = crypto.createHmac('sha256', profile.demoSecret || '').update(payload).digest('hex');
+  if (profile.sampleSignature !== expected) {
+    fail(`${profile.id} sampleSignature mismatch: expected ${expected}, got ${profile.sampleSignature}`);
+  }
+  for (const code of profile.failureCodes || []) {
+    if (!knownErrorCodes.has(code)) {
+      fail(`${profile.id} references unknown error code ${code}`);
+    }
+  }
+}
+
 for (const error of examples.errorExamples || []) {
   if (!knownErrorCodes.has(error.code)) {
     fail(`${error.id} references unknown error code ${error.code}`);
@@ -81,6 +109,12 @@ for (const row of matrix.rows || []) {
   }
   if (!exampleIDs.has(row.successExampleId)) {
     fail(`${row.channel} matrix references unknown example ${row.successExampleId}`);
+  }
+  if (!profileIDs.has(row.signatureProfileId)) {
+    fail(`${row.channel} matrix references unknown signature profile ${row.signatureProfileId}`);
+  }
+  if (!row.signatureHeader || !row.timestampHeader) {
+    fail(`${row.channel} matrix must declare signature and timestamp headers`);
   }
   for (const code of row.errors || []) {
     if (!knownErrorCodes.has(code)) {

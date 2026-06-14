@@ -6,6 +6,7 @@
       "channel": "WeChat",
       "adapterEndpoint": "POST /api/channels/wechat/inbound",
       "successExampleId": "wechat-adapter-inbound",
+      "signatureProfileId": "wechat-official-callback",
       "conversationKey": "openId",
       "messageKey": "msgId",
       "customerField": "nickname",
@@ -13,14 +14,18 @@
       "timestampField": "timestamp",
       "origin": "https://wechat.example.com",
       "secretRef": "ANJING_CHANNEL_WECHAT_SECRET",
+      "signatureHeader": "X-WX-Signature",
+      "timestampHeader": "X-WX-Timestamp",
       "replayKey": "channel + msgId",
       "rateLimit": "60/min",
+      "retrySemantics": "official callback retries by msgId",
       "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_signature"]
     },
     {
       "channel": "App",
       "adapterEndpoint": "POST /api/channels/app/inbound",
       "successExampleId": "app-adapter-inbound",
+      "signatureProfileId": "app-mobile-sdk-callback",
       "conversationKey": "deviceId",
       "messageKey": "messageId",
       "customerField": "userName",
@@ -28,14 +33,18 @@
       "timestampField": "sentAt",
       "origin": "app://agent-customer-service",
       "secretRef": "ANJING_CHANNEL_APP_SECRET",
+      "signatureHeader": "X-App-Signature",
+      "timestampHeader": "X-App-Sent-At",
       "replayKey": "channel + messageId",
       "rateLimit": "90/min",
+      "retrySemantics": "mobile SDK retries by messageId",
       "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "stale_signature"]
     },
     {
       "channel": "Marketplace",
       "adapterEndpoint": "POST /api/channels/marketplace/inbound",
       "successExampleId": "marketplace-adapter-inbound",
+      "signatureProfileId": "marketplace-order-message-callback",
       "conversationKey": "buyerId",
       "messageKey": "eventId",
       "customerField": "buyerName",
@@ -43,8 +52,11 @@
       "timestampField": "occurredAt",
       "origin": "https://marketplace.example.com",
       "secretRef": "ANJING_CHANNEL_MARKETPLACE_SECRET",
+      "signatureHeader": "X-Marketplace-Signature",
+      "timestampHeader": "X-Marketplace-Occurred-At",
       "replayKey": "channel + eventId",
       "rateLimit": "45/min",
+      "retrySemantics": "order event retries by eventId",
       "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_timestamp"]
     }
   ]

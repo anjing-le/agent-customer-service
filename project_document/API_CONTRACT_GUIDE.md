@@ -76,7 +76,7 @@ Go API 当前响应格式：
 
 ## Channel Protocol Examples
 
-`contracts/examples/channel-protocols.json` 固化了标准 inbound、WeChat、App 和 Marketplace adapter 的请求样例。每个样例都包含：
+`contracts/examples/channel-protocols.json` 固化了标准 inbound、WeChat、App 和 Marketplace adapter 的请求样例，并为每个真实平台补充 `platformSignatureProfiles`。每个请求样例都包含：
 
 - endpoint 和请求头
 - demo secret 与 secret ref
@@ -84,15 +84,15 @@ Go API 当前响应格式：
 - HMAC-SHA256 signature
 - 关键错误码样例，例如 `channel_origin_denied`、`channel_rate_limited`、`duplicate_inbound`
 
-`scripts/check-channel-examples.js` 会在质量门禁里重新计算签名，并确认样例 endpoint、失败样例引用和错误码仍存在于 API contract。
+每个验签 profile 会声明平台侧 `signatureHeader`、`timestampHeader`、`replayHeader`、canonical payload 字段、样例 canonical payload、样例签名、重试语义和关键失败码。`scripts/check-channel-examples.js` 会在质量门禁里重新计算请求样例和平台 profile 的签名，并确认样例 endpoint、失败样例引用、矩阵 profile 引用和错误码仍存在于 API contract。
 
 本地服务启动后，可以执行 `./scripts/demo-channel-inbound.sh`，脚本会读取同一份样例，动态刷新 timestamp、消息 ID 和签名，并把请求发送到运行中的渠道入口。
 
-React 控制台的渠道接入区域也直接读取这份样例，展示 endpoint、来源头、secret ref、签名外部会话 ID 和预期状态码，并可用 demo secret 发送演示请求。请求成功后，控制台展示 Agent 回复、trace、证据标题和 fallback reason，便于课堂解释不同渠道如何归一到同一条可靠 Agent 链路。
+React 控制台的渠道接入区域也直接读取这份样例，展示 endpoint、来源头、secret ref、平台签名头、replay 头、签名预览、签名外部会话 ID 和预期状态码，并可用 demo secret 发送演示请求。请求成功后，控制台展示 Agent 回复、trace、证据标题和 fallback reason，便于课堂解释不同渠道如何归一到同一条可靠 Agent 链路。
 
 控制台还会读取 `errorExamples`，提供来源不匹配、签名错误、过期 timestamp、重复消息和限流等失败演示，展示 `status + error.code`。Dashboard 会聚合 `ChannelAlert[]`、`ChannelFailureTrend[]`、`ChannelAlertPolicy[]`、`NotificationPolicyChange[]`、`NotificationPolicyEvent[]` 和 `ChannelNotification[]`，用于说明系统为什么不会盲收外部请求，以及失败如何进入运营监控、通知策略、目标解析、secret ref 签名、delivery client、退避重试、外部回执、投递审计、死信和确认闭环。`/api/ops/channel-alert-policies/update` 支持调整 target URL、secret ref、max attempts 和 backoff seconds；HIGH/CRITICAL 渠道会先生成 24 小时待审批变更，变更携带 current 快照、字段级 diff 和 `APPROVE <channel>` 确认短语，`approve-change` 仅允许 `ops-lead`、`security-owner`、`platform-owner` 携带确认短语后生效，`reject-change` 也要求审批人权限，`cancel-change` 允许申请方撤销，`rollback` 仅允许审批人携带 `ROLLBACK <channel>` 回滚到最近一次已批准变更的申请前快照，过期变更会在 Dashboard 和审批动作前自动标记为 `EXPIRED` 并记录审计。`ChannelNotification.deliveryAudit` 只返回 payload hash、签名预览和脱敏请求/响应摘要，不返回完整 signed payload 或密钥值。
 
-`contracts/channel-protocol-matrix.json` 补充真实渠道差异表，说明各 adapter 的外部会话键、消息幂等键、客户字段、内容字段、时间字段、来源白名单、secret ref、replay key、rate limit 和关键失败码。控制台会把这张矩阵展示为“协议差异”，让字段映射和可靠性边界可以直接对照。
+`contracts/channel-protocol-matrix.json` 补充真实渠道差异表，说明各 adapter 的外部会话键、消息幂等键、客户字段、内容字段、时间字段、来源白名单、secret ref、平台签名头、时间头、replay key、rate limit、重试语义和关键失败码。控制台会把这张矩阵展示为“协议差异”，让字段映射、验签头和可靠性边界可以直接对照。
 
 ## Pagination
 
