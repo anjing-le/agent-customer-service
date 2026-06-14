@@ -49,7 +49,7 @@ func (f failingRuntime) UpdateChannelAlertPolicy(string, string, string, int, in
 	return store.ChannelAlertPolicy{}, errors.New("database unavailable")
 }
 
-func (f failingRuntime) ApproveNotificationPolicyChange(string, string, string) (store.ChannelAlertPolicy, error) {
+func (f failingRuntime) ApproveNotificationPolicyChange(string, string, string, string) (store.ChannelAlertPolicy, error) {
 	return store.ChannelAlertPolicy{}, errors.New("database unavailable")
 }
 
@@ -61,7 +61,7 @@ func (f failingRuntime) CancelNotificationPolicyChange(string, string, string) (
 	return store.NotificationPolicyChange{}, errors.New("database unavailable")
 }
 
-func (f failingRuntime) RollbackChannelAlertPolicy(string, string, string) (store.ChannelAlertPolicy, error) {
+func (f failingRuntime) RollbackChannelAlertPolicy(string, string, string, string) (store.ChannelAlertPolicy, error) {
 	return store.ChannelAlertPolicy{}, errors.New("database unavailable")
 }
 

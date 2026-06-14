@@ -291,9 +291,10 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			return
 		}
 		var req struct {
-			ID       string `json:"id"`
-			Approver string `json:"approver"`
-			Note     string `json:"note"`
+			ID           string `json:"id"`
+			Approver     string `json:"approver"`
+			Note         string `json:"note"`
+			Confirmation string `json:"confirmation"`
 		}
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
@@ -303,7 +304,7 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			httpjson.BadRequest(w, "id is required")
 			return
 		}
-		policy, err := st.ApproveNotificationPolicyChange(req.ID, req.Approver, req.Note)
+		policy, err := st.ApproveNotificationPolicyChange(req.ID, req.Approver, req.Note, req.Confirmation)
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return
@@ -366,9 +367,10 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			return
 		}
 		var req struct {
-			Channel string `json:"channel"`
-			Actor   string `json:"actor"`
-			Note    string `json:"note"`
+			Channel      string `json:"channel"`
+			Actor        string `json:"actor"`
+			Note         string `json:"note"`
+			Confirmation string `json:"confirmation"`
 		}
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
@@ -378,7 +380,7 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			httpjson.BadRequest(w, "channel is required")
 			return
 		}
-		policy, err := st.RollbackChannelAlertPolicy(req.Channel, req.Actor, req.Note)
+		policy, err := st.RollbackChannelAlertPolicy(req.Channel, req.Actor, req.Note, req.Confirmation)
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return

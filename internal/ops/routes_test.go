@@ -218,7 +218,15 @@ func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
 		t.Fatalf("expected policy audit event, got %#v", dashboard.PolicyEvents)
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/approve-change", strings.NewReader(`{"id":"`+dashboard.PolicyChanges[0].ID+`","approver":"ops-lead","note":"审批通过"}`))
+	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/approve-change", strings.NewReader(`{"id":"`+dashboard.PolicyChanges[0].ID+`","approver":"ops-a","note":"审批通过","confirmation":"`+dashboard.PolicyChanges[0].ConfirmationText+`"}`))
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected unauthorized approval to fail, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/approve-change", strings.NewReader(`{"id":"`+dashboard.PolicyChanges[0].ID+`","approver":"ops-lead","note":"审批通过","confirmation":"`+dashboard.PolicyChanges[0].ConfirmationText+`"}`))
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -231,7 +239,7 @@ func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
 		}
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/rollback", strings.NewReader(`{"channel":"Marketplace","actor":"ops-a","note":"回滚通知目标"}`))
+	req = httptest.NewRequest(http.MethodPost, "/api/ops/channel-alert-policies/rollback", strings.NewReader(`{"channel":"Marketplace","actor":"ops-lead","note":"回滚通知目标","confirmation":"ROLLBACK Marketplace"}`))
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

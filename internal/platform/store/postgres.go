@@ -418,7 +418,7 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 	return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s not found", channel)
 }
 
-func (s *PostgresStore) ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error) {
+func (s *PostgresStore) ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error) {
 	ctx := context.Background()
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -436,6 +436,13 @@ func (s *PostgresStore) ApproveNotificationPolicyChange(id string, approver stri
 	if change.Status != "PENDING" {
 		return ChannelAlertPolicy{}, fmt.Errorf("notification policy change %s is not pending", id)
 	}
+	approvedBy := fallback(approver, "ops-lead")
+	if err := requireNotificationPolicyApprover(approvedBy); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if err := requireNotificationPolicyConfirmation("APPROVE", change.Channel, confirmation); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
 	before, err := channelAlertPolicyTx(ctx, tx, change.Channel)
 	if err != nil {
 		return ChannelAlertPolicy{}, err
@@ -452,7 +459,6 @@ func (s *PostgresStore) ApproveNotificationPolicyChange(id string, approver stri
 		return ChannelAlertPolicy{}, fmt.Errorf("apply notification policy change: %w", err)
 	}
 	now := time.Now().UTC()
-	approvedBy := fallback(approver, "ops-lead")
 	if _, err := tx.Exec(ctx, `
 		update notification_policy_changes
 		set status = 'APPROVED',
@@ -498,12 +504,15 @@ func (s *PostgresStore) RejectNotificationPolicyChange(id string, reviewer strin
 	if change.Status != "PENDING" {
 		return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s is not pending", id)
 	}
+	reviewedBy := fallback(reviewer, "ops-lead")
+	if err := requireNotificationPolicyApprover(reviewedBy); err != nil {
+		return NotificationPolicyChange{}, err
+	}
 	before, err := channelAlertPolicyTx(ctx, tx, change.Channel)
 	if err != nil {
 		return NotificationPolicyChange{}, err
 	}
 	now := time.Now().UTC()
-	reviewedBy := fallback(reviewer, "ops-lead")
 	if _, err := tx.Exec(ctx, `
 		update notification_policy_changes
 		set status = 'REJECTED',
@@ -572,10 +581,17 @@ func (s *PostgresStore) CancelNotificationPolicyChange(id string, actor string, 
 	return change, nil
 }
 
-func (s *PostgresStore) RollbackChannelAlertPolicy(channel string, actor string, note string) (ChannelAlertPolicy, error) {
+func (s *PostgresStore) RollbackChannelAlertPolicy(channel string, actor string, note string, confirmation string) (ChannelAlertPolicy, error) {
 	normalized := strings.TrimSpace(channel)
 	if normalized == "" {
 		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
+	}
+	rolledBackBy := fallback(actor, "ops-lead")
+	if err := requireNotificationPolicyApprover(rolledBackBy); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if err := requireNotificationPolicyConfirmation("ROLLBACK", normalized, confirmation); err != nil {
+		return ChannelAlertPolicy{}, err
 	}
 	ctx := context.Background()
 	tx, err := s.pool.Begin(ctx)
@@ -607,7 +623,7 @@ func (s *PostgresStore) RollbackChannelAlertPolicy(channel string, actor string,
 	if err != nil {
 		return ChannelAlertPolicy{}, err
 	}
-	event := newNotificationPolicyEvent(after.Channel, "ROLLBACK", fallback(actor, "ops-a"), notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, "通知目标已回滚到上一版"), time.Now().UTC().Format(time.RFC3339))
+	event := newNotificationPolicyEvent(after.Channel, "ROLLBACK", rolledBackBy, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, "通知目标已回滚到上一版"), time.Now().UTC().Format(time.RFC3339))
 	if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
 		return ChannelAlertPolicy{}, err
 	}
@@ -1760,6 +1776,7 @@ func notificationPolicyChangeTx(ctx context.Context, q queryer, id string) (Noti
 	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 	item.ExpiresAt = expiresAt.UTC().Format(time.RFC3339)
 	item.Diff = notificationPolicyDiff(item)
+	item.ConfirmationText = notificationPolicyConfirmationText("APPROVE", item.Channel)
 	if approvedAt != nil {
 		item.ApprovedAt = approvedAt.UTC().Format(time.RFC3339)
 	}
@@ -1840,6 +1857,7 @@ func (s *PostgresStore) listNotificationPolicyChanges() ([]NotificationPolicyCha
 		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		item.ExpiresAt = expiresAt.UTC().Format(time.RFC3339)
 		item.Diff = notificationPolicyDiff(item)
+		item.ConfirmationText = notificationPolicyConfirmationText("APPROVE", item.Channel)
 		if approvedAt != nil {
 			item.ApprovedAt = approvedAt.UTC().Format(time.RFC3339)
 		}

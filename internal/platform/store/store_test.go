@@ -563,7 +563,13 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	if len(dashboard.PolicyChanges[0].Diff) == 0 || dashboard.PolicyChanges[0].CurrentSecretRef == "" {
 		t.Fatalf("expected policy change diff and current snapshot, got %#v", dashboard.PolicyChanges[0])
 	}
-	approved, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过")
+	if _, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-a", "审批通过", dashboard.PolicyChanges[0].ConfirmationText); err == nil {
+		t.Fatal("expected unauthorized notification policy approval to fail")
+	}
+	if _, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过", ""); err == nil {
+		t.Fatal("expected missing confirmation to fail")
+	}
+	approved, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过", dashboard.PolicyChanges[0].ConfirmationText)
 	if err != nil {
 		t.Fatalf("approve policy change: %v", err)
 	}
@@ -601,7 +607,13 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	if notification.MaxAttempts != 5 || notification.BackoffSeconds != 45 {
 		t.Fatalf("expected configured retry values, got %#v", notification)
 	}
-	rolledBack, err := st.RollbackChannelAlertPolicy("Marketplace", "ops-a", "回滚通知目标")
+	if _, err := st.RollbackChannelAlertPolicy("Marketplace", "ops-a", "回滚通知目标", "ROLLBACK Marketplace"); err == nil {
+		t.Fatal("expected unauthorized rollback to fail")
+	}
+	if _, err := st.RollbackChannelAlertPolicy("Marketplace", "ops-lead", "回滚通知目标", ""); err == nil {
+		t.Fatal("expected missing rollback confirmation to fail")
+	}
+	rolledBack, err := st.RollbackChannelAlertPolicy("Marketplace", "ops-lead", "回滚通知目标", "ROLLBACK Marketplace")
 	if err != nil {
 		t.Fatalf("rollback channel alert policy: %v", err)
 	}
@@ -722,7 +734,7 @@ func TestExpiredNotificationPolicyChangeIsAudited(t *testing.T) {
 	if dashboard.PolicyEvents[0].Action != "EXPIRE" {
 		t.Fatalf("expected expire event, got %#v", dashboard.PolicyEvents[0])
 	}
-	if _, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过"); err == nil {
+	if _, err := st.ApproveNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "审批通过", dashboard.PolicyChanges[0].ConfirmationText); err == nil {
 		t.Fatal("expected expired policy change approval to fail")
 	}
 }

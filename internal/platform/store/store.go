@@ -86,10 +86,10 @@ type Runtime interface {
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
 	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
-	ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error)
+	ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error)
 	RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error)
 	CancelNotificationPolicyChange(id string, actor string, note string) (NotificationPolicyChange, error)
-	RollbackChannelAlertPolicy(channel string, actor string, note string) (ChannelAlertPolicy, error)
+	RollbackChannelAlertPolicy(channel string, actor string, note string, confirmation string) (ChannelAlertPolicy, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
@@ -282,6 +282,7 @@ type NotificationPolicyChange struct {
 	CurrentMaxAttempts    int                      `json:"currentMaxAttempts"`
 	CurrentBackoffSeconds int                      `json:"currentBackoffSeconds"`
 	Diff                  []NotificationPolicyDiff `json:"diff"`
+	ConfirmationText      string                   `json:"confirmationText"`
 	RequestedBy           string                   `json:"requestedBy"`
 	Status                string                   `json:"status"`
 	Note                  string                   `json:"note"`
@@ -720,7 +721,7 @@ func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secre
 	return ChannelAlertPolicy{}, fmt.Errorf("channel alert policy %s not found", channel)
 }
 
-func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error) {
+func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.expireNotificationPolicyChangesLocked(time.Now().UTC())
@@ -730,6 +731,13 @@ func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note
 		}
 		if s.policyChanges[changeIdx].Status != "PENDING" {
 			return ChannelAlertPolicy{}, fmt.Errorf("notification policy change %s is not pending", id)
+		}
+		approvedBy := fallback(approver, "ops-lead")
+		if err := requireNotificationPolicyApprover(approvedBy); err != nil {
+			return ChannelAlertPolicy{}, err
+		}
+		if err := requireNotificationPolicyConfirmation("APPROVE", s.policyChanges[changeIdx].Channel, confirmation); err != nil {
+			return ChannelAlertPolicy{}, err
 		}
 		for policyIdx := range s.alertPolicies {
 			if !strings.EqualFold(s.alertPolicies[policyIdx].Channel, s.policyChanges[changeIdx].Channel) {
@@ -745,9 +753,9 @@ func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note
 			normalizeChannelAlertPolicy(&after)
 			now := time.Now().UTC().Format(time.RFC3339)
 			s.policyChanges[changeIdx].Status = "APPROVED"
-			s.policyChanges[changeIdx].ApprovedBy = fallback(approver, "ops-lead")
+			s.policyChanges[changeIdx].ApprovedBy = approvedBy
 			s.policyChanges[changeIdx].ApprovedAt = now
-			event := newNotificationPolicyEvent(after.Channel, "APPROVE", approver, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, s.policyChanges[changeIdx].Note), now)
+			event := newNotificationPolicyEvent(after.Channel, "APPROVE", approvedBy, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, s.policyChanges[changeIdx].Note), now)
 			s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
 			return channelAlertPolicies([]ChannelAlertPolicy{s.alertPolicies[policyIdx]}, channelAlerts(s.channelFailures))[0], nil
 		}
@@ -766,12 +774,16 @@ func (s *Store) RejectNotificationPolicyChange(id string, reviewer string, note 
 		if s.policyChanges[changeIdx].Status != "PENDING" {
 			return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s is not pending", id)
 		}
+		reviewedBy := fallback(reviewer, "ops-lead")
+		if err := requireNotificationPolicyApprover(reviewedBy); err != nil {
+			return NotificationPolicyChange{}, err
+		}
 		now := time.Now().UTC().Format(time.RFC3339)
 		s.policyChanges[changeIdx].Status = "REJECTED"
-		s.policyChanges[changeIdx].ApprovedBy = fallback(reviewer, "ops-lead")
+		s.policyChanges[changeIdx].ApprovedBy = reviewedBy
 		s.policyChanges[changeIdx].ApprovedAt = now
 		before := notificationPolicyFor(s.alertPolicies, s.policyChanges[changeIdx].Channel)
-		event := newNotificationPolicyEvent(s.policyChanges[changeIdx].Channel, "REJECT", reviewer, notificationPolicySummary(before), notificationPolicyChangeSummary(s.policyChanges[changeIdx]), fallback(note, s.policyChanges[changeIdx].Note), now)
+		event := newNotificationPolicyEvent(s.policyChanges[changeIdx].Channel, "REJECT", reviewedBy, notificationPolicySummary(before), notificationPolicyChangeSummary(s.policyChanges[changeIdx]), fallback(note, s.policyChanges[changeIdx].Note), now)
 		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
 		return s.policyChanges[changeIdx], nil
 	}
@@ -801,12 +813,19 @@ func (s *Store) CancelNotificationPolicyChange(id string, actor string, note str
 	return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s not found", id)
 }
 
-func (s *Store) RollbackChannelAlertPolicy(channel string, actor string, note string) (ChannelAlertPolicy, error) {
+func (s *Store) RollbackChannelAlertPolicy(channel string, actor string, note string, confirmation string) (ChannelAlertPolicy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	normalized := strings.TrimSpace(channel)
 	if normalized == "" {
 		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
+	}
+	rolledBackBy := fallback(actor, "ops-lead")
+	if err := requireNotificationPolicyApprover(rolledBackBy); err != nil {
+		return ChannelAlertPolicy{}, err
+	}
+	if err := requireNotificationPolicyConfirmation("ROLLBACK", normalized, confirmation); err != nil {
+		return ChannelAlertPolicy{}, err
 	}
 	for policyIdx := range s.alertPolicies {
 		if !strings.EqualFold(s.alertPolicies[policyIdx].Channel, normalized) {
@@ -825,7 +844,7 @@ func (s *Store) RollbackChannelAlertPolicy(channel string, actor string, note st
 		after := s.alertPolicies[policyIdx]
 		normalizeChannelAlertPolicy(&after)
 		now := time.Now().UTC().Format(time.RFC3339)
-		event := newNotificationPolicyEvent(after.Channel, "ROLLBACK", actor, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, "通知目标已回滚到上一版"), now)
+		event := newNotificationPolicyEvent(after.Channel, "ROLLBACK", rolledBackBy, notificationPolicySummary(before), notificationPolicySummary(after), fallback(note, "通知目标已回滚到上一版"), now)
 		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
 		if len(s.policyEvents) > 30 {
 			s.policyEvents = s.policyEvents[:30]
@@ -1545,6 +1564,7 @@ func newNotificationPolicyChange(current ChannelAlertPolicy, targetURL, secretRe
 		CurrentMaxAttempts:    next.CurrentMaxAttempts,
 		CurrentBackoffSeconds: next.CurrentBackoffSeconds,
 		Diff:                  next.Diff,
+		ConfirmationText:      notificationPolicyConfirmationText("APPROVE", next.Channel),
 		RequestedBy:           fallback(requestedBy, "ops-a"),
 		Status:                "PENDING",
 		Note:                  fallback(note, "通知策略变更待审批"),
@@ -1580,10 +1600,32 @@ func latestApprovedNotificationPolicyChange(changes []NotificationPolicyChange, 
 	for _, change := range changes {
 		if change.Status == "APPROVED" && strings.EqualFold(change.Channel, channel) && strings.TrimSpace(change.CurrentTargetURL) != "" && strings.TrimSpace(change.CurrentSecretRef) != "" {
 			change.Diff = notificationPolicyDiff(change)
+			change.ConfirmationText = notificationPolicyConfirmationText("APPROVE", change.Channel)
 			return change, true
 		}
 	}
 	return NotificationPolicyChange{}, false
+}
+
+func requireNotificationPolicyApprover(actor string) error {
+	switch strings.ToLower(strings.TrimSpace(actor)) {
+	case "ops-lead", "security-owner", "platform-owner":
+		return nil
+	default:
+		return fmt.Errorf("notification policy actor %s is not authorized", fallback(actor, "unknown"))
+	}
+}
+
+func requireNotificationPolicyConfirmation(action, channel, confirmation string) error {
+	expected := notificationPolicyConfirmationText(action, channel)
+	if strings.TrimSpace(confirmation) != expected {
+		return fmt.Errorf("confirmation %q is required", expected)
+	}
+	return nil
+}
+
+func notificationPolicyConfirmationText(action, channel string) string {
+	return fmt.Sprintf("%s %s", strings.ToUpper(strings.TrimSpace(action)), strings.TrimSpace(channel))
 }
 
 func notificationPolicyChangeTTL() time.Duration {

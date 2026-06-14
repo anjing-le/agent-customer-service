@@ -110,6 +110,7 @@ type NotificationPolicyChange = {
   currentMaxAttempts: number;
   currentBackoffSeconds: number;
   diff: NotificationPolicyDiff[];
+  confirmationText: string;
   requestedBy: string;
   status: string;
   note: string;
@@ -963,11 +964,15 @@ function App() {
   };
 
   const rollbackChannelAlertPolicy = async (policy: ChannelAlertPolicy) => {
+    const confirmation = `ROLLBACK ${policy.channel}`;
+    if (!window.confirm(`确认回滚 ${policy.channel} 通知目标？审批人需要提交确认短语：${confirmation}`)) {
+      return;
+    }
     setError('');
     try {
       await api<ChannelAlertPolicy>('/api/ops/channel-alert-policies/rollback', {
         method: 'POST',
-        body: JSON.stringify({ channel: policy.channel, actor: 'ops-a', note: '通知目标回滚到上一版' })
+        body: JSON.stringify({ channel: policy.channel, actor: 'ops-lead', note: '通知目标回滚到上一版', confirmation })
       });
       await load();
     } catch (err) {
@@ -976,11 +981,14 @@ function App() {
   };
 
   const approveNotificationPolicyChange = async (change: NotificationPolicyChange) => {
+    if (!window.confirm(`确认批准 ${change.channel} 通知目标变更？审批人需要提交确认短语：${change.confirmationText}`)) {
+      return;
+    }
     setError('');
     try {
       await api<ChannelAlertPolicy>('/api/ops/channel-alert-policies/approve-change', {
         method: 'POST',
-        body: JSON.stringify({ id: change.id, approver: 'ops-lead', note: '通知目标审批通过' })
+        body: JSON.stringify({ id: change.id, approver: 'ops-lead', note: '通知目标审批通过', confirmation: change.confirmationText })
       });
       await load();
     } catch (err) {
@@ -1688,6 +1696,7 @@ function App() {
                       <span>{change.targetUrl} · {change.secretRef}</span>
                       <small>{change.maxAttempts} attempts · {change.backoffSeconds}s backoff</small>
                       <small>{change.requestedBy} · expires {change.expiresAt.slice(11, 19)}</small>
+                      <small>confirm: {change.confirmationText}</small>
                       <small>{change.note}</small>
                       {change.diff.length > 0 && (
                         <div className="policyDiffs">

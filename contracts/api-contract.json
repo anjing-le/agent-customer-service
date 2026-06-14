@@ -436,11 +436,12 @@
       }
     },
     "ApproveNotificationPolicyChangeRequest": {
-      "required": ["id"],
+      "required": ["id", "confirmation"],
       "fields": {
         "id": "string",
         "approver": "string",
-        "note": "string"
+        "note": "string",
+        "confirmation": "APPROVE <channel>"
       }
     },
     "RejectNotificationPolicyChangeRequest": {
@@ -460,11 +461,12 @@
       }
     },
     "RollbackChannelAlertPolicyRequest": {
-      "required": ["channel"],
+      "required": ["channel", "confirmation"],
       "fields": {
         "channel": "string",
         "actor": "string",
-        "note": "string"
+        "note": "string",
+        "confirmation": "ROLLBACK <channel>"
       }
     },
     "SubmitAnnotationRequest": {
@@ -620,7 +622,7 @@
       }
     },
     "NotificationPolicyChange": {
-      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "currentTargetUrl", "currentSecretRef", "currentMaxAttempts", "currentBackoffSeconds", "diff", "requestedBy", "status", "note", "createdAt", "expiresAt"],
+      "required": ["id", "channel", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "currentTargetUrl", "currentSecretRef", "currentMaxAttempts", "currentBackoffSeconds", "diff", "confirmationText", "requestedBy", "status", "note", "createdAt", "expiresAt"],
       "fields": {
         "id": "string",
         "channel": "string",
@@ -633,6 +635,7 @@
         "currentMaxAttempts": "number",
         "currentBackoffSeconds": "number",
         "diff": "NotificationPolicyDiff[]",
+        "confirmationText": "APPROVE <channel>",
         "requestedBy": "string",
         "status": "PENDING|APPROVED|REJECTED|CANCELED|EXPIRED",
         "note": "string",
