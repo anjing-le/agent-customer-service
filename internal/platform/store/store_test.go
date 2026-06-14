@@ -20,6 +20,15 @@ func (f fakeReplyGenerator) GenerateReply(context.Context, ReplyRequest) (ReplyG
 	return ReplyGeneration{Content: f.reply, Model: "fake-model"}, nil
 }
 
+type recordingDeliveryClient struct {
+	requests []NotificationDeliveryRequest
+}
+
+func (r *recordingDeliveryClient) DeliverChannelNotification(_ context.Context, req NotificationDeliveryRequest) (NotificationDeliveryResult, error) {
+	r.requests = append(r.requests, req)
+	return NotificationDeliveryResult{Accepted: true, ReceiptStatus: "204 NO_CONTENT", ReceiptBody: "custom delivery accepted"}, nil
+}
+
 func TestSendMessageUsesKnowledgeEvidence(t *testing.T) {
 	st := NewSeedStore()
 
@@ -529,5 +538,43 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	}
 	if acked.Status != "ACKED" || acked.AckedBy != "ops-a" {
 		t.Fatalf("expected acked notification, got %#v", acked)
+	}
+}
+
+func TestDispatchChannelNotificationUsesDeliveryClientAndSecretRef(t *testing.T) {
+	t.Setenv("ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET", "custom-notification-secret")
+	client := &recordingDeliveryClient{}
+	st := NewSeedStore(WithNotificationDeliveryClient(client))
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("custom-delivery-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record channel failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	sent, err := st.DispatchChannelNotification(dashboard.Notifications[0].ID, "SUCCESS")
+	if err != nil {
+		t.Fatalf("dispatch notification: %v", err)
+	}
+	if sent.Status != "SENT" || sent.ReceiptStatus != "204 NO_CONTENT" {
+		t.Fatalf("expected custom delivery receipt, got %#v", sent)
+	}
+	if sent.SecretRef != "ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET" {
+		t.Fatalf("expected secret ref, got %#v", sent)
+	}
+	if len(client.requests) != 1 || client.requests[0].Notification.ID != sent.ID {
+		t.Fatalf("expected delivery client call, got %#v", client.requests)
+	}
+	expectedSignature := signChannelNotification(client.requests[0].Notification)
+	if sent.Signature != expectedSignature {
+		t.Fatalf("expected env-secret signature %s, got %s", expectedSignature, sent.Signature)
 	}
 }

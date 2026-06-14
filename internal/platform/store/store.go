@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,23 @@ type ReplyGeneration struct {
 	Model   string
 }
 
+type NotificationDeliveryClient interface {
+	DeliverChannelNotification(ctx context.Context, req NotificationDeliveryRequest) (NotificationDeliveryResult, error)
+}
+
+type NotificationDeliveryRequest struct {
+	Notification  ChannelNotification
+	Outcome       string
+	SignedPayload string
+}
+
+type NotificationDeliveryResult struct {
+	Accepted      bool
+	ReceiptStatus string
+	ReceiptBody   string
+	Error         string
+}
+
 type Option func(*Store)
 
 func WithReplyGenerator(generator ReplyGenerator) Option {
@@ -38,6 +56,12 @@ func WithReplyGenerator(generator ReplyGenerator) Option {
 func WithChannelIntegrations(integrations []ChannelIntegration) Option {
 	return func(s *Store) {
 		s.integrations = append([]ChannelIntegration(nil), integrations...)
+	}
+}
+
+func WithNotificationDeliveryClient(client NotificationDeliveryClient) Option {
+	return func(s *Store) {
+		s.delivery = client
 	}
 }
 
@@ -91,6 +115,7 @@ type Store struct {
 	rateWindows     map[string]int
 	channelFailures []ChannelFailureEvent
 	generator       ReplyGenerator
+	delivery        NotificationDeliveryClient
 }
 
 type Conversation struct {
@@ -422,6 +447,7 @@ type ChannelNotification struct {
 	Severity         string `json:"severity"`
 	Target           string `json:"target"`
 	TargetURL        string `json:"targetUrl"`
+	SecretRef        string `json:"secretRef"`
 	Status           string `json:"status"`
 	Reason           string `json:"reason"`
 	Count            int    `json:"count"`
@@ -595,9 +621,13 @@ func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
 func (s *Store) DispatchChannelNotification(id, outcome string) (ChannelNotification, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	delivery := s.delivery
+	if delivery == nil {
+		delivery = demoNotificationDeliveryClient{}
+	}
 	for idx := range s.notifications {
 		if s.notifications[idx].ID == id {
-			s.notifications[idx] = dispatchChannelNotification(s.notifications[idx], outcome, time.Now().UTC())
+			s.notifications[idx] = dispatchChannelNotification(s.notifications[idx], outcome, delivery, time.Now().UTC())
 			return s.notifications[idx], nil
 		}
 	}
@@ -1914,6 +1944,7 @@ func newChannelNotification(policy ChannelAlertPolicy, createdAt string) Channel
 		Severity:       policy.Severity,
 		Target:         policy.NotifyTarget,
 		TargetURL:      notificationTargetURL(policy.NotifyTarget),
+		SecretRef:      notificationSecretRef(policy.NotifyTarget),
 		Status:         "OPEN",
 		Reason:         fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
 		Count:          policy.CurrentCount,
@@ -1923,7 +1954,7 @@ func newChannelNotification(policy ChannelAlertPolicy, createdAt string) Channel
 	}
 }
 
-func dispatchChannelNotification(notification ChannelNotification, outcome string, now time.Time) ChannelNotification {
+func dispatchChannelNotification(notification ChannelNotification, outcome string, delivery NotificationDeliveryClient, now time.Time) ChannelNotification {
 	if notification.MaxAttempts <= 0 {
 		notification.MaxAttempts = 3
 	}
@@ -1933,24 +1964,35 @@ func dispatchChannelNotification(notification ChannelNotification, outcome strin
 	if strings.TrimSpace(notification.TargetURL) == "" {
 		notification.TargetURL = notificationTargetURL(notification.Target)
 	}
+	if strings.TrimSpace(notification.SecretRef) == "" {
+		notification.SecretRef = notificationSecretRef(notification.Target)
+	}
 	if notification.Status == "ACKED" || notification.Status == "SENT" || notification.Status == "DEAD_LETTER" {
 		return notification
 	}
 	notification.Attempts++
 	notification.LastDispatchAt = now.Format(time.RFC3339)
 	notification.Signature = signChannelNotification(notification)
-	if strings.EqualFold(outcome, "SUCCESS") {
+	result, err := delivery.DeliverChannelNotification(context.Background(), NotificationDeliveryRequest{
+		Notification:  notification,
+		Outcome:       outcome,
+		SignedPayload: notificationPayload(notification),
+	})
+	if err != nil {
+		result = NotificationDeliveryResult{Error: err.Error(), ReceiptStatus: "500 DELIVERY_ERROR", ReceiptBody: err.Error()}
+	}
+	if result.Accepted {
 		notification.Status = "SENT"
 		notification.LastError = ""
 		notification.DeadLetterReason = ""
 		notification.NextRetryAt = ""
-		notification.ReceiptStatus = "202 ACCEPTED"
-		notification.ReceiptBody = "notification accepted by demo webhook"
+		notification.ReceiptStatus = fallback(result.ReceiptStatus, "202 ACCEPTED")
+		notification.ReceiptBody = fallback(result.ReceiptBody, "notification accepted")
 		return notification
 	}
-	notification.LastError = fallback(outcome, "webhook_timeout")
-	notification.ReceiptStatus = "504 TIMEOUT"
-	notification.ReceiptBody = "demo webhook did not return success"
+	notification.LastError = fallback(result.Error, fallback(outcome, "webhook_timeout"))
+	notification.ReceiptStatus = fallback(result.ReceiptStatus, "504 TIMEOUT")
+	notification.ReceiptBody = fallback(result.ReceiptBody, "delivery client did not return success")
 	if notification.Attempts >= notification.MaxAttempts {
 		notification.Status = "DEAD_LETTER"
 		notification.DeadLetterReason = fmt.Sprintf("failed after %d signed webhook attempts", notification.Attempts)
@@ -1964,10 +2006,40 @@ func dispatchChannelNotification(notification ChannelNotification, outcome strin
 }
 
 func signChannelNotification(notification ChannelNotification) string {
-	payload := fmt.Sprintf("%s|%s|%s|%s|%d|%d", notification.ID, notification.Channel, notification.Target, notification.TargetURL, notification.Count, notification.Attempts)
-	mac := hmac.New(sha256.New, []byte("anjing-notification-demo-secret"))
-	_, _ = mac.Write([]byte(payload))
+	mac := hmac.New(sha256.New, []byte(notificationSecret(notification.SecretRef)))
+	_, _ = mac.Write([]byte(notificationPayload(notification)))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func notificationPayload(notification ChannelNotification) string {
+	return fmt.Sprintf("%s|%s|%s|%s|%d|%d", notification.ID, notification.Channel, notification.Target, notification.TargetURL, notification.Count, notification.Attempts)
+}
+
+func notificationSecret(secretRef string) string {
+	if strings.TrimSpace(secretRef) == "" {
+		return "notification-demo-secret"
+	}
+	if value := os.Getenv(secretRef); strings.TrimSpace(value) != "" {
+		return value
+	}
+	return "notification-demo-secret"
+}
+
+func notificationSecretRef(target string) string {
+	normalized := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_", "/", "_").Replace(strings.TrimSpace(target)))
+	if normalized == "" {
+		normalized = "OPS_WEBHOOK"
+	}
+	return "ANJING_NOTIFICATION_" + normalized + "_SECRET"
+}
+
+type demoNotificationDeliveryClient struct{}
+
+func (demoNotificationDeliveryClient) DeliverChannelNotification(_ context.Context, req NotificationDeliveryRequest) (NotificationDeliveryResult, error) {
+	if strings.EqualFold(req.Outcome, "SUCCESS") {
+		return NotificationDeliveryResult{Accepted: true, ReceiptStatus: "202 ACCEPTED", ReceiptBody: "notification accepted by demo webhook"}, nil
+	}
+	return NotificationDeliveryResult{Accepted: false, ReceiptStatus: "504 TIMEOUT", ReceiptBody: "demo webhook did not return success", Error: fallback(req.Outcome, "webhook_timeout")}, nil
 }
 
 func notificationTargetURL(target string) string {

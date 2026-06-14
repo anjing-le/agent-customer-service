@@ -52,6 +52,7 @@ export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
 export ANJING_CHANNEL_WECHAT_NEXT_SECRET='your-next-wechat-secret'
 export ANJING_CHANNEL_APP_SECRET='your-app-secret'
 export ANJING_CHANNEL_MARKETPLACE_SECRET='your-marketplace-secret'
+export ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET='your-notification-secret'
 export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
 go run ./cmd/platform-all
 ```
@@ -63,6 +64,8 @@ go run ./cmd/platform-all
 - `/api/channels/marketplace/inbound`
 
 adapter 只做字段归一，验签、时间窗、replay 和会话映射仍复用标准 inbound 链路。
+
+渠道告警通知会从 `ChannelNotification.secretRef` 解析 env secret 生成 HMAC-SHA256 出站签名；未配置 env 时使用 demo secret，便于本地教学。
 
 演示脚本会读取 `contracts/examples/channel-protocols.json`，动态生成当前 timestamp、唯一消息 ID 和 HMAC-SHA256 signature：
 

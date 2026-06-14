@@ -14,6 +14,7 @@ import (
 type PostgresStore struct {
 	pool      *pgxpool.Pool
 	generator ReplyGenerator
+	delivery  NotificationDeliveryClient
 }
 
 type PostgresOption func(*PostgresStore)
@@ -21,6 +22,12 @@ type PostgresOption func(*PostgresStore)
 func WithPostgresReplyGenerator(generator ReplyGenerator) PostgresOption {
 	return func(s *PostgresStore) {
 		s.generator = generator
+	}
+}
+
+func WithPostgresNotificationDeliveryClient(client NotificationDeliveryClient) PostgresOption {
+	return func(s *PostgresStore) {
+		s.delivery = client
 	}
 }
 
@@ -305,7 +312,11 @@ func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (Channel
 	if err != nil {
 		return ChannelNotification{}, err
 	}
-	item = dispatchChannelNotification(item, outcome, time.Now().UTC())
+	delivery := s.delivery
+	if delivery == nil {
+		delivery = demoNotificationDeliveryClient{}
+	}
+	item = dispatchChannelNotification(item, outcome, delivery, time.Now().UTC())
 	lastDispatchAt, _ := time.Parse(time.RFC3339, item.LastDispatchAt)
 	nextRetryAt, _ := time.Parse(time.RFC3339, item.NextRetryAt)
 	if _, err := s.pool.Exec(context.Background(), `
@@ -316,14 +327,15 @@ func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (Channel
 		    backoff_seconds = $5,
 		    next_retry_at = $6,
 		    target_url = $7,
-		    signature = $8,
-		    last_dispatch_at = $9,
-		    last_error = $10,
-		    receipt_status = $11,
-		    receipt_body = $12,
-		    dead_letter_reason = $13
+		    secret_ref = $8,
+		    signature = $9,
+		    last_dispatch_at = $10,
+		    last_error = $11,
+		    receipt_status = $12,
+		    receipt_body = $13,
+		    dead_letter_reason = $14
 		where id = $1
-	`, item.ID, item.Status, item.Attempts, item.MaxAttempts, item.BackoffSeconds, nullableTime(item.NextRetryAt, nextRetryAt), item.TargetURL, item.Signature, lastDispatchAt, item.LastError, item.ReceiptStatus, item.ReceiptBody, item.DeadLetterReason); err != nil {
+	`, item.ID, item.Status, item.Attempts, item.MaxAttempts, item.BackoffSeconds, nullableTime(item.NextRetryAt, nextRetryAt), item.TargetURL, item.SecretRef, item.Signature, lastDispatchAt, item.LastError, item.ReceiptStatus, item.ReceiptBody, item.DeadLetterReason); err != nil {
 		return ChannelNotification{}, fmt.Errorf("dispatch channel notification: %w", err)
 	}
 	return item, nil
@@ -336,11 +348,11 @@ func (s *PostgresStore) channelNotification(id string) (ChannelNotification, err
 	var lastDispatchAt *time.Time
 	var nextRetryAt *time.Time
 	if err := s.pool.QueryRow(context.Background(), `
-		select id, channel, severity, target, target_url, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, dead_letter_reason, created_at, acked_by, ack_note, acked_at
+		select id, channel, severity, target, target_url, secret_ref, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, dead_letter_reason, created_at, acked_by, ack_note, acked_at
 		from channel_notifications
 		where id = $1
 	`, id).Scan(
-		&item.ID, &item.Channel, &item.Severity, &item.Target, &item.TargetURL, &item.Status, &item.Reason, &item.Count,
+		&item.ID, &item.Channel, &item.Severity, &item.Target, &item.TargetURL, &item.SecretRef, &item.Status, &item.Reason, &item.Count,
 		&item.Attempts, &item.MaxAttempts, &item.BackoffSeconds, &nextRetryAt, &item.Signature, &lastDispatchAt, &item.LastError, &item.ReceiptStatus, &item.ReceiptBody, &item.DeadLetterReason,
 		&createdAt, &item.AckedBy, &item.AckNote, &ackedAt,
 	); err != nil {
@@ -1372,9 +1384,9 @@ func insertTriggeredNotifications(ctx context.Context, tx pgx.Tx, policies []Cha
 			parsedCreatedAt = time.Now().UTC()
 		}
 		if _, err := tx.Exec(ctx, `
-			insert into channel_notifications (id, channel, severity, target, target_url, status, reason, count, max_attempts, backoff_seconds, created_at)
-			values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		`, notification.ID, notification.Channel, notification.Severity, notification.Target, notification.TargetURL, notification.Status, notification.Reason, notification.Count, notification.MaxAttempts, notification.BackoffSeconds, parsedCreatedAt); err != nil {
+			insert into channel_notifications (id, channel, severity, target, target_url, secret_ref, status, reason, count, max_attempts, backoff_seconds, created_at)
+			values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		`, notification.ID, notification.Channel, notification.Severity, notification.Target, notification.TargetURL, notification.SecretRef, notification.Status, notification.Reason, notification.Count, notification.MaxAttempts, notification.BackoffSeconds, parsedCreatedAt); err != nil {
 			return fmt.Errorf("insert channel notification: %w", err)
 		}
 	}
@@ -1383,7 +1395,7 @@ func insertTriggeredNotifications(ctx context.Context, tx pgx.Tx, policies []Cha
 
 func (s *PostgresStore) listChannelNotifications() ([]ChannelNotification, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, channel, severity, target, target_url, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, dead_letter_reason, created_at, acked_by, ack_note, acked_at
+		select id, channel, severity, target, target_url, secret_ref, status, reason, count, attempts, max_attempts, backoff_seconds, next_retry_at, signature, last_dispatch_at, last_error, receipt_status, receipt_body, dead_letter_reason, created_at, acked_by, ack_note, acked_at
 		from channel_notifications
 		order by created_at desc, id desc
 		limit 30
@@ -1401,7 +1413,7 @@ func (s *PostgresStore) listChannelNotifications() ([]ChannelNotification, error
 		var lastDispatchAt *time.Time
 		var nextRetryAt *time.Time
 		if err := rows.Scan(
-			&item.ID, &item.Channel, &item.Severity, &item.Target, &item.TargetURL, &item.Status, &item.Reason, &item.Count,
+			&item.ID, &item.Channel, &item.Severity, &item.Target, &item.TargetURL, &item.SecretRef, &item.Status, &item.Reason, &item.Count,
 			&item.Attempts, &item.MaxAttempts, &item.BackoffSeconds, &nextRetryAt, &item.Signature, &lastDispatchAt, &item.LastError, &item.ReceiptStatus, &item.ReceiptBody, &item.DeadLetterReason,
 			&createdAt, &item.AckedBy, &item.AckNote, &ackedAt,
 		); err != nil {
@@ -1436,6 +1448,9 @@ func normalizeNotificationTimes(item *ChannelNotification, createdAt time.Time, 
 	}
 	if strings.TrimSpace(item.TargetURL) == "" {
 		item.TargetURL = notificationTargetURL(item.Target)
+	}
+	if strings.TrimSpace(item.SecretRef) == "" {
+		item.SecretRef = notificationSecretRef(item.Target)
 	}
 	if item.MaxAttempts <= 0 {
 		item.MaxAttempts = 3

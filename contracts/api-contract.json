@@ -695,13 +695,14 @@
       }
     },
     "ChannelNotification": {
-      "required": ["id", "channel", "severity", "target", "targetUrl", "status", "reason", "count", "attempts", "maxAttempts", "backoffSeconds", "createdAt"],
+      "required": ["id", "channel", "severity", "target", "targetUrl", "secretRef", "status", "reason", "count", "attempts", "maxAttempts", "backoffSeconds", "createdAt"],
       "fields": {
         "id": "string",
         "channel": "string",
         "severity": "LOW|MEDIUM|HIGH|CRITICAL",
         "target": "string",
         "targetUrl": "string",
+        "secretRef": "string",
         "status": "OPEN|RETRYING|SENT|DEAD_LETTER|ACKED",
         "reason": "string",
         "count": "number",
@@ -709,7 +710,7 @@
         "maxAttempts": "number",
         "backoffSeconds": "number",
         "nextRetryAt": "RFC3339 string",
-        "signature": "HMAC-SHA256 hex string",
+        "signature": "HMAC-SHA256 hex string using secretRef env fallback",
         "lastDispatchAt": "RFC3339 string",
         "lastError": "string",
         "receiptStatus": "string",
