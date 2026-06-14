@@ -12,14 +12,20 @@ import (
 
 func main() {
 	cfg := config.Load("ops-api", "10003")
-	var st store.Runtime = store.NewSeedStore()
+	var seedOptions []store.Option
+	var postgresOptions []store.PostgresOption
+	if delivery := config.NotificationDeliveryClient(cfg.Notifications); delivery != nil {
+		seedOptions = append(seedOptions, store.WithNotificationDeliveryClient(delivery))
+		postgresOptions = append(postgresOptions, store.WithPostgresNotificationDeliveryClient(delivery))
+	}
+	var st store.Runtime = store.NewSeedStore(seedOptions...)
 	if cfg.DatabaseURL != "" {
 		pool, err := db.Open(context.Background(), cfg.DatabaseURL)
 		if err != nil {
 			panic(err)
 		}
 		defer pool.Close()
-		st = store.NewPostgresStore(pool)
+		st = store.NewPostgresStore(pool, postgresOptions...)
 	}
 	mux := service.NewMux(cfg.ServiceName, st, ops.Register)
 	if err := service.Listen(cfg.Addr, cfg.ServiceName, mux); err != nil {

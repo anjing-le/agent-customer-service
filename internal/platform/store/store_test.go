@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -576,5 +578,47 @@ func TestDispatchChannelNotificationUsesDeliveryClientAndSecretRef(t *testing.T)
 	expectedSignature := signChannelNotification(client.requests[0].Notification)
 	if sent.Signature != expectedSignature {
 		t.Fatalf("expected env-secret signature %s, got %s", expectedSignature, sent.Signature)
+	}
+}
+
+func TestHTTPNotificationDeliveryClientPostsSignedWebhook(t *testing.T) {
+	var signatureHeader string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		signatureHeader = r.Header.Get("X-Anjing-Signature")
+		if r.Header.Get("X-Anjing-Secret-Ref") != "ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET" {
+			t.Fatalf("expected secret ref header, got %s", r.Header.Get("X-Anjing-Secret-Ref"))
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("accepted by test server"))
+	}))
+	defer server.Close()
+
+	t.Setenv("ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET", "http-notification-secret")
+	notification := ChannelNotification{
+		ID:          "notice_http_1",
+		Channel:     "Marketplace",
+		Severity:    "HIGH",
+		Target:      "marketplace-oncall",
+		TargetURL:   server.URL,
+		SecretRef:   "ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET",
+		Count:       3,
+		Attempts:    1,
+		MaxAttempts: 3,
+	}
+	notification.Signature = signChannelNotification(notification)
+	client := NewHTTPNotificationDeliveryClient(time.Second)
+	result, err := client.DeliverChannelNotification(context.Background(), NotificationDeliveryRequest{
+		Notification:  notification,
+		Outcome:       "SUCCESS",
+		SignedPayload: notificationPayload(notification),
+	})
+	if err != nil {
+		t.Fatalf("deliver webhook: %v", err)
+	}
+	if !result.Accepted || result.ReceiptStatus != "202 Accepted" || result.ReceiptBody != "accepted by test server" {
+		t.Fatalf("expected accepted receipt, got %#v", result)
+	}
+	if signatureHeader != notification.Signature {
+		t.Fatalf("expected signature header %s, got %s", notification.Signature, signatureHeader)
 	}
 }

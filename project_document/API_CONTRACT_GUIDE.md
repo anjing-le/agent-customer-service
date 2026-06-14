@@ -54,7 +54,7 @@ Go API 当前响应格式：
 - `/api/ops/transfers/resolve`: 处理人工 ticket。
 - `/api/ops/review-tasks/assign`: 领取助手回复质检任务。
 - `/api/ops/review-tasks/complete`: 完成助手回复质检任务。
-- `/api/ops/channel-notifications/dispatch`: 演示渠道告警通知出站，解析通知目标 URL 和 secret ref，并通过可替换 delivery client 生成 HMAC-SHA256 签名；失败会按退避时间重试，成功记录外部回执，超过最大次数进入死信。
+- `/api/ops/channel-notifications/dispatch`: 渠道告警通知出站，解析通知目标 URL 和 secret ref，并通过可替换 delivery client 生成 HMAC-SHA256 签名；默认 demo client 可稳定教学，配置 `ANJING_NOTIFICATION_DELIVERY_MODE=http` 后使用真实 HTTP client；失败会按退避时间重试，成功记录外部回执，超过最大次数进入死信。
 - `/api/ops/annotations/submit`: 对助手消息提交人工质检标注。
 - `/api/ops/training-samples/export`: 导出低分或待复核标注生成的复盘样本。
 

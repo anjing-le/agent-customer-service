@@ -24,6 +24,10 @@ func main() {
 		seedOptions = append(seedOptions, store.WithReplyGenerator(generator))
 		postgresOptions = append(postgresOptions, store.WithPostgresReplyGenerator(generator))
 	}
+	if delivery := config.NotificationDeliveryClient(cfg.Notifications); delivery != nil {
+		seedOptions = append(seedOptions, store.WithNotificationDeliveryClient(delivery))
+		postgresOptions = append(postgresOptions, store.WithPostgresNotificationDeliveryClient(delivery))
+	}
 	var st store.Runtime = store.NewSeedStore(seedOptions...)
 	if cfg.DatabaseURL != "" {
 		pool, err := db.Open(context.Background(), cfg.DatabaseURL)

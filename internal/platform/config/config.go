@@ -14,6 +14,7 @@ type Config struct {
 	MigrationsDir string
 	LLM           LLMConfig
 	Channels      ChannelConfig
+	Notifications NotificationConfig
 }
 
 type LLMConfig struct {
@@ -25,6 +26,11 @@ type LLMConfig struct {
 type ChannelConfig struct {
 	Secrets                map[string]string
 	SignatureWindowSeconds int
+}
+
+type NotificationConfig struct {
+	DeliveryMode      string
+	HTTPTimeoutMillis int
 }
 
 func Load(serviceName, defaultPort string) Config {
@@ -47,6 +53,10 @@ func Load(serviceName, defaultPort string) Config {
 				"marketplace": env("ANJING_CHANNEL_MARKETPLACE_SECRET", "marketplace-demo-secret"),
 			},
 			SignatureWindowSeconds: envInt("ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS", 300),
+		},
+		Notifications: NotificationConfig{
+			DeliveryMode:      env("ANJING_NOTIFICATION_DELIVERY_MODE", "demo"),
+			HTTPTimeoutMillis: envInt("ANJING_NOTIFICATION_HTTP_TIMEOUT_MS", 2000),
 		},
 	}
 }

@@ -56,7 +56,7 @@ user message
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
-| 渠道观测 | Dashboard 聚合失败类型、小时趋势、通知策略和通知事件；通知事件可演示目标解析、secret ref 签名、可替换 delivery client、退避重试、外部回执、死信和运营确认 |
+| 渠道观测 | Dashboard 聚合失败类型、小时趋势、通知策略和通知事件；通知事件可演示目标解析、secret ref 签名、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认 |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
 | 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |

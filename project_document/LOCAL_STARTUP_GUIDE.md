@@ -54,6 +54,8 @@ export ANJING_CHANNEL_APP_SECRET='your-app-secret'
 export ANJING_CHANNEL_MARKETPLACE_SECRET='your-marketplace-secret'
 export ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET='your-notification-secret'
 export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
+export ANJING_NOTIFICATION_DELIVERY_MODE=demo
+export ANJING_NOTIFICATION_HTTP_TIMEOUT_MS=2000
 go run ./cmd/platform-all
 ```
 
@@ -65,7 +67,7 @@ go run ./cmd/platform-all
 
 adapter 只做字段归一，验签、时间窗、replay 和会话映射仍复用标准 inbound 链路。
 
-渠道告警通知会从 `ChannelNotification.secretRef` 解析 env secret 生成 HMAC-SHA256 出站签名；未配置 env 时使用 demo secret，便于本地教学。
+渠道告警通知会从 `ChannelNotification.secretRef` 解析 env secret 生成 HMAC-SHA256 出站签名；未配置 env 时使用 demo secret，便于本地教学。默认 `ANJING_NOTIFICATION_DELIVERY_MODE=demo` 不访问外网；改成 `http` 后会使用真实 HTTP delivery client，并读取 `ANJING_NOTIFICATION_HTTP_TIMEOUT_MS` 控制超时。
 
 演示脚本会读取 `contracts/examples/channel-protocols.json`，动态生成当前 timestamp、唯一消息 ID 和 HMAC-SHA256 signature：
 
