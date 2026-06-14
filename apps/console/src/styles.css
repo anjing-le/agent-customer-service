@@ -298,6 +298,12 @@ h2 {
   margin-top: 14px;
 }
 
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .panelDivider {
   height: 1px;
   margin: 14px 0 0;
@@ -870,6 +876,7 @@ input {
 
 .trendCell {
   display: grid;
+  gap: 6px;
   min-height: 72px;
   padding: 9px;
   border: 1px solid #edf2ef;
@@ -892,6 +899,20 @@ input {
 .trendCell b {
   color: #1f6f52;
   font-size: 18px;
+}
+
+.trendBar {
+  overflow: hidden;
+  height: 6px;
+  border-radius: 999px;
+  background: #e6f0eb;
+}
+
+.trendBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #1f6f52;
 }
 
 .evidence {

@@ -692,6 +692,7 @@ function App() {
     dead: channelNotifications.filter((item) => item.status === 'DEAD_LETTER').length,
     audited: channelNotifications.filter((item) => (item.deliveryAudit?.length ?? 0) > 0).length
   };
+  const maxTrendCount = Math.max(1, ...channelFailureTrends.map((item) => item.count));
   const visibleConversations = conversations.filter((item) => channelFilter === 'ALL' || item.channel === channelFilter);
   const visibleTransfers = transfers.filter((ticket) => {
     if (channelFilter !== 'ALL' && ticket.channel !== channelFilter) {
@@ -1189,6 +1190,43 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadChannelOpsReport = () => {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      window: 'last 24 hours',
+      summary: {
+        channelFailures: channelAlerts.reduce((sum, item) => sum + item.count, 0),
+        activeAlerts: channelAlertPolicies.filter((item) => item.active).length,
+        openNotifications: notificationStats.open,
+        retryingNotifications: notificationStats.retrying,
+        deadLetters: notificationStats.dead,
+        runbooks: channelRunbooks.length
+      },
+      alerts: channelAlerts,
+      trends: channelFailureTrends,
+      notificationStats,
+      runbooks: channelRunbooks,
+      notifications: channelNotifications.map((item) => ({
+        id: item.id,
+        channel: item.channel,
+        status: item.status,
+        target: item.target,
+        attempts: item.attempts,
+        maxAttempts: item.maxAttempts,
+        deadLetterReason: item.deadLetterReason,
+        ackedBy: item.ackedBy,
+        ackedAt: item.ackedAt
+      }))
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-ops-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <main className="shell">
       <aside className="nav">
@@ -1639,13 +1677,23 @@ function App() {
                 <p className="sectionLabel">失败趋势</p>
                 <h2>小时桶</h2>
               </div>
-              <span className="status">{channelFailureTrends.length}</span>
+              <div className="headerActions">
+                <span className="status">{channelFailureTrends.length}</span>
+                <button className="tinyButton" onClick={downloadChannelOpsReport} title="导出运营日报">
+                  <Download size={14} />
+                </button>
+              </div>
             </div>
             <div className="trendGrid">
               {channelFailureTrends.slice(0, 8).map((item) => (
                 <article className="trendCell" key={`${item.channel}-${item.bucketStart}`}>
-                  <strong>{item.channel}</strong>
-                  <span>{item.bucketStart.slice(11, 16)}</span>
+                  <div>
+                    <strong>{item.channel}</strong>
+                    <span>{item.bucketStart.slice(11, 16)}</span>
+                  </div>
+                  <div className="trendBar">
+                    <span style={{ width: `${Math.max(8, Math.round((item.count / maxTrendCount) * 100))}%` }} />
+                  </div>
                   <b>{item.count}</b>
                 </article>
               ))}
