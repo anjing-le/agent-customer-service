@@ -45,6 +45,10 @@ func (f failingRuntime) RecordChannelFailure(store.ChannelFailureEvent) error {
 	return errors.New("database unavailable")
 }
 
+func (f failingRuntime) AcknowledgeChannelNotification(string, string, string) (store.ChannelNotification, error) {
+	return store.ChannelNotification{}, errors.New("database unavailable")
+}
+
 func (f failingRuntime) ReceiveChannelMessage(store.ChannelInboundMessage) (store.SendMessageResult, error) {
 	return store.SendMessageResult{}, errors.New("database unavailable")
 }

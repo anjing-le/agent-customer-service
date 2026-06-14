@@ -184,6 +184,14 @@
       "response": { "status": 200, "schema": "ReviewTask" }
     },
     {
+      "id": "ackChannelNotification",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-notifications/ack",
+      "request": { "body": "AcknowledgeChannelNotificationRequest" },
+      "response": { "status": 200, "schema": "ChannelNotification" }
+    },
+    {
       "id": "submitAnnotation",
       "boundary": "ops",
       "method": "POST",
@@ -350,6 +358,14 @@
       "required": ["id"],
       "fields": {
         "id": "string"
+      }
+    },
+    "AcknowledgeChannelNotificationRequest": {
+      "required": ["id"],
+      "fields": {
+        "id": "string",
+        "actor": "string",
+        "note": "string"
       }
     },
     "SubmitAnnotationRequest": {
@@ -592,7 +608,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -604,6 +620,7 @@
         "channelAlerts": "ChannelAlert[]",
         "channelFailureTrends": "ChannelFailureTrend[]",
         "channelAlertPolicies": "ChannelAlertPolicy[]",
+        "channelNotifications": "ChannelNotification[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]",
         "reviewTasks": "ReviewTask[]",
@@ -642,6 +659,22 @@
         "active": "boolean",
         "currentCount": "number",
         "lastTriggeredAt": "RFC3339 string"
+      }
+    },
+    "ChannelNotification": {
+      "required": ["id", "channel", "severity", "target", "status", "reason", "count", "createdAt"],
+      "fields": {
+        "id": "string",
+        "channel": "string",
+        "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+        "target": "string",
+        "status": "OPEN|ACKED",
+        "reason": "string",
+        "count": "number",
+        "createdAt": "RFC3339 string",
+        "ackedBy": "string",
+        "ackNote": "string",
+        "ackedAt": "RFC3339 string"
       }
     },
     "ChannelPolicy": {

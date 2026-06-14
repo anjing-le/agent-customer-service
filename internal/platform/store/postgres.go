@@ -238,7 +238,13 @@ func (s *PostgresStore) RecordChannelFailure(event ChannelFailureEvent) error {
 	if parsed, err := time.Parse(time.RFC3339, event.CreatedAt); err == nil {
 		createdAt = parsed.UTC()
 	}
-	if _, err := s.pool.Exec(context.Background(), `
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin record channel failure: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
 		insert into channel_failure_events (
 			channel, code, reason, external_conversation_id, external_message_id, origin, created_at
 		)
@@ -246,7 +252,47 @@ func (s *PostgresStore) RecordChannelFailure(event ChannelFailureEvent) error {
 	`, event.Channel, event.Code, event.Reason, event.ExternalConversationID, event.ExternalMessageID, event.Origin, createdAt); err != nil {
 		return fmt.Errorf("record channel failure: %w", err)
 	}
+	alerts, err := s.listChannelAlertsTx(ctx, tx)
+	if err != nil {
+		return err
+	}
+	policies, err := s.listChannelAlertPoliciesTx(ctx, tx, alerts)
+	if err != nil {
+		return err
+	}
+	if err := insertTriggeredNotifications(ctx, tx, policies, createdAt.Format(time.RFC3339)); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit channel failure: %w", err)
+	}
 	return nil
+}
+
+func (s *PostgresStore) AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error) {
+	var item ChannelNotification
+	var createdAt time.Time
+	var ackedAt *time.Time
+	err := s.pool.QueryRow(context.Background(), `
+		update channel_notifications
+		set status = 'ACKED',
+		    acked_by = $2,
+		    ack_note = $3,
+		    acked_at = now()
+		where id = $1
+		returning id, channel, severity, target, status, reason, count, created_at, acked_by, ack_note, acked_at
+	`, id, fallback(actor, "operator"), fallback(note, "已确认渠道告警")).Scan(
+		&item.ID, &item.Channel, &item.Severity, &item.Target, &item.Status, &item.Reason, &item.Count,
+		&createdAt, &item.AckedBy, &item.AckNote, &ackedAt,
+	)
+	if err != nil {
+		return ChannelNotification{}, fmt.Errorf("ack channel notification: %w", err)
+	}
+	item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+	if ackedAt != nil {
+		item.AckedAt = ackedAt.UTC().Format(time.RFC3339)
+	}
+	return item, nil
 }
 
 func (s *PostgresStore) ChannelIntegration(channel string) (ChannelIntegration, error) {
@@ -807,6 +853,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	notifications, err := s.listChannelNotifications()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -850,6 +900,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		ChannelAlerts:   channelAlerts,
 		ChannelTrends:   channelTrends,
 		AlertPolicies:   alertPolicies,
+		Notifications:   notifications,
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
 		ReviewTasks:     reviewTasks,
@@ -1131,7 +1182,16 @@ func (s *PostgresStore) listChannelIntegrations() ([]ChannelIntegration, error) 
 }
 
 func (s *PostgresStore) listChannelAlerts() ([]ChannelAlert, error) {
-	rows, err := s.pool.Query(context.Background(), `
+	return s.listChannelAlertsTx(context.Background(), s.pool)
+}
+
+type queryer interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func (s *PostgresStore) listChannelAlertsTx(ctx context.Context, q queryer) ([]ChannelAlert, error) {
+	rows, err := q.Query(ctx, `
 		select channel, code, count(*)::int, max(created_at)
 		from channel_failure_events
 		where created_at >= now() - interval '24 hours'
@@ -1152,7 +1212,7 @@ func (s *PostgresStore) listChannelAlerts() ([]ChannelAlert, error) {
 			return nil, err
 		}
 		alert.LastSeenAt = lastSeenAt.UTC().Format(time.RFC3339)
-		if err := s.pool.QueryRow(context.Background(), `
+		if err := q.QueryRow(ctx, `
 			select reason, origin
 			from channel_failure_events
 			where channel = $1 and code = $2
@@ -1200,7 +1260,11 @@ func (s *PostgresStore) listChannelFailureTrends() ([]ChannelFailureTrend, error
 }
 
 func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
-	rows, err := s.pool.Query(context.Background(), `
+	return s.listChannelAlertPoliciesTx(context.Background(), s.pool, alerts)
+}
+
+func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q queryer, alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
+	rows, err := q.Query(ctx, `
 		select channel, severity, threshold, window_minutes, notify_target, enabled
 		from channel_alert_policies
 		order by channel
@@ -1225,6 +1289,75 @@ func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]Chann
 		policies = defaultChannelAlertPolicies()
 	}
 	return channelAlertPolicies(policies, alerts), nil
+}
+
+func insertTriggeredNotifications(ctx context.Context, tx pgx.Tx, policies []ChannelAlertPolicy, createdAt string) error {
+	for _, policy := range policies {
+		if !policy.Active {
+			continue
+		}
+		var exists bool
+		if err := tx.QueryRow(ctx, `
+			select exists(
+				select 1
+				from channel_notifications
+				where channel = $1
+				  and status = 'OPEN'
+			)
+		`, policy.Channel).Scan(&exists); err != nil {
+			return fmt.Errorf("check open channel notification: %w", err)
+		}
+		if exists {
+			continue
+		}
+		notification := newChannelNotification(policy, createdAt)
+		parsedCreatedAt, err := time.Parse(time.RFC3339, notification.CreatedAt)
+		if err != nil {
+			parsedCreatedAt = time.Now().UTC()
+		}
+		if _, err := tx.Exec(ctx, `
+			insert into channel_notifications (id, channel, severity, target, status, reason, count, created_at)
+			values ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, notification.ID, notification.Channel, notification.Severity, notification.Target, notification.Status, notification.Reason, notification.Count, parsedCreatedAt); err != nil {
+			return fmt.Errorf("insert channel notification: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *PostgresStore) listChannelNotifications() ([]ChannelNotification, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, channel, severity, target, status, reason, count, created_at, acked_by, ack_note, acked_at
+		from channel_notifications
+		order by created_at desc, id desc
+		limit 30
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel notifications: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]ChannelNotification, 0)
+	for rows.Next() {
+		var item ChannelNotification
+		var createdAt time.Time
+		var ackedAt *time.Time
+		if err := rows.Scan(
+			&item.ID, &item.Channel, &item.Severity, &item.Target, &item.Status, &item.Reason, &item.Count,
+			&createdAt, &item.AckedBy, &item.AckNote, &ackedAt,
+		); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		if ackedAt != nil {
+			item.AckedAt = ackedAt.UTC().Format(time.RFC3339)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func (s *PostgresStore) listRecentMessages() ([]Message, error) {

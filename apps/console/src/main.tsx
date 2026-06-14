@@ -248,6 +248,19 @@ type ChannelAlertPolicy = {
   currentCount: number;
   lastTriggeredAt?: string;
 };
+type ChannelNotification = {
+  id: string;
+  channel: string;
+  severity: string;
+  target: string;
+  status: string;
+  reason: string;
+  count: number;
+  createdAt: string;
+  ackedBy?: string;
+  ackNote?: string;
+  ackedAt?: string;
+};
 type ChannelProtocolExample = {
   id: string;
   channel: string;
@@ -318,6 +331,7 @@ type Dashboard = {
   channelAlerts: ChannelAlert[] | null;
   channelFailureTrends: ChannelFailureTrend[] | null;
   channelAlertPolicies: ChannelAlertPolicy[] | null;
+  channelNotifications: ChannelNotification[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
   reviewTasks: ReviewTask[] | null;
@@ -532,6 +546,7 @@ function App() {
   const channelAlerts = dashboard?.channelAlerts ?? [];
   const channelFailureTrends = dashboard?.channelFailureTrends ?? [];
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
+  const channelNotifications = dashboard?.channelNotifications ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
@@ -765,6 +780,19 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'complete review task failed');
+    }
+  };
+
+  const acknowledgeChannelNotification = async (notification: ChannelNotification) => {
+    setError('');
+    try {
+      await api<ChannelNotification>('/api/ops/channel-notifications/ack', {
+        method: 'POST',
+        body: JSON.stringify({ id: notification.id, actor: 'ops-a', note: '已确认并通知渠道负责人' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ack notification failed');
     }
   };
 
@@ -1376,6 +1404,34 @@ function App() {
                 </article>
               ))}
               {channelAlertPolicies.length === 0 && <p className="empty">暂无通知策略</p>}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">通知事件</p>
+                <h2>出站模拟</h2>
+              </div>
+              <span className="status warning">{channelNotifications.filter((item) => item.status === 'OPEN').length}</span>
+            </div>
+            <div className="tableList">
+              {channelNotifications.slice(0, 5).map((item) => (
+                <article className="tableRow" key={item.id}>
+                  <div>
+                    <strong>{item.channel} · {item.target}</strong>
+                    <span>{item.reason}</span>
+                    {item.ackedBy && <span>{item.ackedBy} · {item.ackNote}</span>}
+                  </div>
+                  <div className="gapActions">
+                    <b className={statusClass(item.status === 'OPEN' ? 'HIGH' : 'LOW')}>{item.status}</b>
+                    {item.status === 'OPEN' && (
+                      <button className="tinyButton" onClick={() => acknowledgeChannelNotification(item)} title="确认告警">
+                        <CheckCircle2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+              {channelNotifications.length === 0 && <p className="empty">暂无通知事件</p>}
             </div>
           </section>
 

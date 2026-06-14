@@ -493,4 +493,14 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if !marketplacePolicy.Active || marketplacePolicy.CurrentCount != 3 || marketplacePolicy.NotifyTarget == "" {
 		t.Fatalf("expected active marketplace alert policy, got %#v", marketplacePolicy)
 	}
+	if len(dashboard.Notifications) != 1 || dashboard.Notifications[0].Status != "OPEN" {
+		t.Fatalf("expected one open notification, got %#v", dashboard.Notifications)
+	}
+	acked, err := st.AcknowledgeChannelNotification(dashboard.Notifications[0].ID, "ops-a", "已通知渠道负责人")
+	if err != nil {
+		t.Fatalf("ack notification: %v", err)
+	}
+	if acked.Status != "ACKED" || acked.AckedBy != "ops-a" {
+		t.Fatalf("expected acked notification, got %#v", acked)
+	}
 }

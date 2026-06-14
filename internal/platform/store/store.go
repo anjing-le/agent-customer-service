@@ -47,6 +47,7 @@ type Runtime interface {
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
+	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -77,6 +78,7 @@ type Store struct {
 	channelPolicies []ChannelPolicy
 	integrations    []ChannelIntegration
 	alertPolicies   []ChannelAlertPolicy
+	notifications   []ChannelNotification
 	ruleApprovals   []RuleApproval
 	ruleEvents      []RuleReleaseEvent
 	annotations     []Annotation
@@ -307,6 +309,7 @@ type Dashboard struct {
 	ChannelAlerts   []ChannelAlert        `json:"channelAlerts"`
 	ChannelTrends   []ChannelFailureTrend `json:"channelFailureTrends"`
 	AlertPolicies   []ChannelAlertPolicy  `json:"channelAlertPolicies"`
+	Notifications   []ChannelNotification `json:"channelNotifications"`
 	Quality         QualitySummary        `json:"quality"`
 	Annotations     []Annotation          `json:"annotations"`
 	ReviewTasks     []ReviewTask          `json:"reviewTasks"`
@@ -391,6 +394,20 @@ type ChannelAlertPolicy struct {
 	Active          bool   `json:"active"`
 	CurrentCount    int    `json:"currentCount"`
 	LastTriggeredAt string `json:"lastTriggeredAt,omitempty"`
+}
+
+type ChannelNotification struct {
+	ID        string `json:"id"`
+	Channel   string `json:"channel"`
+	Severity  string `json:"severity"`
+	Target    string `json:"target"`
+	Status    string `json:"status"`
+	Reason    string `json:"reason"`
+	Count     int    `json:"count"`
+	CreatedAt string `json:"createdAt"`
+	AckedBy   string `json:"ackedBy,omitempty"`
+	AckNote   string `json:"ackNote,omitempty"`
+	AckedAt   string `json:"ackedAt,omitempty"`
 }
 
 func NewSeedStore(options ...Option) *Store {
@@ -536,7 +553,25 @@ func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
 	if len(s.channelFailures) > 100 {
 		s.channelFailures = s.channelFailures[:100]
 	}
+	alerts := channelAlerts(s.channelFailures)
+	policies := channelAlertPolicies(s.alertPolicies, alerts)
+	s.notifications = appendTriggeredNotifications(s.notifications, policies, event.CreatedAt)
 	return nil
+}
+
+func (s *Store) AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for idx := range s.notifications {
+		if s.notifications[idx].ID == id {
+			s.notifications[idx].Status = "ACKED"
+			s.notifications[idx].AckedBy = fallback(actor, "operator")
+			s.notifications[idx].AckNote = fallback(note, "已确认渠道告警")
+			s.notifications[idx].AckedAt = time.Now().UTC().Format(time.RFC3339)
+			return s.notifications[idx], nil
+		}
+	}
+	return ChannelNotification{}, fmt.Errorf("channel notification %s not found", id)
 }
 
 func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
@@ -812,6 +847,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelAlerts:   channelAlerts,
 		ChannelTrends:   channelFailureTrends(s.channelFailures, time.Now().UTC()),
 		AlertPolicies:   alertPolicies,
+		Notifications:   append([]ChannelNotification(nil), s.notifications...),
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
 		ReviewTasks:     append([]ReviewTask(nil), s.reviewTasks...),
@@ -1665,6 +1701,42 @@ func channelAlertPolicies(policies []ChannelAlertPolicy, alerts []ChannelAlert) 
 		result = append(result, item)
 	}
 	return result
+}
+
+func appendTriggeredNotifications(existing []ChannelNotification, policies []ChannelAlertPolicy, createdAt string) []ChannelNotification {
+	result := append([]ChannelNotification(nil), existing...)
+	for _, policy := range policies {
+		if !policy.Active || hasOpenChannelNotification(result, policy.Channel) {
+			continue
+		}
+		result = append([]ChannelNotification{newChannelNotification(policy, createdAt)}, result...)
+	}
+	if len(result) > 50 {
+		return result[:50]
+	}
+	return result
+}
+
+func hasOpenChannelNotification(items []ChannelNotification, channel string) bool {
+	for _, item := range items {
+		if item.Channel == channel && item.Status == "OPEN" {
+			return true
+		}
+	}
+	return false
+}
+
+func newChannelNotification(policy ChannelAlertPolicy, createdAt string) ChannelNotification {
+	return ChannelNotification{
+		ID:        fmt.Sprintf("channel_notice_%d", time.Now().UnixNano()),
+		Channel:   policy.Channel,
+		Severity:  policy.Severity,
+		Target:    policy.NotifyTarget,
+		Status:    "OPEN",
+		Reason:    fmt.Sprintf("%s failures reached %d/%d in %dm", policy.Channel, policy.CurrentCount, policy.Threshold, policy.WindowMinutes),
+		Count:     policy.CurrentCount,
+		CreatedAt: fallback(createdAt, time.Now().UTC().Format(time.RFC3339)),
+	}
 }
 
 func activeAlertPolicies(policies []ChannelAlertPolicy) int {

@@ -1,6 +1,7 @@
 package ops
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -155,6 +156,42 @@ func TestReviewTaskRoutesAssignAndCompleteTask(t *testing.T) {
 	}
 	if !strings.Contains(completeRec.Body.String(), `"status":"COMPLETED"`) {
 		t.Fatalf("expected completed task, got %s", completeRec.Body.String())
+	}
+}
+
+func TestAcknowledgeChannelNotificationRoute(t *testing.T) {
+	st := store.NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("event-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.Notifications) == 0 {
+		t.Fatal("expected notification")
+	}
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-notifications/ack", strings.NewReader(`{"id":"`+dashboard.Notifications[0].ID+`","actor":"ops-a","note":"已确认"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"status":"ACKED"`) {
+		t.Fatalf("expected acked notification, got %s", rec.Body.String())
 	}
 }
 

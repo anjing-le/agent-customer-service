@@ -68,6 +68,7 @@
         { "name": "resolveTransfer", "path": "/api/ops/transfers/resolve", "methods": ["POST"] },
         { "name": "assignReviewTask", "path": "/api/ops/review-tasks/assign", "methods": ["POST"] },
         { "name": "completeReviewTask", "path": "/api/ops/review-tasks/complete", "methods": ["POST"] },
+        { "name": "ackChannelNotification", "path": "/api/ops/channel-notifications/ack", "methods": ["POST"] },
         { "name": "submitAnnotation", "path": "/api/ops/annotations/submit", "methods": ["POST"] },
         { "name": "exportTrainingSamples", "path": "/api/ops/training-samples/export", "methods": ["GET"] }
       ]
