@@ -87,6 +87,7 @@ type Runtime interface {
 	RecordChannelFailure(event ChannelFailureEvent) error
 	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
 	ApproveNotificationPolicyChange(id string, approver string, note string) (ChannelAlertPolicy, error)
+	RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
@@ -737,6 +738,28 @@ func (s *Store) ApproveNotificationPolicyChange(id string, approver string, note
 		}
 	}
 	return ChannelAlertPolicy{}, fmt.Errorf("notification policy change %s not found", id)
+}
+
+func (s *Store) RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for changeIdx := range s.policyChanges {
+		if s.policyChanges[changeIdx].ID != id {
+			continue
+		}
+		if s.policyChanges[changeIdx].Status != "PENDING" {
+			return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s is not pending", id)
+		}
+		now := time.Now().UTC().Format(time.RFC3339)
+		s.policyChanges[changeIdx].Status = "REJECTED"
+		s.policyChanges[changeIdx].ApprovedBy = fallback(reviewer, "ops-lead")
+		s.policyChanges[changeIdx].ApprovedAt = now
+		before := notificationPolicyFor(s.alertPolicies, s.policyChanges[changeIdx].Channel)
+		event := newNotificationPolicyEvent(s.policyChanges[changeIdx].Channel, "REJECT", reviewer, notificationPolicySummary(before), notificationPolicyChangeSummary(s.policyChanges[changeIdx]), fallback(note, s.policyChanges[changeIdx].Note), now)
+		s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
+		return s.policyChanges[changeIdx], nil
+	}
+	return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s not found", id)
 }
 
 func (s *Store) DispatchChannelNotification(id, outcome string) (ChannelNotification, error) {
@@ -1443,6 +1466,18 @@ func notificationPolicyChangeSummary(change NotificationPolicyChange) string {
 
 func requiresNotificationPolicyApproval(policy ChannelAlertPolicy) bool {
 	return policy.Severity == "HIGH" || policy.Severity == "CRITICAL"
+}
+
+func notificationPolicyFor(policies []ChannelAlertPolicy, channel string) ChannelAlertPolicy {
+	for _, policy := range policies {
+		if strings.EqualFold(policy.Channel, channel) {
+			normalizeChannelAlertPolicy(&policy)
+			return policy
+		}
+	}
+	policy := newDefaultChannelAlertPolicy(channel, "MEDIUM", 5, 60, "ops-webhook")
+	normalizeChannelAlertPolicy(&policy)
+	return policy
 }
 
 func newRuleApproval(code, approver, riskLevel, note string, sampleIDs []string, createdAt string) RuleApproval {

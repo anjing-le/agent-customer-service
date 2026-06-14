@@ -600,6 +600,45 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	}
 }
 
+func TestRejectNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
+	st := NewSeedStore()
+	original, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/reject", "ANJING_NOTIFICATION_REJECT_SECRET", 5, 45, "ops-a", "待拒绝变更")
+	if err != nil {
+		t.Fatalf("request channel alert policy update: %v", err)
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.PolicyChanges) != 1 || dashboard.PolicyChanges[0].Status != "PENDING" {
+		t.Fatalf("expected pending policy change, got %#v", dashboard.PolicyChanges)
+	}
+	rejected, err := st.RejectNotificationPolicyChange(dashboard.PolicyChanges[0].ID, "ops-lead", "目标未备案")
+	if err != nil {
+		t.Fatalf("reject policy change: %v", err)
+	}
+	if rejected.Status != "REJECTED" || rejected.ApprovedBy != "ops-lead" {
+		t.Fatalf("expected rejected policy change, got %#v", rejected)
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	var marketplace ChannelAlertPolicy
+	for _, policy := range dashboard.AlertPolicies {
+		if policy.Channel == "Marketplace" {
+			marketplace = policy
+			break
+		}
+	}
+	if marketplace.TargetURL != original.TargetURL || marketplace.SecretRef != original.SecretRef {
+		t.Fatalf("expected rejected change to keep original policy, got %#v", marketplace)
+	}
+	if dashboard.PolicyEvents[0].Action != "REJECT" || !strings.Contains(dashboard.PolicyEvents[0].Note, "目标未备案") {
+		t.Fatalf("expected reject event, got %#v", dashboard.PolicyEvents[0])
+	}
+}
+
 func TestDispatchChannelNotificationUsesDeliveryClientAndSecretRef(t *testing.T) {
 	t.Setenv("ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET", "custom-notification-secret")
 	client := &recordingDeliveryClient{}

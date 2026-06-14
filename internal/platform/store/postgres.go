@@ -477,6 +477,49 @@ func (s *PostgresStore) ApproveNotificationPolicyChange(id string, approver stri
 	return channelAlertPolicies([]ChannelAlertPolicy{after}, alerts)[0], nil
 }
 
+func (s *PostgresStore) RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error) {
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return NotificationPolicyChange{}, fmt.Errorf("begin reject notification policy change: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	change, err := notificationPolicyChangeTx(ctx, tx, id)
+	if err != nil {
+		return NotificationPolicyChange{}, err
+	}
+	if change.Status != "PENDING" {
+		return NotificationPolicyChange{}, fmt.Errorf("notification policy change %s is not pending", id)
+	}
+	before, err := channelAlertPolicyTx(ctx, tx, change.Channel)
+	if err != nil {
+		return NotificationPolicyChange{}, err
+	}
+	now := time.Now().UTC()
+	reviewedBy := fallback(reviewer, "ops-lead")
+	if _, err := tx.Exec(ctx, `
+		update notification_policy_changes
+		set status = 'REJECTED',
+		    approved_by = $2,
+		    approved_at = $3
+		where id = $1
+	`, id, reviewedBy, now); err != nil {
+		return NotificationPolicyChange{}, fmt.Errorf("reject notification policy change: %w", err)
+	}
+	change.Status = "REJECTED"
+	change.ApprovedBy = reviewedBy
+	change.ApprovedAt = now.Format(time.RFC3339)
+	event := newNotificationPolicyEvent(change.Channel, "REJECT", reviewedBy, notificationPolicySummary(before), notificationPolicyChangeSummary(change), fallback(note, change.Note), now.Format(time.RFC3339))
+	if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
+		return NotificationPolicyChange{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return NotificationPolicyChange{}, fmt.Errorf("commit reject notification policy change: %w", err)
+	}
+	return change, nil
+}
+
 func (s *PostgresStore) channelNotification(id string) (ChannelNotification, error) {
 	var item ChannelNotification
 	var createdAt time.Time

@@ -5,6 +5,7 @@ import {
   BookOpen,
   Bot,
   CheckCircle2,
+  CircleX,
   ClipboardCheck,
   Database,
   Send,
@@ -963,6 +964,19 @@ function App() {
     }
   };
 
+  const rejectNotificationPolicyChange = async (change: NotificationPolicyChange) => {
+    setError('');
+    try {
+      await api<NotificationPolicyChange>('/api/ops/channel-alert-policies/reject-change', {
+        method: 'POST',
+        body: JSON.stringify({ id: change.id, reviewer: 'ops-lead', note: '通知目标未完成备案' })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'reject notification policy change failed');
+    }
+  };
+
   const submitAnnotation = async () => {
     if (!latestAssistantMessage) {
       setError('请先选择或生成一条 Agent 回复');
@@ -1635,9 +1649,14 @@ function App() {
                       <small>{change.maxAttempts} attempts · {change.backoffSeconds}s backoff</small>
                       <small>{change.requestedBy} · {change.note}</small>
                     </div>
-                    <button className="tinyButton" onClick={() => approveNotificationPolicyChange(change)} title="批准通知目标变更">
-                      <CheckCircle2 size={14} />
-                    </button>
+                    <div className="gapActions">
+                      <button className="tinyButton" onClick={() => approveNotificationPolicyChange(change)} title="批准通知目标变更">
+                        <CheckCircle2 size={14} />
+                      </button>
+                      <button className="tinyButton dangerButton" onClick={() => rejectNotificationPolicyChange(change)} title="拒绝通知目标变更">
+                        <CircleX size={14} />
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>

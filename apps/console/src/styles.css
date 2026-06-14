@@ -167,6 +167,11 @@ h2 {
   background: #edf4f0;
 }
 
+.dangerButton {
+  color: #9f2f24;
+  background: #f8e4de;
+}
+
 .notice {
   gap: 8px;
   margin-bottom: 16px;
