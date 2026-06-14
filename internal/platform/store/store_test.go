@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -457,5 +458,39 @@ func TestPublishAndRollbackRuleRecordsEvents(t *testing.T) {
 	}
 	if len(dashboard.RuleApprovals) != 1 {
 		t.Fatalf("expected one approval record, got %#v", dashboard.RuleApprovals)
+	}
+}
+
+func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
+	st := NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(ChannelFailureEvent{
+			Channel:                "Marketplace",
+			Code:                   "channel_signature_invalid",
+			Reason:                 "签名错误",
+			ExternalConversationID: "buyer-demo",
+			ExternalMessageID:      fmt.Sprintf("event-%d", idx),
+			Origin:                 "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record channel failure: %v", err)
+		}
+	}
+
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ChannelTrends) == 0 {
+		t.Fatalf("expected channel failure trends, got %#v", dashboard.ChannelTrends)
+	}
+	var marketplacePolicy ChannelAlertPolicy
+	for _, policy := range dashboard.AlertPolicies {
+		if policy.Channel == "Marketplace" {
+			marketplacePolicy = policy
+			break
+		}
+	}
+	if !marketplacePolicy.Active || marketplacePolicy.CurrentCount != 3 || marketplacePolicy.NotifyTarget == "" {
+		t.Fatalf("expected active marketplace alert policy, got %#v", marketplacePolicy)
 	}
 }

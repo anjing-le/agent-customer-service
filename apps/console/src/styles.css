@@ -720,6 +720,38 @@ textarea {
   text-align: right;
 }
 
+.trendGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trendCell {
+  display: grid;
+  min-height: 72px;
+  padding: 9px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.trendCell strong,
+.trendCell span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trendCell span {
+  color: #64786d;
+  font-size: 12px;
+}
+
+.trendCell b {
+  color: #1f6f52;
+  font-size: 18px;
+}
+
 .evidence {
   padding: 12px 0;
   border-top: 1px solid #edf2ef;

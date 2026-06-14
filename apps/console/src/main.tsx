@@ -232,6 +232,22 @@ type ChannelAlert = {
   lastOrigin: string;
   lastSeenAt: string;
 };
+type ChannelFailureTrend = {
+  channel: string;
+  bucketStart: string;
+  count: number;
+};
+type ChannelAlertPolicy = {
+  channel: string;
+  severity: string;
+  threshold: number;
+  windowMinutes: number;
+  notifyTarget: string;
+  enabled: boolean;
+  active: boolean;
+  currentCount: number;
+  lastTriggeredAt?: string;
+};
 type ChannelProtocolExample = {
   id: string;
   channel: string;
@@ -300,6 +316,8 @@ type Dashboard = {
   channelPolicies: ChannelPolicy[] | null;
   integrations: ChannelIntegration[] | null;
   channelAlerts: ChannelAlert[] | null;
+  channelFailureTrends: ChannelFailureTrend[] | null;
+  channelAlertPolicies: ChannelAlertPolicy[] | null;
   quality: QualitySummary;
   annotations: Annotation[] | null;
   reviewTasks: ReviewTask[] | null;
@@ -512,6 +530,8 @@ function App() {
   const channelPolicies = dashboard?.channelPolicies ?? [];
   const integrations = dashboard?.integrations ?? [];
   const channelAlerts = dashboard?.channelAlerts ?? [];
+  const channelFailureTrends = dashboard?.channelFailureTrends ?? [];
+  const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
@@ -1314,6 +1334,48 @@ function App() {
                 </article>
               ))}
               {channelAlerts.length === 0 && <p className="empty">暂无渠道失败记录</p>}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">失败趋势</p>
+                <h2>小时桶</h2>
+              </div>
+              <span className="status">{channelFailureTrends.length}</span>
+            </div>
+            <div className="trendGrid">
+              {channelFailureTrends.slice(0, 8).map((item) => (
+                <article className="trendCell" key={`${item.channel}-${item.bucketStart}`}>
+                  <strong>{item.channel}</strong>
+                  <span>{item.bucketStart.slice(11, 16)}</span>
+                  <b>{item.count}</b>
+                </article>
+              ))}
+              {channelFailureTrends.length === 0 && <p className="empty">暂无失败趋势</p>}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">通知策略</p>
+                <h2>失败告警</h2>
+              </div>
+              <span className="status warning">{channelAlertPolicies.filter((item) => item.active).length}</span>
+            </div>
+            <div className="tableList">
+              {channelAlertPolicies.map((policy) => (
+                <article className="tableRow" key={policy.channel}>
+                  <div>
+                    <strong>{policy.channel} · {policy.notifyTarget}</strong>
+                    <span>{policy.currentCount}/{policy.threshold} in {policy.windowMinutes}m</span>
+                    {policy.lastTriggeredAt && <span>{policy.lastTriggeredAt.slice(11, 19)}</span>}
+                  </div>
+                  <div>
+                    <em>{policy.severity}</em>
+                    <b className={statusClass(policy.active ? 'HIGH' : 'LOW')}>{policy.active ? 'ACTIVE' : 'READY'}</b>
+                  </div>
+                </article>
+              ))}
+              {channelAlertPolicies.length === 0 && <p className="empty">暂无通知策略</p>}
             </div>
           </section>
 

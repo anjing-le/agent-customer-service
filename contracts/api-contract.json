@@ -592,7 +592,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -602,6 +602,8 @@
         "channelPolicies": "ChannelPolicy[]",
         "integrations": "ChannelIntegration[]",
         "channelAlerts": "ChannelAlert[]",
+        "channelFailureTrends": "ChannelFailureTrend[]",
+        "channelAlertPolicies": "ChannelAlertPolicy[]",
         "quality": "QualitySummary",
         "annotations": "Annotation[]",
         "reviewTasks": "ReviewTask[]",
@@ -618,6 +620,28 @@
         "lastReason": "string",
         "lastOrigin": "string",
         "lastSeenAt": "RFC3339 string"
+      }
+    },
+    "ChannelFailureTrend": {
+      "required": ["channel", "bucketStart", "count"],
+      "fields": {
+        "channel": "string",
+        "bucketStart": "RFC3339 string",
+        "count": "number"
+      }
+    },
+    "ChannelAlertPolicy": {
+      "required": ["channel", "severity", "threshold", "windowMinutes", "notifyTarget", "enabled", "active", "currentCount"],
+      "fields": {
+        "channel": "string",
+        "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+        "threshold": "number",
+        "windowMinutes": "number",
+        "notifyTarget": "string",
+        "enabled": "boolean",
+        "active": "boolean",
+        "currentCount": "number",
+        "lastTriggeredAt": "RFC3339 string"
       }
     },
     "ChannelPolicy": {

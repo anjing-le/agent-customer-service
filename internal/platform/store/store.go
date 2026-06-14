@@ -76,6 +76,7 @@ type Store struct {
 	tickets         []TransferTicket
 	channelPolicies []ChannelPolicy
 	integrations    []ChannelIntegration
+	alertPolicies   []ChannelAlertPolicy
 	ruleApprovals   []RuleApproval
 	ruleEvents      []RuleReleaseEvent
 	annotations     []Annotation
@@ -296,19 +297,21 @@ type TrainingSample struct {
 }
 
 type Dashboard struct {
-	Metrics         []Metric             `json:"metrics"`
-	Conversations   []Conversation       `json:"conversations"`
-	KnowledgeGaps   []KnowledgeGap       `json:"knowledgeGaps"`
-	Rules           []Rule               `json:"rules"`
-	Transfers       []TransferTicket     `json:"transfers"`
-	ChannelPolicies []ChannelPolicy      `json:"channelPolicies"`
-	Integrations    []ChannelIntegration `json:"integrations"`
-	ChannelAlerts   []ChannelAlert       `json:"channelAlerts"`
-	Quality         QualitySummary       `json:"quality"`
-	Annotations     []Annotation         `json:"annotations"`
-	ReviewTasks     []ReviewTask         `json:"reviewTasks"`
-	RuleApprovals   []RuleApproval       `json:"ruleApprovals"`
-	RuleEvents      []RuleReleaseEvent   `json:"ruleEvents"`
+	Metrics         []Metric              `json:"metrics"`
+	Conversations   []Conversation        `json:"conversations"`
+	KnowledgeGaps   []KnowledgeGap        `json:"knowledgeGaps"`
+	Rules           []Rule                `json:"rules"`
+	Transfers       []TransferTicket      `json:"transfers"`
+	ChannelPolicies []ChannelPolicy       `json:"channelPolicies"`
+	Integrations    []ChannelIntegration  `json:"integrations"`
+	ChannelAlerts   []ChannelAlert        `json:"channelAlerts"`
+	ChannelTrends   []ChannelFailureTrend `json:"channelFailureTrends"`
+	AlertPolicies   []ChannelAlertPolicy  `json:"channelAlertPolicies"`
+	Quality         QualitySummary        `json:"quality"`
+	Annotations     []Annotation          `json:"annotations"`
+	ReviewTasks     []ReviewTask          `json:"reviewTasks"`
+	RuleApprovals   []RuleApproval        `json:"ruleApprovals"`
+	RuleEvents      []RuleReleaseEvent    `json:"ruleEvents"`
 }
 
 type Metric struct {
@@ -372,6 +375,24 @@ type ChannelAlert struct {
 	LastSeenAt string `json:"lastSeenAt"`
 }
 
+type ChannelFailureTrend struct {
+	Channel     string `json:"channel"`
+	BucketStart string `json:"bucketStart"`
+	Count       int    `json:"count"`
+}
+
+type ChannelAlertPolicy struct {
+	Channel         string `json:"channel"`
+	Severity        string `json:"severity"`
+	Threshold       int    `json:"threshold"`
+	WindowMinutes   int    `json:"windowMinutes"`
+	NotifyTarget    string `json:"notifyTarget"`
+	Enabled         bool   `json:"enabled"`
+	Active          bool   `json:"active"`
+	CurrentCount    int    `json:"currentCount"`
+	LastTriggeredAt string `json:"lastTriggeredAt,omitempty"`
+}
+
 func NewSeedStore(options ...Option) *Store {
 	now := time.Now().UTC().Format(time.RFC3339)
 	st := &Store{
@@ -401,6 +422,7 @@ func NewSeedStore(options ...Option) *Store {
 		},
 		channelPolicies: defaultChannelPolicies(),
 		integrations:    defaultChannelIntegrations(now),
+		alertPolicies:   defaultChannelAlertPolicies(),
 	}
 	st.messages = []Message{
 		{ID: "msg_demo_1", ConversationID: "conv_demo_refund", Role: "user", Content: "7 天无理由退货的运费怎么计算？", Engine: "customer", Safe: true, CreatedAt: now},
@@ -767,6 +789,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 	transfers := withTransferSLAs(s.tickets, s.channelPolicies, time.Now().UTC())
 	quality := qualitySummary(s.messages, s.gaps, transfers, s.annotations)
 	channelAlerts := channelAlerts(s.channelFailures)
+	alertPolicies := channelAlertPolicies(s.alertPolicies, channelAlerts)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
@@ -777,6 +800,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(s.rules)), Note: "guardrail and transfer policies"},
 			{Label: "Channel failures", Value: fmt.Sprintf("%d", channelAlertCount(channelAlerts)), Note: "rejected inbound requests"},
+			{Label: "Active alerts", Value: fmt.Sprintf("%d", activeAlertPolicies(alertPolicies)), Note: "notification policies triggered"},
 			{Label: "Review tasks", Value: fmt.Sprintf("%d", openReviews), Note: "assistant replies awaiting QA"},
 		},
 		Conversations:   append([]Conversation(nil), s.conversations...),
@@ -786,6 +810,8 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelPolicies: append([]ChannelPolicy(nil), s.channelPolicies...),
 		Integrations:    append([]ChannelIntegration(nil), s.integrations...),
 		ChannelAlerts:   channelAlerts,
+		ChannelTrends:   channelFailureTrends(s.channelFailures, time.Now().UTC()),
+		AlertPolicies:   alertPolicies,
 		Quality:         quality,
 		Annotations:     append([]Annotation(nil), s.annotations...),
 		ReviewTasks:     append([]ReviewTask(nil), s.reviewTasks...),
@@ -1281,6 +1307,15 @@ func defaultChannelIntegrations(now string) []ChannelIntegration {
 	}
 }
 
+func defaultChannelAlertPolicies() []ChannelAlertPolicy {
+	return []ChannelAlertPolicy{
+		{Channel: "Web", Severity: "MEDIUM", Threshold: 8, WindowMinutes: 60, NotifyTarget: "ops-webhook", Enabled: true},
+		{Channel: "WeChat", Severity: "HIGH", Threshold: 5, WindowMinutes: 60, NotifyTarget: "wechat-oncall", Enabled: true},
+		{Channel: "App", Severity: "MEDIUM", Threshold: 6, WindowMinutes: 60, NotifyTarget: "app-oncall", Enabled: true},
+		{Channel: "Marketplace", Severity: "HIGH", Threshold: 3, WindowMinutes: 60, NotifyTarget: "marketplace-oncall", Enabled: true},
+	}
+}
+
 func channelIntegrationFor(integrations []ChannelIntegration, channel string) ChannelIntegration {
 	normalized := strings.ToLower(strings.TrimSpace(channel))
 	for _, integration := range integrations {
@@ -1582,6 +1617,64 @@ func channelAlerts(events []ChannelFailureEvent) []ChannelAlert {
 		alerts = append(alerts, alertsByKey[k])
 	}
 	return alerts
+}
+
+func channelFailureTrends(events []ChannelFailureEvent, now time.Time) []ChannelFailureTrend {
+	type key struct {
+		channel string
+		bucket  string
+	}
+	cutoff := now.Add(-4 * time.Hour)
+	counts := make(map[key]int)
+	order := make([]key, 0)
+	for _, event := range events {
+		createdAt, err := time.Parse(time.RFC3339, event.CreatedAt)
+		if err != nil || createdAt.Before(cutoff) {
+			continue
+		}
+		bucket := createdAt.UTC().Truncate(time.Hour).Format(time.RFC3339)
+		k := key{channel: fallback(event.Channel, "Unknown"), bucket: bucket}
+		if _, exists := counts[k]; !exists {
+			order = append(order, k)
+		}
+		counts[k]++
+	}
+	trends := make([]ChannelFailureTrend, 0, len(order))
+	for _, k := range order {
+		trends = append(trends, ChannelFailureTrend{Channel: k.channel, BucketStart: k.bucket, Count: counts[k]})
+	}
+	return trends
+}
+
+func channelAlertPolicies(policies []ChannelAlertPolicy, alerts []ChannelAlert) []ChannelAlertPolicy {
+	result := make([]ChannelAlertPolicy, 0, len(policies))
+	for _, policy := range policies {
+		item := policy
+		for _, alert := range alerts {
+			if alert.Channel == item.Channel {
+				item.CurrentCount += alert.Count
+				if alert.LastSeenAt > item.LastTriggeredAt {
+					item.LastTriggeredAt = alert.LastSeenAt
+				}
+			}
+		}
+		item.Active = item.Enabled && item.CurrentCount >= item.Threshold
+		if !item.Active {
+			item.LastTriggeredAt = ""
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func activeAlertPolicies(policies []ChannelAlertPolicy) int {
+	total := 0
+	for _, policy := range policies {
+		if policy.Active {
+			total++
+		}
+	}
+	return total
 }
 
 func channelAlertCount(alerts []ChannelAlert) int {

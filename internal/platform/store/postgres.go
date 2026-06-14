@@ -799,6 +799,14 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	channelTrends, err := s.listChannelFailureTrends()
+	if err != nil {
+		return Dashboard{}, err
+	}
+	alertPolicies, err := s.listChannelAlertPolicies(channelAlerts)
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -830,6 +838,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 			{Label: "SLA escalations", Value: fmt.Sprintf("%d", escalatedTransferCount(transfers)), Note: "open tickets past response SLA"},
 			{Label: "Enabled rules", Value: fmt.Sprintf("%d", enabledRules(rules)), Note: "guardrail and transfer policies"},
 			{Label: "Channel failures", Value: fmt.Sprintf("%d", channelAlertCount(channelAlerts)), Note: "rejected inbound requests"},
+			{Label: "Active alerts", Value: fmt.Sprintf("%d", activeAlertPolicies(alertPolicies)), Note: "notification policies triggered"},
 			{Label: "Review tasks", Value: fmt.Sprintf("%d", openReviews), Note: "assistant replies awaiting QA"},
 		},
 		Conversations:   conversations,
@@ -839,6 +848,8 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		ChannelPolicies: channelPolicies,
 		Integrations:    integrations,
 		ChannelAlerts:   channelAlerts,
+		ChannelTrends:   channelTrends,
+		AlertPolicies:   alertPolicies,
 		Quality:         qualitySummary(messages, gaps, transfers, annotations),
 		Annotations:     annotations,
 		ReviewTasks:     reviewTasks,
@@ -1156,6 +1167,64 @@ func (s *PostgresStore) listChannelAlerts() ([]ChannelAlert, error) {
 		return nil, err
 	}
 	return alerts, nil
+}
+
+func (s *PostgresStore) listChannelFailureTrends() ([]ChannelFailureTrend, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select channel, date_trunc('hour', created_at) as bucket_start, count(*)::int
+		from channel_failure_events
+		where created_at >= now() - interval '4 hours'
+		group by channel, bucket_start
+		order by bucket_start desc, channel
+		limit 40
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel failure trends: %w", err)
+	}
+	defer rows.Close()
+
+	trends := make([]ChannelFailureTrend, 0)
+	for rows.Next() {
+		var item ChannelFailureTrend
+		var bucketStart time.Time
+		if err := rows.Scan(&item.Channel, &bucketStart, &item.Count); err != nil {
+			return nil, err
+		}
+		item.BucketStart = bucketStart.UTC().Format(time.RFC3339)
+		trends = append(trends, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return trends, nil
+}
+
+func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select channel, severity, threshold, window_minutes, notify_target, enabled
+		from channel_alert_policies
+		order by channel
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel alert policies: %w", err)
+	}
+	defer rows.Close()
+
+	policies := make([]ChannelAlertPolicy, 0)
+	for rows.Next() {
+		var item ChannelAlertPolicy
+		if err := rows.Scan(&item.Channel, &item.Severity, &item.Threshold, &item.WindowMinutes, &item.NotifyTarget, &item.Enabled); err != nil {
+			return nil, err
+		}
+		policies = append(policies, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(policies) == 0 {
+		policies = defaultChannelAlertPolicies()
+	}
+	return channelAlertPolicies(policies, alerts), nil
 }
 
 func (s *PostgresStore) listRecentMessages() ([]Message, error) {
