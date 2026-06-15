@@ -393,6 +393,63 @@ h2 {
   font-size: 12px;
 }
 
+.auditQualityGrid {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 2px;
+}
+
+.auditQualityRow {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.7fr) minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfc;
+}
+
+.auditQualityRow div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.auditQualityRow strong,
+.auditQualityRow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auditQualityRow span {
+  color: #64786d;
+  font-size: 12px;
+}
+
+.auditQualityBar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2ef;
+}
+
+.auditQualityBar span {
+  display: block;
+  height: 100%;
+  background: #3e8f68;
+}
+
+.auditQualityBar em {
+  display: block;
+  height: 100%;
+  background: #d98b73;
+}
+
 .activeSession {
   display: grid;
   gap: 4px;

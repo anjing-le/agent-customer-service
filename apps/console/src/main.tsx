@@ -761,6 +761,21 @@ function App() {
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
   const auditStatusOptions = ['ALL', 'ACCEPTED', 'REJECTED'] as const;
   const auditChannels = Array.from(new Set([...protocolMatrix.map((item) => item.channel), ...channelInboundAudits.map((item) => item.channel)])).sort();
+  const auditQualityRows = auditChannels.map((channel) => {
+    const items = channelInboundAudits.filter((audit) => audit.channel === channel);
+    const total = items.length;
+    const accepted = items.filter((audit) => audit.status === 'ACCEPTED').length;
+    const rejected = items.filter((audit) => audit.status === 'REJECTED').length;
+    const acceptanceRate = total > 0 ? Math.round((accepted / total) * 100) : 0;
+    const topCode = items
+      .filter((audit) => audit.status === 'REJECTED')
+      .reduce<Record<string, number>>((acc, audit) => {
+        acc[audit.code] = (acc[audit.code] ?? 0) + 1;
+        return acc;
+      }, {});
+    const topError = Object.entries(topCode).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0];
+    return { channel, total, accepted, rejected, acceptanceRate, topError: topError ? `${topError[0]}:${topError[1]}` : '' };
+  }).filter((item) => item.total > 0);
   const notificationChannels = Array.from(new Set(channelNotifications.map((item) => item.channel))).sort();
   const notificationStatusOptions = ['ALL', 'OPEN', 'RETRYING', 'SENT', 'DEAD_LETTER', 'ACKED'] as const;
   const visibleNotifications = channelNotifications.filter((item) => {
@@ -1891,6 +1906,23 @@ function App() {
                 <Download size={14} />
               </button>
             </div>
+            {auditQualityRows.length > 0 && (
+              <div className="auditQualityGrid">
+                {auditQualityRows.map((item) => (
+                  <article className="auditQualityRow" key={item.channel}>
+                    <div>
+                      <strong>{item.channel}</strong>
+                      <span>{item.accepted}/{item.total} accepted · {item.acceptanceRate}%</span>
+                    </div>
+                    <div className="auditQualityBar">
+                      <span style={{ width: `${item.acceptanceRate}%` }} />
+                      <em style={{ width: `${100 - item.acceptanceRate}%` }} />
+                    </div>
+                    <b className={item.rejected > 0 ? 'status warning' : 'status'}>{item.topError || 'clean'}</b>
+                  </article>
+                ))}
+              </div>
+            )}
             <div className="tableList compactList">
               {channelInboundAudits.slice(0, 6).map((audit) => (
                 <article className="tableRow" key={audit.id}>
