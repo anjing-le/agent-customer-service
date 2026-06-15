@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -838,6 +839,39 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 			summary.Channels = append(summary.Channels, notification.Channel)
 		}
 	}
+	summary.InboundAudit = channelInboundAuditSummary(dashboard.ChannelAudits)
+	return summary
+}
+
+func channelInboundAuditSummary(audits []store.ChannelInboundAudit) store.ChannelInboundAuditSummary {
+	summary := store.ChannelInboundAuditSummary{Total: len(audits)}
+	errorCounts := map[string]int{}
+	for _, audit := range audits {
+		switch strings.ToUpper(strings.TrimSpace(audit.Status)) {
+		case "ACCEPTED":
+			summary.Accepted++
+		case "REJECTED":
+			summary.Rejected++
+			errorCounts[fallbackReportValue(audit.Code)]++
+		}
+	}
+	if summary.Total > 0 {
+		summary.AcceptanceRate = int(float64(summary.Accepted) / float64(summary.Total) * 100)
+	}
+	codes := make([]store.ChannelInboundAuditCodeCount, 0, len(errorCounts))
+	for code, count := range errorCounts {
+		codes = append(codes, store.ChannelInboundAuditCodeCount{Code: code, Count: count})
+	}
+	sort.Slice(codes, func(i, j int) bool {
+		if codes[i].Count == codes[j].Count {
+			return codes[i].Code < codes[j].Code
+		}
+		return codes[i].Count > codes[j].Count
+	})
+	if len(codes) > 3 {
+		codes = codes[:3]
+	}
+	summary.TopErrorCodes = codes
 	return summary
 }
 
@@ -859,6 +893,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 			deadLetters++
 		}
 	}
+	inboundAudit := channelInboundAuditSummary(dashboard.ChannelAudits)
 
 	var b strings.Builder
 	b.WriteString("# Agent Customer Service Channel Ops Report\n\n")
@@ -866,6 +901,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString("- Window: last 24 hours\n")
 	b.WriteString(fmt.Sprintf("- Channel failures: %d\n", totalFailures))
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
+	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
 	b.WriteString(fmt.Sprintf("- Notifications: open=%d retrying=%d dead_letter=%d\n\n", openNotifications, retryingNotifications, deadLetters))
 
 	b.WriteString("## Alerts\n\n")
@@ -884,6 +920,21 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	} else {
 		for _, trend := range dashboard.ChannelTrends {
 			b.WriteString(fmt.Sprintf("- %s %s: %d\n", trend.Channel, trend.BucketStart, trend.Count))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("## Inbound Acceptance\n\n")
+	if inboundAudit.Total == 0 {
+		b.WriteString("- No inbound audit records.\n\n")
+	} else {
+		b.WriteString(fmt.Sprintf("- Accepted: %d / %d (%d%%)\n", inboundAudit.Accepted, inboundAudit.Total, inboundAudit.AcceptanceRate))
+		b.WriteString(fmt.Sprintf("- Rejected: %d\n", inboundAudit.Rejected))
+		if len(inboundAudit.TopErrorCodes) > 0 {
+			b.WriteString("- Top error codes:\n")
+			for _, item := range inboundAudit.TopErrorCodes {
+				b.WriteString(fmt.Sprintf("  - `%s`: %d\n", item.Code, item.Count))
+			}
 		}
 		b.WriteString("\n")
 	}
@@ -929,6 +980,18 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 	}
 	for _, trend := range dashboard.ChannelTrends {
 		if err := writer.Write([]string{"trend", trend.Channel, trend.BucketStart, "", fmt.Sprintf("%d", trend.Count), "", "", ""}); err != nil {
+			return nil, err
+		}
+	}
+	inboundAudit := channelInboundAuditSummary(dashboard.ChannelAudits)
+	if err := writer.Write([]string{"inbound_audit", "", "ACCEPTANCE_RATE", "accepted", fmt.Sprintf("%d/%d (%d%%)", inboundAudit.Accepted, inboundAudit.Total, inboundAudit.AcceptanceRate), "", "", ""}); err != nil {
+		return nil, err
+	}
+	if err := writer.Write([]string{"inbound_audit", "", "REJECTED", "rejected", fmt.Sprintf("%d", inboundAudit.Rejected), "", "", ""}); err != nil {
+		return nil, err
+	}
+	for _, item := range inboundAudit.TopErrorCodes {
+		if err := writer.Write([]string{"inbound_audit_error", "", "REJECTED", item.Code, fmt.Sprintf("%d", item.Count), "", "", ""}); err != nil {
 			return nil, err
 		}
 	}

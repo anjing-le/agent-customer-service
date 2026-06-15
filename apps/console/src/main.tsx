@@ -451,6 +451,13 @@ type ChannelOpsReportSummary = {
   retrying: number;
   deadLetters: number;
   channels: string[];
+  inboundAudit?: {
+    total: number;
+    accepted: number;
+    rejected: number;
+    acceptanceRate: number;
+    topErrorCodes: Array<{ code: string; count: number }>;
+  };
 };
 type ChannelOpsReport = {
   id: string;
@@ -2025,6 +2032,12 @@ function App() {
                   <div>
                     <strong>{report.format.toUpperCase()} · {report.generatedAt.slice(0, 16).replace('T', ' ')}</strong>
                     <span>{report.summary.failureCount} failures · {report.summary.activeRunbooks} runbooks · {report.summary.openNotifications + report.summary.retrying} open notices</span>
+                    {report.summary.inboundAudit && (
+                      <span>
+                        inbound {report.summary.inboundAudit.accepted}/{report.summary.inboundAudit.total} accepted · {report.summary.inboundAudit.acceptanceRate}%
+                        {report.summary.inboundAudit.topErrorCodes.length > 0 ? ` · ${report.summary.inboundAudit.topErrorCodes.map((item) => `${item.code}:${item.count}`).join(' / ')}` : ''}
+                      </span>
+                    )}
                     <span>{report.summary.channels.length > 0 ? report.summary.channels.join(' / ') : 'ALL channels'}</span>
                   </div>
                   <button className="tinyButton" onClick={() => downloadSavedChannelOpsReport(report).catch((err) => setError(err instanceof Error ? err.message : 'download saved channel ops report failed'))} title="下载历史日报">

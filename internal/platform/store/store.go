@@ -444,12 +444,26 @@ type ChannelOpsReport struct {
 }
 
 type ChannelOpsReportSummary struct {
-	FailureCount      int      `json:"failureCount"`
-	ActiveRunbooks    int      `json:"activeRunbooks"`
-	OpenNotifications int      `json:"openNotifications"`
-	Retrying          int      `json:"retrying"`
-	DeadLetters       int      `json:"deadLetters"`
-	Channels          []string `json:"channels"`
+	FailureCount      int                        `json:"failureCount"`
+	ActiveRunbooks    int                        `json:"activeRunbooks"`
+	OpenNotifications int                        `json:"openNotifications"`
+	Retrying          int                        `json:"retrying"`
+	DeadLetters       int                        `json:"deadLetters"`
+	Channels          []string                   `json:"channels"`
+	InboundAudit      ChannelInboundAuditSummary `json:"inboundAudit"`
+}
+
+type ChannelInboundAuditSummary struct {
+	Total          int                            `json:"total"`
+	Accepted       int                            `json:"accepted"`
+	Rejected       int                            `json:"rejected"`
+	AcceptanceRate int                            `json:"acceptanceRate"`
+	TopErrorCodes  []ChannelInboundAuditCodeCount `json:"topErrorCodes"`
+}
+
+type ChannelInboundAuditCodeCount struct {
+	Code  string `json:"code"`
+	Count int    `json:"count"`
 }
 
 type ChannelOpsReportEvent struct {

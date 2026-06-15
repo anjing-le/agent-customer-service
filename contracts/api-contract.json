@@ -703,7 +703,23 @@
         "openNotifications": "number",
         "retrying": "number",
         "deadLetters": "number",
-        "channels": "string[]"
+        "channels": "string[]",
+        "inboundAudit": "ChannelInboundAuditSummary"
+      }
+    },
+    "ChannelInboundAuditSummary": {
+      "fields": {
+        "total": "number",
+        "accepted": "number",
+        "rejected": "number",
+        "acceptanceRate": "number",
+        "topErrorCodes": "ChannelInboundAuditCodeCount[]"
+      }
+    },
+    "ChannelInboundAuditCodeCount": {
+      "fields": {
+        "code": "string",
+        "count": "number"
       }
     },
     "ChannelOpsReportScheduler": {

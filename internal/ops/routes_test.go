@@ -473,6 +473,12 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 			t.Fatalf("record failure: %v", err)
 		}
 	}
+	if err := st.RecordChannelInboundAudit(store.ChannelInboundAudit{Channel: "Marketplace", Status: "ACCEPTED", Code: "accepted"}); err != nil {
+		t.Fatalf("record accepted audit: %v", err)
+	}
+	if err := st.RecordChannelInboundAudit(store.ChannelInboundAudit{Channel: "Marketplace", Status: "REJECTED", Code: "invalid_signature"}); err != nil {
+		t.Fatalf("record rejected audit: %v", err)
+	}
 	mux := http.NewServeMux()
 	Register(mux, st)
 
@@ -486,7 +492,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
 		t.Fatalf("expected markdown content type, got %s", rec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid"} {
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Inbound audits: total=2 accepted=1 rejected=1 acceptance_rate=50%", "`invalid_signature`: 1"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in markdown report, got %s", expected, rec.Body.String())
 		}
@@ -504,6 +510,11 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "section,channel,status,code,count,owner,next_action,escalation") {
 		t.Fatalf("expected csv header, got %s", rec.Body.String())
+	}
+	for _, expected := range []string{"inbound_audit,,ACCEPTANCE_RATE,accepted,1/2 (50%)", "inbound_audit_error,,REJECTED,invalid_signature,1"} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in csv report, got %s", expected, rec.Body.String())
+		}
 	}
 }
 
@@ -534,6 +545,9 @@ func TestChannelOpsReportHistoryRoutesGenerateListAndExport(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("record failure: %v", err)
 	}
+	if err := st.RecordChannelInboundAudit(store.ChannelInboundAudit{Channel: "App", Status: "ACCEPTED", Code: "accepted"}); err != nil {
+		t.Fatalf("record accepted audit: %v", err)
+	}
 	mux := http.NewServeMux()
 	Register(mux, st)
 
@@ -544,7 +558,7 @@ func TestChannelOpsReportHistoryRoutesGenerateListAndExport(t *testing.T) {
 	if generateRec.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", generateRec.Code, generateRec.Body.String())
 	}
-	for _, expected := range []string{`"format":"markdown"`, `"contentType":"text/markdown; charset=utf-8"`, `"failureCount":1`, "# Agent Customer Service Channel Ops Report"} {
+	for _, expected := range []string{`"format":"markdown"`, `"contentType":"text/markdown; charset=utf-8"`, `"failureCount":1`, `"inboundAudit":{"total":1,"accepted":1,"rejected":0,"acceptanceRate":100`, "# Agent Customer Service Channel Ops Report"} {
 		if !strings.Contains(generateRec.Body.String(), expected) {
 			t.Fatalf("expected %s in generated report, got %s", expected, generateRec.Body.String())
 		}
