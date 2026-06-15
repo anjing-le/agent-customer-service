@@ -751,7 +751,12 @@
         "source": "INBOUND_AUDIT_ACTIVE|DEAD_LETTER|HIGH_FREQUENCY_FAILURE|RETRYING_DELIVERY",
         "reason": "string",
         "recommendedAction": "string",
-        "count": "number"
+        "count": "number",
+        "actionType": "REVIEW_RUNBOOK|ACK_NOTIFICATION",
+        "actionRef": "string",
+        "actionLabel": "string",
+        "notificationId": "string",
+        "runbookStatus": "DISPATCH|ESCALATE"
       }
     },
     "ChannelInboundAuditQualitySummary": {

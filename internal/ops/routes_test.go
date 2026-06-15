@@ -494,7 +494,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
 		t.Fatalf("expected markdown content type, got %s", rec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `INBOUND_AUDIT_ACTIVE`", "`invalid_signature`: 3", "Active channels: Marketplace"} {
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in markdown report, got %s", expected, rec.Body.String())
 		}
@@ -513,7 +513,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "section,channel,status,code,count,owner,next_action,escalation") {
 		t.Fatalf("expected csv header, got %s", rec.Body.String())
 	}
-	for _, expected := range []string{"inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "INBOUND_AUDIT_ACTIVE"} {
+	for _, expected := range []string{"inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in csv report, got %s", expected, rec.Body.String())
 		}
@@ -560,7 +560,7 @@ func TestChannelOpsReportHistoryRoutesGenerateListAndExport(t *testing.T) {
 	if generateRec.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", generateRec.Code, generateRec.Body.String())
 	}
-	for _, expected := range []string{`"format":"markdown"`, `"contentType":"text/markdown; charset=utf-8"`, `"failureCount":1`, `"handoffPriorities":[{"rank":1`, `"source":"HIGH_FREQUENCY_FAILURE"`, `"inboundAudit":{"total":1,"accepted":1,"rejected":0,"acceptanceRate":100`, "# Agent Customer Service Channel Ops Report"} {
+	for _, expected := range []string{`"format":"markdown"`, `"contentType":"text/markdown; charset=utf-8"`, `"failureCount":1`, `"handoffPriorities":[{"rank":1`, `"source":"HIGH_FREQUENCY_FAILURE"`, `"actionType":"REVIEW_RUNBOOK"`, `"actionLabel":"Review channel runbook"`, `"inboundAudit":{"total":1,"accepted":1,"rejected":0,"acceptanceRate":100`, "# Agent Customer Service Channel Ops Report"} {
 		if !strings.Contains(generateRec.Body.String(), expected) {
 			t.Fatalf("expected %s in generated report, got %s", expected, generateRec.Body.String())
 		}

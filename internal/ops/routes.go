@@ -971,6 +971,8 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 	for _, channel := range inboundQuality.ActiveChannels {
 		event := eventByChannel[channel]
 		snapshot := channelAuditQuality(dashboard.ChannelAudits, channel)
+		runbook := channelRunbookForHandoff(dashboard.ChannelRunbooks, channel, "ESCALATE")
+		notification := channelNotificationForHandoff(dashboard.Notifications, channel, "OPEN", "RETRYING", "DEAD_LETTER")
 		reason := fmt.Sprintf("inbound acceptance is %d%% with %d samples", snapshot.AcceptanceRate, snapshot.Total)
 		if event.FailureCode != "" {
 			reason = fmt.Sprintf("%s; top failure `%s`", reason, event.FailureCode)
@@ -984,12 +986,18 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 				Reason:            reason,
 				RecommendedAction: "pause blind channel rollout, inspect signature/origin/replay configuration, then rerun inbound examples",
 				Count:             snapshot.TopErrorCount,
+				ActionType:        "REVIEW_RUNBOOK",
+				ActionRef:         handoffRunbookRef(runbook),
+				ActionLabel:       handoffRunbookLabel(channel, runbook),
+				NotificationID:    notification.ID,
+				RunbookStatus:     runbook.Status,
 			},
 		})
 	}
 	for _, notification := range dashboard.Notifications {
 		switch notification.Status {
 		case "DEAD_LETTER":
+			runbook := channelRunbookForHandoff(dashboard.ChannelRunbooks, notification.Channel, "ESCALATE")
 			candidates = append(candidates, channelOpsHandoffCandidate{
 				score: 300000 + notification.Attempts,
 				item: store.ChannelOpsHandoffPriority{
@@ -999,9 +1007,15 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 					Reason:            fallbackReportValue(notification.DeadLetterReason),
 					RecommendedAction: "acknowledge the dead letter, inspect delivery audit, and repair the webhook target before replay",
 					Count:             notification.Attempts,
+					ActionType:        "ACK_NOTIFICATION",
+					ActionRef:         notification.ID,
+					ActionLabel:       "Acknowledge dead-letter notification",
+					NotificationID:    notification.ID,
+					RunbookStatus:     runbook.Status,
 				},
 			})
 		case "RETRYING":
+			runbook := channelRunbookForHandoff(dashboard.ChannelRunbooks, notification.Channel, "DISPATCH")
 			candidates = append(candidates, channelOpsHandoffCandidate{
 				score: 100000 + notification.Attempts,
 				item: store.ChannelOpsHandoffPriority{
@@ -1011,6 +1025,11 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 					Reason:            fallbackReportValue(notification.LastError),
 					RecommendedAction: "check target health before retry budget is exhausted",
 					Count:             notification.Attempts,
+					ActionType:        "ACK_NOTIFICATION",
+					ActionRef:         notification.ID,
+					ActionLabel:       "Acknowledge or dispatch retrying notification",
+					NotificationID:    notification.ID,
+					RunbookStatus:     runbook.Status,
 				},
 			})
 		}
@@ -1026,6 +1045,8 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 		return alerts[i].Count > alerts[j].Count
 	})
 	for _, alert := range alerts {
+		runbook := channelRunbookForHandoff(dashboard.ChannelRunbooks, alert.Channel, "DISPATCH")
+		notification := channelNotificationForHandoff(dashboard.Notifications, alert.Channel, "OPEN", "RETRYING", "DEAD_LETTER")
 		candidates = append(candidates, channelOpsHandoffCandidate{
 			score: 200000 + alert.Count,
 			item: store.ChannelOpsHandoffPriority{
@@ -1035,6 +1056,11 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 				Reason:            fmt.Sprintf("%d `%s` failures; last reason %s", alert.Count, alert.Code, fallbackReportValue(alert.LastReason)),
 				RecommendedAction: "compare the latest failure origin with channel policy and runbook checks",
 				Count:             alert.Count,
+				ActionType:        "REVIEW_RUNBOOK",
+				ActionRef:         handoffRunbookRef(runbook),
+				ActionLabel:       handoffRunbookLabel(alert.Channel, runbook),
+				NotificationID:    notification.ID,
+				RunbookStatus:     runbook.Status,
 			},
 		})
 	}
@@ -1062,6 +1088,50 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 		}
 	}
 	return priorities
+}
+
+func channelRunbookForHandoff(runbooks []store.ChannelRunbook, channel string, preferredStatus string) store.ChannelRunbook {
+	var fallback store.ChannelRunbook
+	for _, runbook := range runbooks {
+		if !strings.EqualFold(runbook.Channel, channel) {
+			continue
+		}
+		if fallback.Channel == "" {
+			fallback = runbook
+		}
+		if preferredStatus != "" && strings.EqualFold(runbook.Status, preferredStatus) {
+			return runbook
+		}
+	}
+	return fallback
+}
+
+func channelNotificationForHandoff(notifications []store.ChannelNotification, channel string, statuses ...string) store.ChannelNotification {
+	for _, status := range statuses {
+		for _, notification := range notifications {
+			if strings.EqualFold(notification.Channel, channel) && strings.EqualFold(notification.Status, status) {
+				return notification
+			}
+		}
+	}
+	return store.ChannelNotification{}
+}
+
+func handoffRunbookRef(runbook store.ChannelRunbook) string {
+	if runbook.Channel == "" {
+		return ""
+	}
+	if runbook.Status == "" {
+		return runbook.Channel
+	}
+	return runbook.Channel + ":" + runbook.Status
+}
+
+func handoffRunbookLabel(channel string, runbook store.ChannelRunbook) string {
+	if runbook.Status == "" {
+		return "Review channel runbook"
+	}
+	return fmt.Sprintf("Review %s %s runbook", channel, runbook.Status)
 }
 
 func latestChannelInboundAuditQualityEventByChannel(events []store.ChannelInboundAuditQualityEvent) map[string]store.ChannelInboundAuditQualityEvent {
@@ -1236,7 +1306,10 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 		b.WriteString("- No urgent handoff items.\n\n")
 	} else {
 		for _, item := range handoffPriorities {
-			b.WriteString(fmt.Sprintf("%d. %s `%s` [%s]: %s. Next: %s\n", item.Rank, item.Channel, item.Source, item.Severity, item.Reason, item.RecommendedAction))
+			b.WriteString(fmt.Sprintf("%d. %s `%s` [%s]: %s. Next: %s. Action: %s (%s)\n", item.Rank, item.Channel, item.Source, item.Severity, item.Reason, item.RecommendedAction, item.ActionLabel, fallbackReportValue(item.ActionRef)))
+			if item.NotificationID != "" || item.RunbookStatus != "" {
+				b.WriteString(fmt.Sprintf("   - Links: notification=%s runbook=%s\n", fallbackReportValue(item.NotificationID), fallbackReportValue(item.RunbookStatus)))
+			}
 		}
 		b.WriteString("\n")
 	}
@@ -1361,7 +1434,8 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 		}
 	}
 	for _, item := range channelOpsHandoffPriorities(dashboard) {
-		if err := writer.Write([]string{"handoff_priority", item.Channel, item.Severity, item.Source, fmt.Sprintf("%d", item.Count), "", item.RecommendedAction, item.Reason}); err != nil {
+		linkSummary := fmt.Sprintf("action=%s ref=%s notification=%s runbook=%s reason=%s", fallbackReportValue(item.ActionType), fallbackReportValue(item.ActionRef), fallbackReportValue(item.NotificationID), fallbackReportValue(item.RunbookStatus), item.Reason)
+		if err := writer.Write([]string{"handoff_priority", item.Channel, item.Severity, item.Source, fmt.Sprintf("%d", item.Count), item.ActionLabel, item.RecommendedAction, linkSummary}); err != nil {
 			return nil, err
 		}
 	}

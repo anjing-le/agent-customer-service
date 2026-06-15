@@ -465,6 +465,11 @@ type ChannelOpsReportSummary = {
     reason: string;
     recommendedAction: string;
     count: number;
+    actionType: string;
+    actionRef?: string;
+    actionLabel: string;
+    notificationId?: string;
+    runbookStatus?: string;
   }> | null;
   inboundAudit?: {
     total: number;
@@ -2258,7 +2263,7 @@ function App() {
                     )}
                     {(report.summary.handoffPriorities ?? []).length > 0 && (
                       <span>
-                        handoff {(report.summary.handoffPriorities ?? []).slice(0, 3).map((item) => `#${item.rank} ${item.channel} ${item.source}`).join(' / ')}
+                        handoff {(report.summary.handoffPriorities ?? []).slice(0, 3).map((item) => `#${item.rank} ${item.channel} ${item.source} · ${item.actionLabel ?? item.actionType ?? item.source}`).join(' / ')}
                       </span>
                     )}
                     <span>{(report.summary.channels ?? []).length > 0 ? (report.summary.channels ?? []).join(' / ') : 'ALL channels'}</span>

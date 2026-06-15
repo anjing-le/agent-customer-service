@@ -466,6 +466,11 @@ type ChannelOpsHandoffPriority struct {
 	Reason            string `json:"reason"`
 	RecommendedAction string `json:"recommendedAction"`
 	Count             int    `json:"count"`
+	ActionType        string `json:"actionType"`
+	ActionRef         string `json:"actionRef,omitempty"`
+	ActionLabel       string `json:"actionLabel"`
+	NotificationID    string `json:"notificationId,omitempty"`
+	RunbookStatus     string `json:"runbookStatus,omitempty"`
 }
 
 type ChannelInboundAuditSummary struct {
