@@ -153,6 +153,10 @@ func (f failingRuntime) RecordChannelOpsReportEvent(store.ChannelOpsReportEvent)
 	return store.ChannelOpsReportEvent{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) RecordChannelInboundAudit(store.ChannelInboundAudit) error {
+	return errors.New("database unavailable")
+}
+
 func (f failingRuntime) ListChannelOpsReportEvents(int) ([]store.ChannelOpsReportEvent, error) {
 	return nil, errors.New("database unavailable")
 }

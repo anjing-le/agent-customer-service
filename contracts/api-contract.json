@@ -1000,7 +1000,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelInboundAudits", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -1011,6 +1011,7 @@
         "integrations": "ChannelIntegration[]",
         "channelAlerts": "ChannelAlert[]",
         "channelFailureTrends": "ChannelFailureTrend[]",
+        "channelInboundAudits": "ChannelInboundAudit[]",
         "channelAlertPolicies": "ChannelAlertPolicy[]",
         "channelNotifications": "ChannelNotification[]",
         "channelRunbooks": "ChannelRunbook[]",
@@ -1041,6 +1042,23 @@
         "channel": "string",
         "bucketStart": "RFC3339 string",
         "count": "number"
+      }
+    },
+    "ChannelInboundAudit": {
+      "required": ["id", "channel", "externalConversationId", "status", "code", "createdAt"],
+      "fields": {
+        "id": "string",
+        "channel": "string",
+        "externalConversationId": "string",
+        "externalMessageId": "string",
+        "origin": "string",
+        "status": "ACCEPTED|REJECTED",
+        "code": "accepted|invalid_signature|stale_signature|duplicate_inbound|channel_origin_denied|channel_rate_limited",
+        "reason": "string",
+        "replayKey": "string",
+        "signaturePreview": "string",
+        "contentHash": "string",
+        "createdAt": "RFC3339 string"
       }
     },
     "ChannelAlertPolicy": {

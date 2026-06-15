@@ -289,6 +289,20 @@ type ChannelFailureTrend = {
   bucketStart: string;
   count: number;
 };
+type ChannelInboundAudit = {
+  id: string;
+  channel: string;
+  externalConversationId: string;
+  externalMessageId?: string;
+  origin?: string;
+  status: string;
+  code: string;
+  reason?: string;
+  replayKey?: string;
+  signaturePreview?: string;
+  contentHash?: string;
+  createdAt: string;
+};
 type ChannelAlertPolicy = {
   channel: string;
   severity: string;
@@ -489,6 +503,7 @@ type Dashboard = {
   integrations: ChannelIntegration[] | null;
   channelAlerts: ChannelAlert[] | null;
   channelFailureTrends: ChannelFailureTrend[] | null;
+  channelInboundAudits: ChannelInboundAudit[] | null;
   channelAlertPolicies: ChannelAlertPolicy[] | null;
   channelNotifications: ChannelNotification[] | null;
   channelRunbooks: ChannelRunbook[] | null;
@@ -724,6 +739,7 @@ function App() {
   const integrations = dashboard?.integrations ?? [];
   const channelAlerts = dashboard?.channelAlerts ?? [];
   const channelFailureTrends = dashboard?.channelFailureTrends ?? [];
+  const channelInboundAudits = dashboard?.channelInboundAudits ?? [];
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
   const channelRunbooks = dashboard?.channelRunbooks ?? [];
@@ -1768,6 +1784,28 @@ function App() {
                   </button>
                 </article>
               ))}
+            </div>
+            <div className="panelDivider" />
+            <div className="panelHeader compactHeader">
+              <div>
+                <p className="sectionLabel">验收审计</p>
+                <h2>最近入站</h2>
+              </div>
+              <span className="status">{channelInboundAudits.length}</span>
+            </div>
+            <div className="tableList compactList">
+              {channelInboundAudits.slice(0, 6).map((audit) => (
+                <article className="tableRow" key={audit.id}>
+                  <div>
+                    <strong>{audit.channel} · {audit.status}</strong>
+                    <span>{audit.code} · {audit.reason || 'channel inbound accepted'}</span>
+                    <span>{[audit.origin, audit.externalConversationId, audit.externalMessageId].filter(Boolean).join(' / ')}</span>
+                    {audit.signaturePreview && <span>sig {audit.signaturePreview}... · {audit.replayKey?.slice(0, 12)}...</span>}
+                  </div>
+                  <b className={audit.status === 'REJECTED' ? 'status danger' : 'status'}>{audit.createdAt.slice(11, 19)}</b>
+                </article>
+              ))}
+              {channelInboundAudits.length === 0 && <p className="empty">暂无渠道验收审计</p>}
             </div>
             <div className="panelDivider" />
             <div className="panelHeader compactHeader">

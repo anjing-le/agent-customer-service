@@ -9,6 +9,7 @@
 | `Conversation` | 一条客服会话，记录客户、渠道、意图、风险和最后一句话 | `internal/platform/store` |
 | `ChannelInboundMessage` | 外部渠道进入系统的标准化消息，包含渠道、外部会话 ID、客户和内容 | `/api/channels/inbound` |
 | `ChannelInboundReceipt` | 渠道入站流水，记录 replay key、外部消息 ID、签名、时间戳和内容 hash，用于防重复提交和渠道对账 | `channel_inbound_events` |
+| `ChannelInboundAudit` | 渠道入站验收审计，记录来源、验签/限流/幂等结果、失败原因、签名预览、replay key 和内容 hash，不保存完整 payload 或密钥 | `Dashboard.channelInboundAudits` |
 | `ChannelAdapterRequest` | 真实渠道回调的薄适配请求，例如 WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu 字段映射 | `/api/channels/*/inbound` 与 `contracts/channel-protocol-matrix.json` |
 | `Message` | 用户或助手的一条消息，包含回复引擎、证据、兜底原因和 trace | `SendMessage` runtime |
 | `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
@@ -81,6 +82,7 @@ user message
 | `ListConversations` / `CreateConversation` | 会话管理 |
 | `SendMessage` | 一轮用户输入的核心处理 |
 | `RecordChannelInbound` | 记录渠道入站 replay key，重复载荷不再进入客服链路 |
+| `RecordChannelInboundAudit` | 记录渠道请求验收结果，成功和拒绝都可复盘 |
 | `AcknowledgeChannelNotification` | 确认渠道通知事件 |
 | `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
 | `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |

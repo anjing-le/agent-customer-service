@@ -84,6 +84,7 @@ type Runtime interface {
 	ChannelIntegration(channel string) (ChannelIntegration, error)
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
+	RecordChannelInboundAudit(audit ChannelInboundAudit) error
 	RecordChannelFailure(event ChannelFailureEvent) error
 	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
 	ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error)
@@ -138,6 +139,7 @@ type Store struct {
 	annotations     []Annotation
 	reviewTasks     []ReviewTask
 	inboundReplay   map[string]ChannelInboundReceipt
+	inboundAudits   []ChannelInboundAudit
 	rateWindows     map[string]int
 	channelFailures []ChannelFailureEvent
 	generator       ReplyGenerator
@@ -417,6 +419,7 @@ type Dashboard struct {
 	Integrations     []ChannelIntegration       `json:"integrations"`
 	ChannelAlerts    []ChannelAlert             `json:"channelAlerts"`
 	ChannelTrends    []ChannelFailureTrend      `json:"channelFailureTrends"`
+	ChannelAudits    []ChannelInboundAudit      `json:"channelInboundAudits"`
 	AlertPolicies    []ChannelAlertPolicy       `json:"channelAlertPolicies"`
 	Notifications    []ChannelNotification      `json:"channelNotifications"`
 	ChannelRunbooks  []ChannelRunbook           `json:"channelRunbooks"`
@@ -523,6 +526,21 @@ type ChannelFailureEvent struct {
 	ExternalConversationID string `json:"externalConversationId"`
 	ExternalMessageID      string `json:"externalMessageId"`
 	Origin                 string `json:"origin"`
+	CreatedAt              string `json:"createdAt"`
+}
+
+type ChannelInboundAudit struct {
+	ID                     string `json:"id"`
+	Channel                string `json:"channel"`
+	ExternalConversationID string `json:"externalConversationId"`
+	ExternalMessageID      string `json:"externalMessageId,omitempty"`
+	Origin                 string `json:"origin,omitempty"`
+	Status                 string `json:"status"`
+	Code                   string `json:"code"`
+	Reason                 string `json:"reason,omitempty"`
+	ReplayKey              string `json:"replayKey,omitempty"`
+	SignaturePreview       string `json:"signaturePreview,omitempty"`
+	ContentHash            string `json:"contentHash,omitempty"`
 	CreatedAt              string `json:"createdAt"`
 }
 
@@ -711,6 +729,17 @@ func (s *Store) RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error
 	}
 	s.inboundReplay[receipt.ReplayKey] = receipt
 	return true, nil
+}
+
+func (s *Store) RecordChannelInboundAudit(audit ChannelInboundAudit) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalizeChannelInboundAudit(&audit)
+	s.inboundAudits = append([]ChannelInboundAudit{audit}, s.inboundAudits...)
+	if len(s.inboundAudits) > 100 {
+		s.inboundAudits = s.inboundAudits[:100]
+	}
+	return nil
 }
 
 func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
@@ -1281,6 +1310,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Integrations:     append([]ChannelIntegration(nil), s.integrations...),
 		ChannelAlerts:    channelAlerts,
 		ChannelTrends:    channelFailureTrends(s.channelFailures, time.Now().UTC()),
+		ChannelAudits:    append([]ChannelInboundAudit(nil), s.inboundAudits...),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
 		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications),
@@ -2322,6 +2352,19 @@ func normalizeChannelOpsReportEvent(event *ChannelOpsReportEvent) {
 	event.Format = fallback(strings.ToLower(strings.TrimSpace(event.Format)), "markdown")
 	if strings.TrimSpace(event.CreatedAt) == "" {
 		event.CreatedAt = now.Format(time.RFC3339)
+	}
+}
+
+func normalizeChannelInboundAudit(audit *ChannelInboundAudit) {
+	now := time.Now().UTC()
+	if strings.TrimSpace(audit.ID) == "" {
+		audit.ID = fmt.Sprintf("channel_inbound_audit_%d", now.UnixNano())
+	}
+	audit.Channel = fallback(strings.TrimSpace(audit.Channel), "Unknown")
+	audit.Status = fallback(strings.ToUpper(strings.TrimSpace(audit.Status)), "REJECTED")
+	audit.Code = fallback(strings.TrimSpace(audit.Code), "channel_inbound")
+	if strings.TrimSpace(audit.CreatedAt) == "" {
+		audit.CreatedAt = now.Format(time.RFC3339)
 	}
 }
 

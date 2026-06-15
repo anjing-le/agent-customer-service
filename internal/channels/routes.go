@@ -249,10 +249,12 @@ func handleInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, cfg
 		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
+	_ = st.RecordChannelInboundAudit(channelInboundAudit(r, req, "ACCEPTED", "accepted", "channel inbound accepted"))
 	httpjson.OK(w, result)
 }
 
 func failChannelInbound(w http.ResponseWriter, r *http.Request, st store.Runtime, status int, code, message string, req inboundRequest) {
+	_ = st.RecordChannelInboundAudit(channelInboundAudit(r, req, "REJECTED", code, message))
 	_ = st.RecordChannelFailure(store.ChannelFailureEvent{
 		Channel:                strings.TrimSpace(req.Channel),
 		Code:                   code,
@@ -263,6 +265,31 @@ func failChannelInbound(w http.ResponseWriter, r *http.Request, st store.Runtime
 		CreatedAt:              time.Now().UTC().Format(time.RFC3339),
 	})
 	httpjson.Fail(w, status, code, message)
+}
+
+func channelInboundAudit(r *http.Request, req inboundRequest, status string, code string, reason string) store.ChannelInboundAudit {
+	return store.ChannelInboundAudit{
+		ID:                     fmt.Sprintf("channel_inbound_audit_%d", time.Now().UnixNano()),
+		Channel:                strings.TrimSpace(req.Channel),
+		ExternalConversationID: strings.TrimSpace(req.ExternalConversationID),
+		ExternalMessageID:      strings.TrimSpace(req.ExternalMessageID),
+		Origin:                 requestOrigin(r),
+		Status:                 status,
+		Code:                   code,
+		Reason:                 reason,
+		ReplayKey:              replayKey(req),
+		SignaturePreview:       signaturePreview(req.Signature),
+		ContentHash:            contentHash(req.Content),
+		CreatedAt:              time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+func signaturePreview(signature string) string {
+	signature = strings.TrimSpace(signature)
+	if len(signature) <= 12 {
+		return signature
+	}
+	return signature[:12]
 }
 
 func originAllowed(r *http.Request, integration store.ChannelIntegration) bool {

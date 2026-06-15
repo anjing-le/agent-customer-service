@@ -49,6 +49,53 @@ func TestInboundRouteRejectsInvalidSignature(t *testing.T) {
 	}
 }
 
+func TestInboundRouteRecordsAcceptedAndRejectedAudits(t *testing.T) {
+	st := store.NewSeedStore()
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, st, testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "这个商品能不能开发票？"
+	signature := ChannelSignature("WeChat", "wx-open-audit", timestamp, content)
+	body := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-audit","externalMessageId":"wechat-audit-1","customer":"微信客户","content":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", body)
+	req.Header.Set("X-Channel-Origin", "https://wechat.example.com")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	badBody := strings.NewReader(`{"channel":"WeChat","externalConversationId":"wx-open-audit","externalMessageId":"wechat-audit-2","customer":"微信客户","content":"你好","timestamp":"` + timestamp + `","signature":"bad-signature"}`)
+	badReq := httptest.NewRequest(http.MethodPost, "/api/channels/inbound", badBody)
+	badReq.Header.Set("X-Channel-Origin", "https://wechat.example.com")
+	badRec := httptest.NewRecorder()
+	mux.ServeHTTP(badRec, badReq)
+
+	if badRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", badRec.Code, badRec.Body.String())
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ChannelAudits) != 2 {
+		t.Fatalf("expected two channel inbound audits, got %#v", dashboard.ChannelAudits)
+	}
+	rejected := dashboard.ChannelAudits[0]
+	if rejected.Status != "REJECTED" || rejected.Code != "invalid_signature" || rejected.SignaturePreview != "bad-signatur" {
+		t.Fatalf("expected rejected invalid signature audit, got %#v", rejected)
+	}
+	accepted := dashboard.ChannelAudits[1]
+	if accepted.Status != "ACCEPTED" || accepted.Code != "accepted" || accepted.SignaturePreview != signature[:12] {
+		t.Fatalf("expected accepted audit, got %#v", accepted)
+	}
+	if accepted.SignaturePreview == signature {
+		t.Fatalf("expected signature preview to omit full signature, got %#v", accepted)
+	}
+}
+
 func TestInboundRouteRejectsStaleTimestamp(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())

@@ -251,6 +251,23 @@ func (s *PostgresStore) RecordChannelInbound(receipt ChannelInboundReceipt) (boo
 	return tag.RowsAffected() == 1, nil
 }
 
+func (s *PostgresStore) RecordChannelInboundAudit(audit ChannelInboundAudit) error {
+	normalizeChannelInboundAudit(&audit)
+	createdAt := time.Now().UTC()
+	if parsed, err := time.Parse(time.RFC3339, audit.CreatedAt); err == nil {
+		createdAt = parsed.UTC()
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into channel_inbound_audits (
+			id, channel, external_conversation_id, external_message_id, origin, status, code, reason, replay_key, signature_preview, content_hash, created_at
+		)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`, audit.ID, audit.Channel, audit.ExternalConversationID, audit.ExternalMessageID, audit.Origin, audit.Status, audit.Code, audit.Reason, audit.ReplayKey, audit.SignaturePreview, audit.ContentHash, createdAt); err != nil {
+		return fmt.Errorf("record channel inbound audit: %w", err)
+	}
+	return nil
+}
+
 func (s *PostgresStore) RecordChannelFailure(event ChannelFailureEvent) error {
 	if strings.TrimSpace(event.Channel) == "" {
 		event.Channel = "Unknown"
@@ -1319,6 +1336,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	channelAudits, err := s.listChannelInboundAudits()
+	if err != nil {
+		return Dashboard{}, err
+	}
 	alertPolicies, err := s.listChannelAlertPolicies(channelAlerts)
 	if err != nil {
 		return Dashboard{}, err
@@ -1377,6 +1398,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		Integrations:     integrations,
 		ChannelAlerts:    channelAlerts,
 		ChannelTrends:    channelTrends,
+		ChannelAudits:    channelAudits,
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
 		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications),
@@ -1739,6 +1761,47 @@ func (s *PostgresStore) listChannelFailureTrends() ([]ChannelFailureTrend, error
 		return nil, err
 	}
 	return trends, nil
+}
+
+func (s *PostgresStore) listChannelInboundAudits() ([]ChannelInboundAudit, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, channel, external_conversation_id, external_message_id, origin, status, code, reason, replay_key, signature_preview, content_hash, created_at
+		from channel_inbound_audits
+		order by created_at desc, id desc
+		limit 20
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel inbound audits: %w", err)
+	}
+	defer rows.Close()
+
+	audits := make([]ChannelInboundAudit, 0)
+	for rows.Next() {
+		var item ChannelInboundAudit
+		var createdAt time.Time
+		if err := rows.Scan(
+			&item.ID,
+			&item.Channel,
+			&item.ExternalConversationID,
+			&item.ExternalMessageID,
+			&item.Origin,
+			&item.Status,
+			&item.Code,
+			&item.Reason,
+			&item.ReplayKey,
+			&item.SignaturePreview,
+			&item.ContentHash,
+			&createdAt,
+		); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		audits = append(audits, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return audits, nil
 }
 
 func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
