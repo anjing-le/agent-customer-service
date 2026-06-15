@@ -450,6 +450,21 @@ type ChannelFailureResult = {
   code: string;
   reason: string;
 };
+type ChannelOpsHandoffPriority = {
+  rank: number;
+  channel: string;
+  severity: string;
+  source: string;
+  reason: string;
+  recommendedAction: string;
+  count: number;
+  actionType: string;
+  actionRef?: string;
+  actionLabel?: string;
+  notificationId?: string;
+  runbookStatus?: string;
+};
+
 type ChannelOpsReportSummary = {
   failureCount: number;
   activeRunbooks: number;
@@ -457,20 +472,7 @@ type ChannelOpsReportSummary = {
   retrying: number;
   deadLetters: number;
   channels: string[];
-  handoffPriorities?: Array<{
-    rank: number;
-    channel: string;
-    severity: string;
-    source: string;
-    reason: string;
-    recommendedAction: string;
-    count: number;
-    actionType: string;
-    actionRef?: string;
-    actionLabel: string;
-    notificationId?: string;
-    runbookStatus?: string;
-  }> | null;
+  handoffPriorities?: ChannelOpsHandoffPriority[] | null;
   inboundAudit?: {
     total: number;
     accepted: number;
@@ -801,6 +803,7 @@ function App() {
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
   const channelRunbooks = dashboard?.channelRunbooks ?? [];
+  const acknowledgedNotificationIds = new Set(channelNotifications.filter((item) => item.status === 'ACKED' || item.ackedBy).map((item) => item.id));
   const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
   const notificationPolicyChanges = dashboard?.notificationPolicyChanges ?? [];
   const protocolExamples = channelProtocolExamples.examples as unknown as ChannelProtocolExample[];
@@ -1226,6 +1229,27 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ack notification failed');
+    }
+  };
+
+  const acknowledgeHandoffPriority = async (report: ChannelOpsReport, priority: ChannelOpsHandoffPriority) => {
+    if (!priority.notificationId) {
+      setError('handoff priority has no notification to acknowledge');
+      return;
+    }
+    setError('');
+    try {
+      await api<ChannelNotification>('/api/ops/channel-notifications/ack', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: priority.notificationId,
+          actor: 'ops-a',
+          note: `handoff ${report.id} ${priority.actionRef ?? priority.source}: ${priority.actionLabel ?? priority.recommendedAction}`
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ack handoff failed');
     }
   };
 
@@ -2244,35 +2268,53 @@ function App() {
               </div>
             )}
             <div className="tableList compactList">
-              {channelOpsReports.map((report) => (
-                <article className="tableRow" key={report.id}>
-                  <div>
-                    <strong>{report.format.toUpperCase()} · {report.generatedAt.slice(0, 16).replace('T', ' ')}</strong>
-                    <span>{report.summary.failureCount} failures · {report.summary.activeRunbooks} runbooks · {report.summary.openNotifications + report.summary.retrying} open notices</span>
-                    {report.summary.inboundAudit && (
-                      <span>
-                        inbound {report.summary.inboundAudit.accepted}/{report.summary.inboundAudit.total} accepted · {report.summary.inboundAudit.acceptanceRate}%
-                        {(report.summary.inboundAudit.topErrorCodes ?? []).length > 0 ? ` · ${(report.summary.inboundAudit.topErrorCodes ?? []).map((item) => `${item.code}:${item.count}`).join(' / ')}` : ''}
-                      </span>
-                    )}
-                    {report.summary.inboundAuditQuality && (
-                      <span>
-                        quality events {report.summary.inboundAuditQuality.eventCount} · active {report.summary.inboundAuditQuality.active} · watch {report.summary.inboundAuditQuality.watch} · recovered {report.summary.inboundAuditQuality.recovered}
-                        {(report.summary.inboundAuditQuality.activeChannels ?? []).length > 0 ? ` · ${report.summary.inboundAuditQuality.activeChannels?.join(' / ')}` : ''}
-                      </span>
-                    )}
-                    {(report.summary.handoffPriorities ?? []).length > 0 && (
-                      <span>
-                        handoff {(report.summary.handoffPriorities ?? []).slice(0, 3).map((item) => `#${item.rank} ${item.channel} ${item.source} · ${item.actionLabel ?? item.actionType ?? item.source}`).join(' / ')}
-                      </span>
-                    )}
-                    <span>{(report.summary.channels ?? []).length > 0 ? (report.summary.channels ?? []).join(' / ') : 'ALL channels'}</span>
-                  </div>
-                  <button className="tinyButton" onClick={() => downloadSavedChannelOpsReport(report).catch((err) => setError(err instanceof Error ? err.message : 'download saved channel ops report failed'))} title="下载历史日报">
-                    <Download size={14} />
-                  </button>
-                </article>
-              ))}
+              {channelOpsReports.map((report) => {
+                const handoffActions = (report.summary.handoffPriorities ?? [])
+                  .filter((item, index, list) => item.notificationId && list.findIndex((next) => next.notificationId === item.notificationId) === index)
+                  .slice(0, 3);
+                return (
+                  <article className="tableRow" key={report.id}>
+                    <div>
+                      <strong>{report.format.toUpperCase()} · {report.generatedAt.slice(0, 16).replace('T', ' ')}</strong>
+                      <span>{report.summary.failureCount} failures · {report.summary.activeRunbooks} runbooks · {report.summary.openNotifications + report.summary.retrying} open notices</span>
+                      {report.summary.inboundAudit && (
+                        <span>
+                          inbound {report.summary.inboundAudit.accepted}/{report.summary.inboundAudit.total} accepted · {report.summary.inboundAudit.acceptanceRate}%
+                          {(report.summary.inboundAudit.topErrorCodes ?? []).length > 0 ? ` · ${(report.summary.inboundAudit.topErrorCodes ?? []).map((item) => `${item.code}:${item.count}`).join(' / ')}` : ''}
+                        </span>
+                      )}
+                      {report.summary.inboundAuditQuality && (
+                        <span>
+                          quality events {report.summary.inboundAuditQuality.eventCount} · active {report.summary.inboundAuditQuality.active} · watch {report.summary.inboundAuditQuality.watch} · recovered {report.summary.inboundAuditQuality.recovered}
+                          {(report.summary.inboundAuditQuality.activeChannels ?? []).length > 0 ? ` · ${report.summary.inboundAuditQuality.activeChannels?.join(' / ')}` : ''}
+                        </span>
+                      )}
+                      {(report.summary.handoffPriorities ?? []).length > 0 && (
+                        <span>
+                          handoff {(report.summary.handoffPriorities ?? []).slice(0, 3).map((item) => `#${item.rank} ${item.channel} ${item.source} · ${item.actionLabel ?? item.actionType ?? item.source}`).join(' / ')}
+                        </span>
+                      )}
+                      <span>{(report.summary.channels ?? []).length > 0 ? (report.summary.channels ?? []).join(' / ') : 'ALL channels'}</span>
+                    </div>
+                    <div className="gapActions">
+                      {handoffActions.map((item) => (
+                        <button
+                          className="tinyButton"
+                          disabled={item.notificationId ? acknowledgedNotificationIds.has(item.notificationId) : true}
+                          key={`${report.id}-${item.rank}-${item.notificationId}`}
+                          onClick={() => void acknowledgeHandoffPriority(report, item)}
+                          title={item.notificationId && acknowledgedNotificationIds.has(item.notificationId) ? '交接通知已确认' : item.actionLabel ?? '确认交接通知'}
+                        >
+                          <CheckCircle2 size={14} />
+                        </button>
+                      ))}
+                      <button className="tinyButton" onClick={() => downloadSavedChannelOpsReport(report).catch((err) => setError(err instanceof Error ? err.message : 'download saved channel ops report failed'))} title="下载历史日报">
+                        <Download size={14} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
               {channelOpsReports.length === 0 && <p className="empty">暂无历史日报</p>}
             </div>
             <div className="panelDivider" />
