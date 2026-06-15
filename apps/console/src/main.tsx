@@ -446,6 +446,19 @@ type ChannelOpsReport = {
   summary: ChannelOpsReportSummary;
   generatedAt: string;
 };
+type ChannelOpsReportScheduler = {
+  enabled: boolean;
+  format: 'markdown' | 'csv';
+  intervalMins: number;
+  retain: number;
+  runOnStart: boolean;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  lastReportId?: string;
+  lastStatus: 'DISABLED' | 'PENDING' | 'SUCCESS' | 'FAILED';
+  lastError?: string;
+  lastPruned: number;
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
@@ -661,6 +674,7 @@ function App() {
   const [annotationSaving, setAnnotationSaving] = useState(false);
   const [trainingSamples, setTrainingSamples] = useState<TrainingSample[]>([]);
   const [channelOpsReports, setChannelOpsReports] = useState<ChannelOpsReport[]>([]);
+  const [reportScheduler, setReportScheduler] = useState<ChannelOpsReportScheduler | null>(null);
   const [reportGenerating, setReportGenerating] = useState('');
   const [channelDemoSending, setChannelDemoSending] = useState('');
   const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
@@ -744,16 +758,18 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData, sampleData, reportData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
         api<KnowledgeArticle[]>('/api/knowledge/articles'),
         api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
-        api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6')
+        api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6'),
+        api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler')
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData);
       setTrainingSamples(sampleData);
       setChannelOpsReports(reportData);
+      setReportScheduler(schedulerData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1743,6 +1759,16 @@ function App() {
                   <Save size={14} />
                 </button>
               </div>
+            </div>
+            <div className="schedulerStrip">
+              <span className={reportScheduler?.enabled ? 'status' : 'status muted'}>{reportScheduler?.enabled ? 'Scheduler on' : 'Scheduler off'}</span>
+              <span>{reportScheduler?.format ?? 'markdown'} · every {reportScheduler?.intervalMins ?? 1440}m</span>
+              <span>retain {reportScheduler?.retain ?? 30}</span>
+              <span>{reportScheduler?.lastStatus ?? 'DISABLED'}</span>
+              {reportScheduler?.lastRunAt && <span>last {reportScheduler.lastRunAt.slice(5, 16).replace('T', ' ')}</span>}
+              {reportScheduler?.nextRunAt && <span>next {reportScheduler.nextRunAt.slice(5, 16).replace('T', ' ')}</span>}
+              {reportScheduler?.lastReportId && <span>{reportScheduler.lastReportId}</span>}
+              {reportScheduler?.lastError && <span className="dangerText">{reportScheduler.lastError}</span>}
             </div>
             <div className="tableList compactList">
               {channelOpsReports.map((report) => (

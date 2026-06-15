@@ -51,3 +51,24 @@ func TestReportSchedulerRunOnceHonorsCanceledContext(t *testing.T) {
 		t.Fatal("expected canceled context error")
 	}
 }
+
+func TestReportSchedulerStatusTracksRunResult(t *testing.T) {
+	st := store.NewSeedStore()
+	scheduler := NewReportScheduler(st, ReportSchedulerConfig{
+		Enabled:    true,
+		Format:     "csv",
+		Interval:   30 * time.Minute,
+		Retain:     5,
+		RunOnStart: true,
+	}, nil)
+
+	scheduler.runAndLog(context.Background())
+	status := scheduler.Status()
+
+	if !status.Enabled || status.Format != "csv" || status.IntervalMins != 30 || status.Retain != 5 || !status.RunOnStart {
+		t.Fatalf("expected scheduler config in status, got %#v", status)
+	}
+	if status.LastStatus != "SUCCESS" || status.LastReportID == "" || status.LastRunAt == "" || status.NextRunAt == "" {
+		t.Fatalf("expected successful run status, got %#v", status)
+	}
+}

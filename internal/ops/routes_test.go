@@ -1,11 +1,13 @@
 package ops
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
 )
@@ -598,6 +600,34 @@ func TestGenerateChannelOpsReportRouteRejectsInvalidFormat(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "format must be markdown or csv") {
 		t.Fatalf("expected validation error, got %s", rec.Body.String())
+	}
+}
+
+func TestChannelOpsReportSchedulerRouteReturnsStatus(t *testing.T) {
+	st := store.NewSeedStore()
+	scheduler := NewReportScheduler(st, ReportSchedulerConfig{
+		Enabled:    true,
+		Format:     "csv",
+		Interval:   15 * time.Minute,
+		Retain:     7,
+		RunOnStart: true,
+	}, nil)
+	scheduler.runAndLog(context.Background())
+
+	mux := http.NewServeMux()
+	RegisterWithReportScheduler(mux, st, scheduler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report-scheduler", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"enabled":true`, `"format":"csv"`, `"intervalMins":15`, `"retain":7`, `"runOnStart":true`, `"lastStatus":"SUCCESS"`, `"lastReportId":"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in scheduler status, got %s", expected, rec.Body.String())
+		}
 	}
 }
 

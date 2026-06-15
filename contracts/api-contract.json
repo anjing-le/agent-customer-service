@@ -264,6 +264,13 @@
       "response": { "status": 200, "schema": "ChannelOpsReportExport" }
     },
     {
+      "id": "channelOpsReportScheduler",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-ops-report-scheduler",
+      "response": { "status": 200, "schema": "ChannelOpsReportScheduler" }
+    },
+    {
       "id": "listChannelOpsReports",
       "boundary": "ops",
       "method": "GET",
@@ -564,6 +571,22 @@
         "retrying": "number",
         "deadLetters": "number",
         "channels": "string[]"
+      }
+    },
+    "ChannelOpsReportScheduler": {
+      "required": ["enabled", "format", "intervalMins", "retain", "runOnStart", "lastStatus", "lastPruned"],
+      "fields": {
+        "enabled": "boolean",
+        "format": "markdown|csv",
+        "intervalMins": "number",
+        "retain": "number",
+        "runOnStart": "boolean",
+        "lastRunAt": "RFC3339 string",
+        "nextRunAt": "RFC3339 string",
+        "lastReportId": "string",
+        "lastStatus": "DISABLED|PENDING|SUCCESS|FAILED",
+        "lastError": "string",
+        "lastPruned": "number"
       }
     },
     "Conversation": {

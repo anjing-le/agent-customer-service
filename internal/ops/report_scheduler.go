@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/platform/store"
@@ -21,6 +22,22 @@ type ReportScheduler struct {
 	st     store.Runtime
 	cfg    ReportSchedulerConfig
 	logger *slog.Logger
+	mu     sync.RWMutex
+	status ReportSchedulerStatus
+}
+
+type ReportSchedulerStatus struct {
+	Enabled      bool   `json:"enabled"`
+	Format       string `json:"format"`
+	IntervalMins int    `json:"intervalMins"`
+	Retain       int    `json:"retain"`
+	RunOnStart   bool   `json:"runOnStart"`
+	LastRunAt    string `json:"lastRunAt,omitempty"`
+	NextRunAt    string `json:"nextRunAt,omitempty"`
+	LastReportID string `json:"lastReportId,omitempty"`
+	LastStatus   string `json:"lastStatus"`
+	LastError    string `json:"lastError,omitempty"`
+	LastPruned   int    `json:"lastPruned"`
 }
 
 func NewReportScheduler(st store.Runtime, cfg ReportSchedulerConfig, logger *slog.Logger) *ReportScheduler {
@@ -28,14 +45,24 @@ func NewReportScheduler(st store.Runtime, cfg ReportSchedulerConfig, logger *slo
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &ReportScheduler{st: st, cfg: cfg, logger: logger}
+	return &ReportScheduler{st: st, cfg: cfg, logger: logger, status: initialReportSchedulerStatus(cfg)}
 }
 
 func (s *ReportScheduler) Start(ctx context.Context) {
 	if s == nil || s.st == nil || !s.cfg.Enabled {
 		return
 	}
+	s.setNextRun(time.Now().UTC().Add(s.cfg.Interval))
 	go s.loop(ctx)
+}
+
+func (s *ReportScheduler) Status() ReportSchedulerStatus {
+	if s == nil {
+		return initialReportSchedulerStatus(ReportSchedulerConfig{})
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.status
 }
 
 func (s *ReportScheduler) RunOnce(ctx context.Context) (store.ChannelOpsReport, int, error) {
@@ -82,10 +109,56 @@ func (s *ReportScheduler) loop(ctx context.Context) {
 func (s *ReportScheduler) runAndLog(ctx context.Context) {
 	report, pruned, err := s.RunOnce(ctx)
 	if err != nil {
+		s.recordRunFailure(err)
 		s.logger.Error("channel ops report scheduler failed", "error", err)
 		return
 	}
+	s.recordRunSuccess(report, pruned)
 	s.logger.Info("channel ops report generated", "id", report.ID, "format", report.Format, "pruned", pruned)
+}
+
+func (s *ReportScheduler) recordRunSuccess(report store.ChannelOpsReport, pruned int) {
+	now := time.Now().UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status.LastRunAt = now.Format(time.RFC3339)
+	s.status.NextRunAt = now.Add(s.cfg.Interval).Format(time.RFC3339)
+	s.status.LastReportID = report.ID
+	s.status.LastStatus = "SUCCESS"
+	s.status.LastError = ""
+	s.status.LastPruned = pruned
+}
+
+func (s *ReportScheduler) recordRunFailure(err error) {
+	now := time.Now().UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status.LastRunAt = now.Format(time.RFC3339)
+	s.status.NextRunAt = now.Add(s.cfg.Interval).Format(time.RFC3339)
+	s.status.LastStatus = "FAILED"
+	s.status.LastError = err.Error()
+}
+
+func (s *ReportScheduler) setNextRun(next time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status.NextRunAt = next.UTC().Format(time.RFC3339)
+}
+
+func initialReportSchedulerStatus(cfg ReportSchedulerConfig) ReportSchedulerStatus {
+	cfg = normalizeReportSchedulerConfig(cfg)
+	status := "DISABLED"
+	if cfg.Enabled {
+		status = "PENDING"
+	}
+	return ReportSchedulerStatus{
+		Enabled:      cfg.Enabled,
+		Format:       cfg.Format,
+		IntervalMins: int(cfg.Interval / time.Minute),
+		Retain:       cfg.Retain,
+		RunOnStart:   cfg.RunOnStart,
+		LastStatus:   status,
+	}
 }
 
 func normalizeReportSchedulerConfig(cfg ReportSchedulerConfig) ReportSchedulerConfig {

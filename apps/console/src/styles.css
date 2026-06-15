@@ -334,6 +334,33 @@ h2 {
   background: #fde8e2;
 }
 
+.status.muted {
+  color: #66756f;
+  background: #edf2ef;
+}
+
+.schedulerStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 2px;
+  color: #61726b;
+  font-size: 12px;
+}
+
+.schedulerStrip span:not(.status) {
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #edf2ef;
+  border-radius: 6px;
+  background: #fbfdfb;
+}
+
+.dangerText {
+  color: #8d2b1f;
+}
+
 .activeSession {
   display: grid;
   gap: 4px;

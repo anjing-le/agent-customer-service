@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/anjing-le/agent-customer-service/internal/ops"
@@ -28,14 +29,18 @@ func main() {
 		defer pool.Close()
 		st = store.NewPostgresStore(pool, postgresOptions...)
 	}
-	ops.NewReportScheduler(st, ops.ReportSchedulerConfig{
+	reportScheduler := ops.NewReportScheduler(st, ops.ReportSchedulerConfig{
 		Enabled:    cfg.Reports.SchedulerEnabled,
 		Format:     cfg.Reports.SchedulerFormat,
 		Interval:   time.Duration(cfg.Reports.SchedulerIntervalMins) * time.Minute,
 		Retain:     cfg.Reports.SchedulerRetain,
 		RunOnStart: cfg.Reports.SchedulerRunOnStartup,
-	}, nil).Start(context.Background())
-	mux := service.NewMux(cfg.ServiceName, st, ops.Register)
+	}, nil)
+	reportScheduler.Start(context.Background())
+	opsRegister := func(mux *http.ServeMux, st store.Runtime) {
+		ops.RegisterWithReportScheduler(mux, st, reportScheduler)
+	}
+	mux := service.NewMux(cfg.ServiceName, st, opsRegister)
 	if err := service.Listen(cfg.Addr, cfg.ServiceName, mux); err != nil {
 		panic(err)
 	}

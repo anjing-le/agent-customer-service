@@ -31,6 +31,7 @@
 | `ChannelNotification` | 渠道告警出站通知事件，记录目标 URL、secret ref、HMAC 签名、发送次数、退避重试、外部回执、投递审计摘要、死信原因和运营确认 | `Dashboard.channelNotifications` |
 | `ChannelRunbook` | 渠道失败告警的运营处置步骤，由失败聚合、通知状态和告警策略派生，给出下一步、升级条件和检查项 | `Dashboard.channelRunbooks` |
 | `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
+| `ReportSchedulerStatus` | 渠道运营日报后台调度状态，暴露开关、格式、间隔、保留数量、最近运行结果和下一次运行时间 | `/api/ops/channel-ops-report-scheduler` |
 | `NotificationDeliveryAudit` | 通知投递审计记录，只保存 attempt、目标、secret ref、签名预览、payload hash 和脱敏请求/响应摘要，不保存完整 signed payload 或密钥值 | `ChannelNotification.deliveryAudit` |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |
@@ -61,7 +62,7 @@ user message
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
-| 渠道观测 | Dashboard 聚合失败类型、小时趋势、通知策略、通知事件和处置 Runbook；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认 |
+| 渠道观测 | Dashboard 聚合失败类型、小时趋势、通知策略、通知事件和处置 Runbook；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认；日报调度状态单独暴露，避免把后台任务状态混进实时 Dashboard |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
 | 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |

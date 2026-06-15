@@ -14,6 +14,14 @@ import (
 )
 
 func Register(mux *http.ServeMux, st store.Runtime) {
+	registerRoutes(mux, st, nil)
+}
+
+func RegisterWithReportScheduler(mux *http.ServeMux, st store.Runtime, scheduler *ReportScheduler) {
+	registerRoutes(mux, st, scheduler)
+}
+
+func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportScheduler) {
 	mux.HandleFunc("/api/ops/dashboard", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -24,6 +32,17 @@ func Register(mux *http.ServeMux, st store.Runtime) {
 			return
 		}
 		httpjson.OK(w, dashboard)
+	})
+
+	mux.HandleFunc("/api/ops/channel-ops-report-scheduler", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		if scheduler == nil {
+			httpjson.OK(w, initialReportSchedulerStatus(ReportSchedulerConfig{}))
+			return
+		}
+		httpjson.OK(w, scheduler.Status())
 	})
 
 	mux.HandleFunc("/api/ops/channel-ops-report/export", func(w http.ResponseWriter, r *http.Request) {

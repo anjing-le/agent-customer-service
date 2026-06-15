@@ -45,14 +45,18 @@ func main() {
 			SignatureWindow: time.Duration(cfg.Channels.SignatureWindowSeconds) * time.Second,
 		})
 	}
-	ops.NewReportScheduler(st, ops.ReportSchedulerConfig{
+	reportScheduler := ops.NewReportScheduler(st, ops.ReportSchedulerConfig{
 		Enabled:    cfg.Reports.SchedulerEnabled,
 		Format:     cfg.Reports.SchedulerFormat,
 		Interval:   time.Duration(cfg.Reports.SchedulerIntervalMins) * time.Minute,
 		Retain:     cfg.Reports.SchedulerRetain,
 		RunOnStart: cfg.Reports.SchedulerRunOnStartup,
-	}, nil).Start(context.Background())
-	mux := service.NewMux(cfg.ServiceName, st, customer.Register, channelRegister, knowledge.Register, ops.Register)
+	}, nil)
+	reportScheduler.Start(context.Background())
+	opsRegister := func(mux *http.ServeMux, st store.Runtime) {
+		ops.RegisterWithReportScheduler(mux, st, reportScheduler)
+	}
+	mux := service.NewMux(cfg.ServiceName, st, customer.Register, channelRegister, knowledge.Register, opsRegister)
 	consoleweb.Register(mux, cfg.StaticDir)
 	if err := service.Listen(cfg.Addr, cfg.ServiceName, mux); err != nil {
 		panic(err)
