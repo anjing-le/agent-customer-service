@@ -949,6 +949,7 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 	}
 	summary.InboundAudit = channelInboundAuditSummary(dashboard.ChannelAudits)
 	summary.InboundAuditQuality = channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	summary.HandoffPriorities = channelOpsHandoffPriorities(dashboard)
 	for _, channel := range append(append(summary.InboundAuditQuality.ActiveChannels, summary.InboundAuditQuality.WatchChannels...), summary.InboundAuditQuality.RecoveredChannels...) {
 		if channel != "" && !seenChannels[channel] {
 			seenChannels[channel] = true
@@ -956,6 +957,125 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 		}
 	}
 	return summary
+}
+
+type channelOpsHandoffCandidate struct {
+	item  store.ChannelOpsHandoffPriority
+	score int
+}
+
+func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHandoffPriority {
+	candidates := make([]channelOpsHandoffCandidate, 0)
+	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	eventByChannel := latestChannelInboundAuditQualityEventByChannel(dashboard.AuditEvents)
+	for _, channel := range inboundQuality.ActiveChannels {
+		event := eventByChannel[channel]
+		snapshot := channelAuditQuality(dashboard.ChannelAudits, channel)
+		reason := fmt.Sprintf("inbound acceptance is %d%% with %d samples", snapshot.AcceptanceRate, snapshot.Total)
+		if event.FailureCode != "" {
+			reason = fmt.Sprintf("%s; top failure `%s`", reason, event.FailureCode)
+		}
+		candidates = append(candidates, channelOpsHandoffCandidate{
+			score: 400000 + snapshot.TopErrorCount,
+			item: store.ChannelOpsHandoffPriority{
+				Channel:           channel,
+				Severity:          fallbackReportValue(event.Severity),
+				Source:            "INBOUND_AUDIT_ACTIVE",
+				Reason:            reason,
+				RecommendedAction: "pause blind channel rollout, inspect signature/origin/replay configuration, then rerun inbound examples",
+				Count:             snapshot.TopErrorCount,
+			},
+		})
+	}
+	for _, notification := range dashboard.Notifications {
+		switch notification.Status {
+		case "DEAD_LETTER":
+			candidates = append(candidates, channelOpsHandoffCandidate{
+				score: 300000 + notification.Attempts,
+				item: store.ChannelOpsHandoffPriority{
+					Channel:           notification.Channel,
+					Severity:          fallbackReportValue(notification.Severity),
+					Source:            "DEAD_LETTER",
+					Reason:            fallbackReportValue(notification.DeadLetterReason),
+					RecommendedAction: "acknowledge the dead letter, inspect delivery audit, and repair the webhook target before replay",
+					Count:             notification.Attempts,
+				},
+			})
+		case "RETRYING":
+			candidates = append(candidates, channelOpsHandoffCandidate{
+				score: 100000 + notification.Attempts,
+				item: store.ChannelOpsHandoffPriority{
+					Channel:           notification.Channel,
+					Severity:          fallbackReportValue(notification.Severity),
+					Source:            "RETRYING_DELIVERY",
+					Reason:            fallbackReportValue(notification.LastError),
+					RecommendedAction: "check target health before retry budget is exhausted",
+					Count:             notification.Attempts,
+				},
+			})
+		}
+	}
+	alerts := append([]store.ChannelAlert(nil), dashboard.ChannelAlerts...)
+	sort.Slice(alerts, func(i, j int) bool {
+		if alerts[i].Count == alerts[j].Count {
+			if alerts[i].Channel == alerts[j].Channel {
+				return alerts[i].Code < alerts[j].Code
+			}
+			return alerts[i].Channel < alerts[j].Channel
+		}
+		return alerts[i].Count > alerts[j].Count
+	})
+	for _, alert := range alerts {
+		candidates = append(candidates, channelOpsHandoffCandidate{
+			score: 200000 + alert.Count,
+			item: store.ChannelOpsHandoffPriority{
+				Channel:           alert.Channel,
+				Severity:          "WATCH",
+				Source:            "HIGH_FREQUENCY_FAILURE",
+				Reason:            fmt.Sprintf("%d `%s` failures; last reason %s", alert.Count, alert.Code, fallbackReportValue(alert.LastReason)),
+				RecommendedAction: "compare the latest failure origin with channel policy and runbook checks",
+				Count:             alert.Count,
+			},
+		})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].score == candidates[j].score {
+			if candidates[i].item.Channel == candidates[j].item.Channel {
+				return candidates[i].item.Source < candidates[j].item.Source
+			}
+			return candidates[i].item.Channel < candidates[j].item.Channel
+		}
+		return candidates[i].score > candidates[j].score
+	})
+	priorities := make([]store.ChannelOpsHandoffPriority, 0, len(candidates))
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		key := candidate.item.Source + ":" + candidate.item.Channel + ":" + candidate.item.Reason
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		candidate.item.Rank = len(priorities) + 1
+		priorities = append(priorities, candidate.item)
+		if len(priorities) == 6 {
+			break
+		}
+	}
+	return priorities
+}
+
+func latestChannelInboundAuditQualityEventByChannel(events []store.ChannelInboundAuditQualityEvent) map[string]store.ChannelInboundAuditQualityEvent {
+	latest := map[string]store.ChannelInboundAuditQualityEvent{}
+	for _, event := range events {
+		if strings.TrimSpace(event.Channel) == "" {
+			continue
+		}
+		if _, exists := latest[event.Channel]; exists {
+			continue
+		}
+		latest[event.Channel] = event
+	}
+	return latest
 }
 
 func channelInboundAuditSummary(audits []store.ChannelInboundAudit) store.ChannelInboundAuditSummary {
@@ -1098,6 +1218,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	}
 	inboundAudit := channelInboundAuditSummary(dashboard.ChannelAudits)
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	handoffPriorities := channelOpsHandoffPriorities(dashboard)
 
 	var b strings.Builder
 	b.WriteString("# Agent Customer Service Channel Ops Report\n\n")
@@ -1107,7 +1228,18 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
 	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
 	b.WriteString(fmt.Sprintf("- Inbound quality events: total=%d active=%d watch=%d recovered=%d\n", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered))
+	b.WriteString(fmt.Sprintf("- Handoff priorities: %d\n", len(handoffPriorities)))
 	b.WriteString(fmt.Sprintf("- Notifications: open=%d retrying=%d dead_letter=%d\n\n", openNotifications, retryingNotifications, deadLetters))
+
+	b.WriteString("## Handoff Priorities\n\n")
+	if len(handoffPriorities) == 0 {
+		b.WriteString("- No urgent handoff items.\n\n")
+	} else {
+		for _, item := range handoffPriorities {
+			b.WriteString(fmt.Sprintf("%d. %s `%s` [%s]: %s. Next: %s\n", item.Rank, item.Channel, item.Source, item.Severity, item.Reason, item.RecommendedAction))
+		}
+		b.WriteString("\n")
+	}
 
 	b.WriteString("## Alerts\n\n")
 	if len(dashboard.ChannelAlerts) == 0 {
@@ -1225,6 +1357,11 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 	}
 	for _, channel := range inboundQuality.RecoveredChannels {
 		if err := writer.Write([]string{"inbound_quality_channel", channel, "RECOVERED", "", "", "", "current audit quality recovered", ""}); err != nil {
+			return nil, err
+		}
+	}
+	for _, item := range channelOpsHandoffPriorities(dashboard) {
+		if err := writer.Write([]string{"handoff_priority", item.Channel, item.Severity, item.Source, fmt.Sprintf("%d", item.Count), "", item.RecommendedAction, item.Reason}); err != nil {
 			return nil, err
 		}
 	}

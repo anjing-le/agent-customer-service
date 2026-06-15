@@ -457,6 +457,15 @@ type ChannelOpsReportSummary = {
   retrying: number;
   deadLetters: number;
   channels: string[];
+  handoffPriorities?: Array<{
+    rank: number;
+    channel: string;
+    severity: string;
+    source: string;
+    reason: string;
+    recommendedAction: string;
+    count: number;
+  }> | null;
   inboundAudit?: {
     total: number;
     accepted: number;
@@ -2245,6 +2254,11 @@ function App() {
                       <span>
                         quality events {report.summary.inboundAuditQuality.eventCount} · active {report.summary.inboundAuditQuality.active} · watch {report.summary.inboundAuditQuality.watch} · recovered {report.summary.inboundAuditQuality.recovered}
                         {(report.summary.inboundAuditQuality.activeChannels ?? []).length > 0 ? ` · ${report.summary.inboundAuditQuality.activeChannels?.join(' / ')}` : ''}
+                      </span>
+                    )}
+                    {(report.summary.handoffPriorities ?? []).length > 0 && (
+                      <span>
+                        handoff {(report.summary.handoffPriorities ?? []).slice(0, 3).map((item) => `#${item.rank} ${item.channel} ${item.source}`).join(' / ')}
                       </span>
                     )}
                     <span>{(report.summary.channels ?? []).length > 0 ? (report.summary.channels ?? []).join(' / ') : 'ALL channels'}</span>

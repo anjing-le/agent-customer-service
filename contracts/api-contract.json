@@ -739,7 +739,19 @@
         "deadLetters": "number",
         "channels": "string[]",
         "inboundAudit": "ChannelInboundAuditSummary",
-        "inboundAuditQuality": "ChannelInboundAuditQualitySummary"
+        "inboundAuditQuality": "ChannelInboundAuditQualitySummary",
+        "handoffPriorities": "ChannelOpsHandoffPriority[]"
+      }
+    },
+    "ChannelOpsHandoffPriority": {
+      "fields": {
+        "rank": "number",
+        "channel": "string",
+        "severity": "string",
+        "source": "INBOUND_AUDIT_ACTIVE|DEAD_LETTER|HIGH_FREQUENCY_FAILURE|RETRYING_DELIVERY",
+        "reason": "string",
+        "recommendedAction": "string",
+        "count": "number"
       }
     },
     "ChannelInboundAuditQualitySummary": {

@@ -34,6 +34,7 @@
 | `ChannelRunbook` | 渠道失败告警与入站验收质量的运营处置步骤，由失败聚合、通知状态、告警策略和按渠道配置的验收质量阈值派生，给出下一步、升级条件和检查项 | `Dashboard.channelRunbooks` |
 | `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
 | `ChannelInboundAuditSummary` | 渠道验收摘要，统计 accepted/rejected、验收率和高频错误码，用于 Dashboard 日报和运营交接 | `ChannelOpsReport.summary.inboundAudit` |
+| `ChannelOpsHandoffPriority` | 运营日报交接优先级，按 ACTIVE 验收越线、死信、高频失败和重试通知排序，给出原因和下一步动作 | `ChannelOpsReport.summary.handoffPriorities` |
 | `ReportSchedulerStatus` | 渠道运营日报后台调度状态，暴露开关、格式、间隔、保留数量、最近运行结果和下一次运行时间 | `/api/ops/channel-ops-report-scheduler` |
 | `ChannelOpsReportEvent` | 渠道运营日报补偿事件，记录操作者、动作、结果、关联日报、prune 数量、备注和错误，支持按状态/操作者筛选和 CSV 导出 | `/api/ops/channel-ops-report-events` |
 | `NotificationDeliveryAudit` | 通知投递审计记录，只保存 attempt、目标、secret ref、签名预览、payload hash 和脱敏请求/响应摘要，不保存完整 signed payload 或密钥值 | `ChannelNotification.deliveryAudit` |
