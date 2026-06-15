@@ -1339,7 +1339,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelAudits:    append([]ChannelInboundAudit(nil), s.inboundAudits...),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
-		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications),
+		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications, s.inboundAudits),
 		PolicyEvents:     append([]NotificationPolicyEvent(nil), s.policyEvents...),
 		PolicyChanges:    append([]NotificationPolicyChange(nil), s.policyChanges...),
 		Quality:          quality,
@@ -2839,7 +2839,7 @@ func channelAlertCount(alerts []ChannelAlert) int {
 	return total
 }
 
-func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notifications []ChannelNotification) []ChannelRunbook {
+func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notifications []ChannelNotification, audits []ChannelInboundAudit) []ChannelRunbook {
 	runbooks := make([]ChannelRunbook, 0)
 	for _, policy := range policies {
 		if !policy.Active {
@@ -2892,7 +2892,101 @@ func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notif
 			Steps:             steps,
 		})
 	}
+	runbooks = append(runbooks, channelInboundAuditRunbooks(audits, policies)...)
 	return runbooks
+}
+
+func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []ChannelAlertPolicy) []ChannelRunbook {
+	type auditQuality struct {
+		channel       string
+		total         int
+		accepted      int
+		rejected      int
+		codeCounts    map[string]int
+		codeOrder     []string
+		lastCreatedAt string
+	}
+	qualityByChannel := make(map[string]*auditQuality)
+	channelOrder := make([]string, 0)
+	for _, audit := range audits {
+		channel := fallback(audit.Channel, "Unknown")
+		quality, exists := qualityByChannel[channel]
+		if !exists {
+			quality = &auditQuality{channel: channel, codeCounts: make(map[string]int)}
+			qualityByChannel[channel] = quality
+			channelOrder = append(channelOrder, channel)
+		}
+		quality.total++
+		if strings.EqualFold(audit.Status, "ACCEPTED") {
+			quality.accepted++
+		} else {
+			quality.rejected++
+			code := fallback(audit.Code, "inbound_rejected")
+			if _, exists := quality.codeCounts[code]; !exists {
+				quality.codeOrder = append(quality.codeOrder, code)
+			}
+			quality.codeCounts[code]++
+		}
+		if audit.CreatedAt > quality.lastCreatedAt {
+			quality.lastCreatedAt = audit.CreatedAt
+		}
+	}
+
+	runbooks := make([]ChannelRunbook, 0)
+	for _, channel := range channelOrder {
+		quality := qualityByChannel[channel]
+		if quality.total < 3 || quality.rejected == 0 {
+			continue
+		}
+		acceptanceRate := quality.accepted * 100 / quality.total
+		topCode := topInboundAuditCode(quality.codeCounts, quality.codeOrder)
+		topCodeCount := quality.codeCounts[topCode]
+		if acceptanceRate >= 80 && topCodeCount < 2 {
+			continue
+		}
+		policy := notificationPolicyFor(policies, channel)
+		severity := policy.Severity
+		status := "WATCH"
+		if acceptanceRate < 70 {
+			severity = "HIGH"
+		}
+		if acceptanceRate < 50 {
+			status = "ESCALATE"
+		}
+		failureCode := topCode
+		if failureCode == "" {
+			failureCode = "inbound_acceptance_low"
+		}
+		runbooks = append(runbooks, ChannelRunbook{
+			Channel:     channel,
+			Severity:    severity,
+			Status:      status,
+			FailureCode: failureCode,
+			Owner:       policy.NotifyTarget,
+			NextAction:  fmt.Sprintf("最近 %d 次入站验收率为 %d%%，复核验签、来源白名单、时间窗和 replay key。", quality.total, acceptanceRate),
+			Escalation:  "若验收率持续低于 80% 或同一错误码连续出现，升级 platform-owner 与渠道 owner。",
+			Steps: []string{
+				"查看渠道验收审计筛选同一错误码的最近样本",
+				"核对 ChannelIntegration 的 allowed origins、active/next secret ref 和签名窗口",
+				"按 external message id、replay key 和 content hash 对账重复请求",
+				"确认渠道平台签名头和 timestamp 语义是否与协议矩阵一致",
+			},
+		})
+	}
+	return runbooks
+}
+
+func topInboundAuditCode(counts map[string]int, order []string) string {
+	topCode := ""
+	topCount := 0
+	for _, code := range order {
+		count := counts[code]
+		if count > topCount {
+			topCode = code
+			topCount = count
+		}
+	}
+	return topCode
 }
 
 func latestChannelAlert(alerts []ChannelAlert, channel string) ChannelAlert {

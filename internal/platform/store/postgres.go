@@ -1405,7 +1405,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		ChannelAudits:    channelAudits,
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
-		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications),
+		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications, channelAudits),
 		PolicyEvents:     policyEvents,
 		PolicyChanges:    policyChanges,
 		Quality:          qualitySummary(messages, gaps, transfers, annotations),

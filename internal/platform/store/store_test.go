@@ -550,6 +550,42 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	}
 }
 
+func TestChannelInboundAuditQualityCreatesRunbook(t *testing.T) {
+	st := NewSeedStore()
+	audits := []ChannelInboundAudit{
+		{Channel: "WeChat", Status: "ACCEPTED", Code: "accepted"},
+		{Channel: "WeChat", Status: "REJECTED", Code: "invalid_signature"},
+		{Channel: "WeChat", Status: "REJECTED", Code: "invalid_signature"},
+		{Channel: "WeChat", Status: "REJECTED", Code: "invalid_signature"},
+	}
+	for _, audit := range audits {
+		if err := st.RecordChannelInboundAudit(audit); err != nil {
+			t.Fatalf("record channel inbound audit: %v", err)
+		}
+	}
+
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	var runbook ChannelRunbook
+	for _, item := range dashboard.ChannelRunbooks {
+		if item.Channel == "WeChat" && item.FailureCode == "invalid_signature" {
+			runbook = item
+			break
+		}
+	}
+	if runbook.Channel == "" {
+		t.Fatalf("expected inbound audit runbook, got %#v", dashboard.ChannelRunbooks)
+	}
+	if runbook.Status != "ESCALATE" || runbook.Severity != "HIGH" || runbook.Owner == "" {
+		t.Fatalf("expected high severity audit escalation, got %#v", runbook)
+	}
+	if len(runbook.Steps) == 0 || !strings.Contains(runbook.NextAction, "验收率") {
+		t.Fatalf("expected audit-specific runbook guidance, got %#v", runbook)
+	}
+}
+
 func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	st := NewSeedStore()
 	policy, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/marketplace", "ANJING_NOTIFICATION_CUSTOM_SECRET", 5, 45, "ops-a", "切换到生产通知目标")

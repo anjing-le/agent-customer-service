@@ -2218,7 +2218,7 @@ function App() {
             </div>
             <div className="runbookList">
               {channelRunbooks.slice(0, 4).map((item) => (
-                <article className="runbookItem" key={`${item.channel}-${item.status}`}>
+                <article className="runbookItem" key={`${item.channel}-${item.status}-${item.failureCode}`}>
                   <div>
                     <strong>{item.channel} · {item.status}</strong>
                     <span>{item.failureCode} · {item.owner}</span>
