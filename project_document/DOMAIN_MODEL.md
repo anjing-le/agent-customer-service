@@ -10,6 +10,7 @@
 | `ChannelInboundMessage` | 外部渠道进入系统的标准化消息，包含渠道、外部会话 ID、客户和内容 | `/api/channels/inbound` |
 | `ChannelInboundReceipt` | 渠道入站流水，记录 replay key、外部消息 ID、签名、时间戳和内容 hash，用于防重复提交和渠道对账 | `channel_inbound_events` |
 | `ChannelInboundAudit` | 渠道入站验收审计，记录来源、验签/限流/幂等结果、失败原因、签名预览、replay key 和内容 hash，不保存完整 payload 或密钥，支持按渠道/状态/错误码筛选和 CSV 导出 | `/api/ops/channel-inbound-audits` |
+| `ChannelInboundAuditQualityEvent` | 渠道验收质量越线事件，记录触发时的验收率、阈值快照、高频错误码和处置状态，支持筛选和 CSV 导出 | `/api/ops/channel-inbound-audit-quality-events` |
 | `ChannelAdapterRequest` | 真实渠道回调的薄适配请求，例如 WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu 字段映射 | `/api/channels/*/inbound` 与 `contracts/channel-protocol-matrix.json` |
 | `Message` | 用户或助手的一条消息，包含回复引擎、证据、兜底原因和 trace | `SendMessage` runtime |
 | `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
@@ -65,7 +66,7 @@ user message
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
-| 渠道观测 | Dashboard 聚合失败类型、小时趋势、按渠道配置的验收质量阈值、通知策略、通知事件和处置 Runbook；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认；日报调度状态单独暴露，补偿动作单独留痕，避免把后台任务状态混进实时 Dashboard |
+| 渠道观测 | Dashboard 聚合失败类型、小时趋势、按渠道配置的验收质量阈值、通知策略、通知事件和处置 Runbook；验收质量越线会单独沉淀事件，便于复盘什么时候触发过质量线；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认；日报调度状态单独暴露，补偿动作单独留痕，避免把后台任务状态混进实时 Dashboard |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
 | 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |
@@ -84,6 +85,7 @@ user message
 | `SendMessage` | 一轮用户输入的核心处理 |
 | `RecordChannelInbound` | 记录渠道入站 replay key，重复载荷不再进入客服链路 |
 | `RecordChannelInboundAudit` | 记录渠道请求验收结果，成功和拒绝都可复盘 |
+| `ListChannelInboundAuditQualityEvents` | 查询渠道验收质量越线事件，用于运营复盘和导出 |
 | `AcknowledgeChannelNotification` | 确认渠道通知事件 |
 | `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
 | `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |

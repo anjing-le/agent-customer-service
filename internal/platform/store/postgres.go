@@ -265,11 +265,96 @@ func (s *PostgresStore) RecordChannelInboundAudit(audit ChannelInboundAudit) err
 	`, audit.ID, audit.Channel, audit.ExternalConversationID, audit.ExternalMessageID, audit.Origin, audit.Status, audit.Code, audit.Reason, audit.ReplayKey, audit.SignaturePreview, audit.ContentHash, createdAt); err != nil {
 		return fmt.Errorf("record channel inbound audit: %w", err)
 	}
+	audits, err := s.listChannelInboundAudits(100)
+	if err != nil {
+		return err
+	}
+	alerts, err := s.listChannelAlerts()
+	if err != nil {
+		return err
+	}
+	policies, err := s.listChannelAlertPolicies(alerts)
+	if err != nil {
+		return err
+	}
+	event, ok := channelInboundAuditQualityEvent(audits, policies)
+	if !ok {
+		return nil
+	}
+	events, err := s.ListChannelInboundAuditQualityEvents(1)
+	if err != nil {
+		return err
+	}
+	if sameChannelInboundAuditQualityEvent(events, event) {
+		return nil
+	}
+	return s.recordChannelInboundAuditQualityEvent(event)
+}
+
+func (s *PostgresStore) recordChannelInboundAuditQualityEvent(event ChannelInboundAuditQualityEvent) error {
+	normalizeChannelInboundAuditQualityEvent(&event)
+	createdAt := time.Now().UTC()
+	if parsed, err := time.Parse(time.RFC3339, event.CreatedAt); err == nil {
+		createdAt = parsed.UTC()
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into channel_inbound_audit_quality_events (
+			id, channel, severity, status, failure_code, total, accepted, rejected, acceptance_rate,
+			min_samples, min_acceptance_rate, max_error_count, reason, created_at
+		)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+	`, event.ID, event.Channel, event.Severity, event.Status, event.FailureCode, event.Total, event.Accepted, event.Rejected, event.AcceptanceRate, event.MinSamples, event.MinAcceptanceRate, event.MaxErrorCount, event.Reason, createdAt); err != nil {
+		return fmt.Errorf("record channel inbound audit quality event: %w", err)
+	}
 	return nil
 }
 
 func (s *PostgresStore) ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, error) {
 	return s.listChannelInboundAudits(limit)
+}
+
+func (s *PostgresStore) ListChannelInboundAuditQualityEvents(limit int) ([]ChannelInboundAuditQualityEvent, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, channel, severity, status, failure_code, total, accepted, rejected, acceptance_rate,
+		       min_samples, min_acceptance_rate, max_error_count, reason, created_at
+		from channel_inbound_audit_quality_events
+		order by created_at desc, id desc
+		limit $1
+	`, normalizeChannelAuditQualityEventLimit(limit))
+	if err != nil {
+		return nil, fmt.Errorf("list channel inbound audit quality events: %w", err)
+	}
+	defer rows.Close()
+
+	events := make([]ChannelInboundAuditQualityEvent, 0)
+	for rows.Next() {
+		var item ChannelInboundAuditQualityEvent
+		var createdAt time.Time
+		if err := rows.Scan(
+			&item.ID,
+			&item.Channel,
+			&item.Severity,
+			&item.Status,
+			&item.FailureCode,
+			&item.Total,
+			&item.Accepted,
+			&item.Rejected,
+			&item.AcceptanceRate,
+			&item.MinSamples,
+			&item.MinAcceptanceRate,
+			&item.MaxErrorCount,
+			&item.Reason,
+			&createdAt,
+		); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		events = append(events, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 func (s *PostgresStore) RecordChannelFailure(event ChannelFailureEvent) error {

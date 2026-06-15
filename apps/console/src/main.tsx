@@ -498,6 +498,22 @@ type ChannelOpsReportEvent = {
   error?: string;
   createdAt: string;
 };
+type ChannelInboundAuditQualityEvent = {
+  id: string;
+  channel: string;
+  severity: string;
+  status: 'WATCH' | 'ESCALATE';
+  failureCode: string;
+  total: number;
+  accepted: number;
+  rejected: number;
+  acceptanceRate: number;
+  minSamples: number;
+  minAcceptanceRate: number;
+  maxErrorCount: number;
+  reason: string;
+  createdAt: string;
+};
 type ChannelOpsReportCompensationResult = {
   event: ChannelOpsReportEvent;
   report?: ChannelOpsReport;
@@ -726,6 +742,7 @@ function App() {
   const [channelOpsReports, setChannelOpsReports] = useState<ChannelOpsReport[]>([]);
   const [reportScheduler, setReportScheduler] = useState<ChannelOpsReportScheduler | null>(null);
   const [reportEvents, setReportEvents] = useState<ChannelOpsReportEvent[]>([]);
+  const [auditQualityEvents, setAuditQualityEvents] = useState<ChannelInboundAuditQualityEvent[]>([]);
   const [reportEventStatusFilter, setReportEventStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED'>('ALL');
   const [reportEventActorFilter, setReportEventActorFilter] = useState('');
   const [reportGenerating, setReportGenerating] = useState('');
@@ -737,6 +754,7 @@ function App() {
   const [inboundAuditStatusFilter, setInboundAuditStatusFilter] = useState<'ALL' | 'ACCEPTED' | 'REJECTED'>('ALL');
   const [inboundAuditChannelFilter, setInboundAuditChannelFilter] = useState('ALL');
   const [inboundAuditCodeFilter, setInboundAuditCodeFilter] = useState('');
+  const [auditQualityEventStatusFilter, setAuditQualityEventStatusFilter] = useState<'ALL' | 'WATCH' | 'ESCALATE'>('ALL');
   const [notificationStatusFilter, setNotificationStatusFilter] = useState<'ALL' | 'OPEN' | 'RETRYING' | 'SENT' | 'DEAD_LETTER' | 'ACKED'>('ALL');
   const [notificationChannelFilter, setNotificationChannelFilter] = useState('ALL');
   const [expandedNotificationId, setExpandedNotificationId] = useState('');
@@ -766,6 +784,7 @@ function App() {
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
   const auditStatusOptions = ['ALL', 'ACCEPTED', 'REJECTED'] as const;
+  const auditQualityEventStatusOptions = ['ALL', 'WATCH', 'ESCALATE'] as const;
   const auditChannels = Array.from(new Set([...protocolMatrix.map((item) => item.channel), ...channelInboundAudits.map((item) => item.channel)])).sort();
   const auditQualityRows = auditChannels.map((channel) => {
     const items = channelInboundAudits.filter((audit) => audit.channel === channel);
@@ -874,17 +893,46 @@ function App() {
     setDashboard((current) => current ? { ...current, channelInboundAudits: audits } : current);
   };
 
+  const channelInboundAuditQualityEventQuery = (
+    channel = inboundAuditChannelFilter,
+    status: 'ALL' | 'WATCH' | 'ESCALATE' = 'ALL',
+    code = inboundAuditCodeFilter,
+    limit = 20
+  ) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (channel !== 'ALL') {
+      params.set('channel', channel);
+    }
+    if (status !== 'ALL') {
+      params.set('status', status);
+    }
+    if (code.trim()) {
+      params.set('code', code.trim());
+    }
+    return params.toString();
+  };
+
+  const refreshAuditQualityEvents = async (
+    channel = inboundAuditChannelFilter,
+    status: 'ALL' | 'WATCH' | 'ESCALATE' = 'ALL',
+    code = inboundAuditCodeFilter
+  ) => {
+    const events = await api<ChannelInboundAuditQualityEvent[]>(`/api/ops/channel-inbound-audit-quality-events?${channelInboundAuditQualityEventQuery(channel, status, code)}`);
+    setAuditQualityEvents(events);
+  };
+
   const load = async () => {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData, auditQualityEventData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
         api<KnowledgeArticle[]>('/api/knowledge/articles'),
         api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
         api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6'),
         api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler'),
-        api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery()}`)
+        api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery()}`),
+        api<ChannelInboundAuditQualityEvent[]>(`/api/ops/channel-inbound-audit-quality-events?${channelInboundAuditQualityEventQuery()}`)
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData);
@@ -892,6 +940,7 @@ function App() {
       setChannelOpsReports(reportData);
       setReportScheduler(schedulerData);
       setReportEvents(reportEventData);
+      setAuditQualityEvents(auditQualityEventData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1394,6 +1443,20 @@ function App() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `agent-customer-service-channel-inbound-audits-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadChannelInboundAuditQualityEvents = async () => {
+    const response = await fetch(`/api/ops/channel-inbound-audit-quality-events/export?${channelInboundAuditQualityEventQuery(inboundAuditChannelFilter, 'ALL', inboundAuditCodeFilter, 100)}`);
+    if (!response.ok) {
+      throw new Error('download channel inbound audit quality events failed');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-audit-quality-events-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -1932,6 +1995,32 @@ function App() {
                     </div>
                     <b className={item.rejected > 0 ? 'status warning' : 'status'}>{item.topError || 'clean'}</b>
                   </article>
+                ))}
+              </div>
+            )}
+            <div className="eventFilters">
+              {auditQualityEventStatusOptions.map((item) => (
+                <button
+                  className={auditQualityEventStatusFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => {
+                    setAuditQualityEventStatusFilter(item);
+                    void refreshAuditQualityEvents(inboundAuditChannelFilter, item, inboundAuditCodeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load audit quality events failed'));
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+              <button className="tinyButton" onClick={() => downloadChannelInboundAuditQualityEvents().catch((err) => setError(err instanceof Error ? err.message : 'download audit quality events failed'))} title="导出验收质量事件">
+                <Download size={14} />
+              </button>
+            </div>
+            {auditQualityEvents.length > 0 && (
+              <div className="eventStrip">
+                {auditQualityEvents.map((event) => (
+                  <span className={event.status === 'ESCALATE' ? 'status danger' : 'status warning'} key={event.id}>
+                    {event.channel} · {event.status} · {event.failureCode} · {event.accepted}/{event.total} accepted · {event.acceptanceRate}% · {event.createdAt.slice(5, 16).replace('T', ' ')}
+                  </span>
                 ))}
               </div>
             )}

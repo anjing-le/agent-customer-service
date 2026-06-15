@@ -813,6 +813,48 @@ func TestChannelInboundAuditRoutesFilterAndExport(t *testing.T) {
 	}
 }
 
+func TestChannelInboundAuditQualityEventRoutesFilterAndExport(t *testing.T) {
+	st := store.NewSeedStore()
+	for _, audit := range []store.ChannelInboundAudit{
+		{Channel: "WeChat", Status: "ACCEPTED", Code: "accepted"},
+		{Channel: "WeChat", Status: "REJECTED", Code: "invalid_signature"},
+		{Channel: "WeChat", Status: "REJECTED", Code: "invalid_signature"},
+		{Channel: "WeChat", Status: "REJECTED", Code: "invalid_signature"},
+	} {
+		if err := st.RecordChannelInboundAudit(audit); err != nil {
+			t.Fatalf("record audit: %v", err)
+		}
+	}
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/channel-inbound-audit-quality-events?channel=WeChat&status=ESCALATE&code=signature", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"WeChat"`, `"status":"ESCALATE"`, `"failureCode":"invalid_signature"`, `"acceptanceRate":25`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in filtered audit quality events, got %s", expected, rec.Body.String())
+		}
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/ops/channel-inbound-audit-quality-events/export?channel=WeChat&status=ESCALATE", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{"id,channel,severity,status,failure_code,total,accepted,rejected,acceptance_rate", "WeChat", "invalid_signature"} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in exported audit quality events, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
 func generatedReportID(body string) string {
 	const marker = `"id":"`
 	start := strings.Index(body, marker)

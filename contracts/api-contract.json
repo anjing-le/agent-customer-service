@@ -160,6 +160,22 @@
       "response": { "status": 200, "schema": "ChannelInboundAuditsExport" }
     },
     {
+      "id": "listChannelInboundAuditQualityEvents",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-inbound-audit-quality-events",
+      "request": { "query": "ListChannelInboundAuditQualityEventsQuery" },
+      "response": { "status": 200, "schema": "ChannelInboundAuditQualityEvent[]" }
+    },
+    {
+      "id": "exportChannelInboundAuditQualityEvents",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-inbound-audit-quality-events/export",
+      "request": { "query": "ListChannelInboundAuditQualityEventsQuery" },
+      "response": { "status": 200, "schema": "ChannelInboundAuditQualityEventsExport" }
+    },
+    {
       "id": "testRule",
       "boundary": "ops",
       "method": "POST",
@@ -515,6 +531,21 @@
       }
     },
     "ChannelInboundAuditsExport": {
+      "required": ["content"],
+      "fields": {
+        "content": "text/csv response body",
+        "contentType": "text/csv"
+      }
+    },
+    "ListChannelInboundAuditQualityEventsQuery": {
+      "fields": {
+        "limit": "number",
+        "channel": "string",
+        "status": "ALL|WATCH|ESCALATE",
+        "code": "string"
+      }
+    },
+    "ChannelInboundAuditQualityEventsExport": {
       "required": ["content"],
       "fields": {
         "content": "text/csv response body",
@@ -1108,6 +1139,25 @@
         "replayKey": "string",
         "signaturePreview": "string",
         "contentHash": "string",
+        "createdAt": "RFC3339 string"
+      }
+    },
+    "ChannelInboundAuditQualityEvent": {
+      "required": ["id", "channel", "severity", "status", "failureCode", "total", "accepted", "rejected", "acceptanceRate", "minSamples", "minAcceptanceRate", "maxErrorCount", "reason", "createdAt"],
+      "fields": {
+        "id": "string",
+        "channel": "string",
+        "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+        "status": "WATCH|ESCALATE",
+        "failureCode": "string",
+        "total": "number",
+        "accepted": "number",
+        "rejected": "number",
+        "acceptanceRate": "number",
+        "minSamples": "number",
+        "minAcceptanceRate": "number",
+        "maxErrorCount": "number",
+        "reason": "string",
         "createdAt": "RFC3339 string"
       }
     },

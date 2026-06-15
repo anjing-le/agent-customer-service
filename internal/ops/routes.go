@@ -96,6 +96,42 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		httpjson.OK(w, filterChannelInboundAudits(audits, r.URL.Query().Get("channel"), r.URL.Query().Get("status"), r.URL.Query().Get("code")))
 	})
 
+	mux.HandleFunc("/api/ops/channel-inbound-audit-quality-events", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		events, err := st.ListChannelInboundAuditQualityEvents(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, filterChannelInboundAuditQualityEvents(events, r.URL.Query().Get("channel"), r.URL.Query().Get("status"), r.URL.Query().Get("code")))
+	})
+
+	mux.HandleFunc("/api/ops/channel-inbound-audit-quality-events/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 100
+		}
+		events, err := st.ListChannelInboundAuditQualityEvents(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		report, err := renderChannelInboundAuditQualityEventsCSV(filterChannelInboundAuditQualityEvents(events, r.URL.Query().Get("channel"), r.URL.Query().Get("status"), r.URL.Query().Get("code")))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "report_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="agent-customer-service-channel-audit-quality-events.csv"`)
+		_, _ = w.Write(report)
+	})
+
 	mux.HandleFunc("/api/ops/channel-inbound-audits/export", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -691,6 +727,68 @@ func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]by
 			fmt.Sprintf("%d", event.Pruned),
 			event.Note,
 			event.Error,
+			event.CreatedAt,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func filterChannelInboundAuditQualityEvents(events []store.ChannelInboundAuditQualityEvent, channel string, status string, code string) []store.ChannelInboundAuditQualityEvent {
+	channel = strings.ToLower(strings.TrimSpace(channel))
+	status = strings.ToUpper(strings.TrimSpace(status))
+	code = strings.ToLower(strings.TrimSpace(code))
+	if channel == "all" {
+		channel = ""
+	}
+	if status == "ALL" {
+		status = ""
+	}
+	if code == "all" {
+		code = ""
+	}
+	filtered := make([]store.ChannelInboundAuditQualityEvent, 0, len(events))
+	for _, event := range events {
+		if channel != "" && !strings.EqualFold(event.Channel, channel) {
+			continue
+		}
+		if status != "" && !strings.EqualFold(event.Status, status) {
+			continue
+		}
+		if code != "" && !strings.Contains(strings.ToLower(event.FailureCode), code) {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	return filtered
+}
+
+func renderChannelInboundAuditQualityEventsCSV(events []store.ChannelInboundAuditQualityEvent) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"id", "channel", "severity", "status", "failure_code", "total", "accepted", "rejected", "acceptance_rate", "min_samples", "min_acceptance_rate", "max_error_count", "reason", "created_at"}); err != nil {
+		return nil, err
+	}
+	for _, event := range events {
+		if err := writer.Write([]string{
+			event.ID,
+			event.Channel,
+			event.Severity,
+			event.Status,
+			event.FailureCode,
+			fmt.Sprintf("%d", event.Total),
+			fmt.Sprintf("%d", event.Accepted),
+			fmt.Sprintf("%d", event.Rejected),
+			fmt.Sprintf("%d", event.AcceptanceRate),
+			fmt.Sprintf("%d", event.MinSamples),
+			fmt.Sprintf("%d", event.MinAcceptanceRate),
+			fmt.Sprintf("%d", event.MaxErrorCount),
+			event.Reason,
 			event.CreatedAt,
 		}); err != nil {
 			return nil, err

@@ -161,6 +161,10 @@ func (f failingRuntime) ListChannelInboundAudits(int) ([]store.ChannelInboundAud
 	return nil, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ListChannelInboundAuditQualityEvents(int) ([]store.ChannelInboundAuditQualityEvent, error) {
+	return nil, errors.New("database unavailable")
+}
+
 func (f failingRuntime) ListChannelOpsReportEvents(int) ([]store.ChannelOpsReportEvent, error) {
 	return nil, errors.New("database unavailable")
 }

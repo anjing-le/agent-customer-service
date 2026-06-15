@@ -86,6 +86,7 @@ type Runtime interface {
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelInboundAudit(audit ChannelInboundAudit) error
 	ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, error)
+	ListChannelInboundAuditQualityEvents(limit int) ([]ChannelInboundAuditQualityEvent, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
 	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, inboundAuditMinSamples int, inboundAuditMinAcceptanceRate int, inboundAuditMaxErrorCount int, actor string, note string) (ChannelAlertPolicy, error)
 	ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error)
@@ -133,6 +134,7 @@ type Store struct {
 	notifications   []ChannelNotification
 	channelReports  []ChannelOpsReport
 	reportEvents    []ChannelOpsReportEvent
+	auditEvents     []ChannelInboundAuditQualityEvent
 	policyEvents    []NotificationPolicyEvent
 	policyChanges   []NotificationPolicyChange
 	ruleApprovals   []RuleApproval
@@ -466,6 +468,23 @@ type ChannelInboundAuditCodeCount struct {
 	Count int    `json:"count"`
 }
 
+type ChannelInboundAuditQualityEvent struct {
+	ID                string `json:"id"`
+	Channel           string `json:"channel"`
+	Severity          string `json:"severity"`
+	Status            string `json:"status"`
+	FailureCode       string `json:"failureCode"`
+	Total             int    `json:"total"`
+	Accepted          int    `json:"accepted"`
+	Rejected          int    `json:"rejected"`
+	AcceptanceRate    int    `json:"acceptanceRate"`
+	MinSamples        int    `json:"minSamples"`
+	MinAcceptanceRate int    `json:"minAcceptanceRate"`
+	MaxErrorCount     int    `json:"maxErrorCount"`
+	Reason            string `json:"reason"`
+	CreatedAt         string `json:"createdAt"`
+}
+
 type ChannelOpsReportEvent struct {
 	ID        string `json:"id"`
 	Action    string `json:"action"`
@@ -757,6 +776,13 @@ func (s *Store) RecordChannelInboundAudit(audit ChannelInboundAudit) error {
 	if len(s.inboundAudits) > 100 {
 		s.inboundAudits = s.inboundAudits[:100]
 	}
+	policies := channelAlertPolicies(s.alertPolicies, channelAlerts(s.channelFailures))
+	if event, ok := channelInboundAuditQualityEvent(s.inboundAudits, policies); ok && !sameChannelInboundAuditQualityEvent(s.auditEvents, event) {
+		s.auditEvents = append([]ChannelInboundAuditQualityEvent{event}, s.auditEvents...)
+		if len(s.auditEvents) > 100 {
+			s.auditEvents = s.auditEvents[:100]
+		}
+	}
 	return nil
 }
 
@@ -765,6 +791,17 @@ func (s *Store) ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, erro
 	defer s.mu.RUnlock()
 	limit = normalizeChannelInboundAuditLimit(limit)
 	items := append([]ChannelInboundAudit(nil), s.inboundAudits...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
+func (s *Store) ListChannelInboundAuditQualityEvents(limit int) ([]ChannelInboundAuditQualityEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit = normalizeChannelAuditQualityEventLimit(limit)
+	items := append([]ChannelInboundAuditQualityEvent(nil), s.auditEvents...)
 	if len(items) > limit {
 		items = items[:limit]
 	}
@@ -2382,6 +2419,16 @@ func normalizeChannelInboundAuditLimit(limit int) int {
 	return limit
 }
 
+func normalizeChannelAuditQualityEventLimit(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 100 {
+		return 100
+	}
+	return limit
+}
+
 func normalizeChannelOpsReport(report *ChannelOpsReport) {
 	now := time.Now().UTC()
 	if strings.TrimSpace(report.ID) == "" {
@@ -2430,6 +2477,20 @@ func normalizeChannelInboundAudit(audit *ChannelInboundAudit) {
 	audit.Code = fallback(strings.TrimSpace(audit.Code), "channel_inbound")
 	if strings.TrimSpace(audit.CreatedAt) == "" {
 		audit.CreatedAt = now.Format(time.RFC3339)
+	}
+}
+
+func normalizeChannelInboundAuditQualityEvent(event *ChannelInboundAuditQualityEvent) {
+	now := time.Now().UTC()
+	if strings.TrimSpace(event.ID) == "" {
+		event.ID = fmt.Sprintf("channel_audit_quality_event_%d", now.UnixNano())
+	}
+	event.Channel = fallback(strings.TrimSpace(event.Channel), "Unknown")
+	event.Severity = fallback(strings.ToUpper(strings.TrimSpace(event.Severity)), "MEDIUM")
+	event.Status = fallback(strings.ToUpper(strings.TrimSpace(event.Status)), "OPEN")
+	event.FailureCode = fallback(strings.TrimSpace(event.FailureCode), "inbound_acceptance_low")
+	if strings.TrimSpace(event.CreatedAt) == "" {
+		event.CreatedAt = now.Format(time.RFC3339)
 	}
 }
 
@@ -3073,6 +3134,62 @@ func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []Channe
 		})
 	}
 	return runbooks
+}
+
+func channelInboundAuditQualityEvent(audits []ChannelInboundAudit, policies []ChannelAlertPolicy) (ChannelInboundAuditQualityEvent, bool) {
+	runbooks := channelInboundAuditRunbooks(audits, policies)
+	if len(runbooks) == 0 {
+		return ChannelInboundAuditQualityEvent{}, false
+	}
+	runbook := runbooks[0]
+	channelAudits := make([]ChannelInboundAudit, 0)
+	for _, audit := range audits {
+		if strings.EqualFold(audit.Channel, runbook.Channel) {
+			channelAudits = append(channelAudits, audit)
+		}
+	}
+	policy := notificationPolicyFor(policies, runbook.Channel)
+	total := len(channelAudits)
+	accepted := 0
+	rejected := 0
+	for _, audit := range channelAudits {
+		if strings.EqualFold(audit.Status, "ACCEPTED") {
+			accepted++
+		} else {
+			rejected++
+		}
+	}
+	acceptanceRate := 100
+	if total > 0 {
+		acceptanceRate = accepted * 100 / total
+	}
+	event := ChannelInboundAuditQualityEvent{
+		Channel:           runbook.Channel,
+		Severity:          runbook.Severity,
+		Status:            runbook.Status,
+		FailureCode:       runbook.FailureCode,
+		Total:             total,
+		Accepted:          accepted,
+		Rejected:          rejected,
+		AcceptanceRate:    acceptanceRate,
+		MinSamples:        policy.InboundAuditMinSamples,
+		MinAcceptanceRate: policy.InboundAuditMinAcceptanceRate,
+		MaxErrorCount:     policy.InboundAuditMaxErrorCount,
+		Reason:            runbook.NextAction,
+	}
+	normalizeChannelInboundAuditQualityEvent(&event)
+	return event, true
+}
+
+func sameChannelInboundAuditQualityEvent(events []ChannelInboundAuditQualityEvent, next ChannelInboundAuditQualityEvent) bool {
+	if len(events) == 0 {
+		return false
+	}
+	latest := events[0]
+	return strings.EqualFold(latest.Channel, next.Channel) &&
+		latest.FailureCode == next.FailureCode &&
+		latest.Total == next.Total &&
+		latest.AcceptanceRate == next.AcceptanceRate
 }
 
 func topInboundAuditCode(counts map[string]int, order []string) string {

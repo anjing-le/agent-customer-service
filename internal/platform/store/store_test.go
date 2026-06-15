@@ -584,6 +584,16 @@ func TestChannelInboundAuditQualityCreatesRunbook(t *testing.T) {
 	if len(runbook.Steps) == 0 || !strings.Contains(runbook.NextAction, "验收率") {
 		t.Fatalf("expected audit-specific runbook guidance, got %#v", runbook)
 	}
+	events, err := st.ListChannelInboundAuditQualityEvents(10)
+	if err != nil {
+		t.Fatalf("list audit quality events: %v", err)
+	}
+	if len(events) != 1 || events[0].Channel != "WeChat" || events[0].FailureCode != "invalid_signature" {
+		t.Fatalf("expected audit quality event, got %#v", events)
+	}
+	if events[0].AcceptanceRate != 25 || events[0].MinAcceptanceRate != 85 {
+		t.Fatalf("expected threshold snapshot, got %#v", events[0])
+	}
 }
 
 func TestChannelInboundAuditRunbookUsesPolicyThresholds(t *testing.T) {
