@@ -544,9 +544,12 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	check, err := st.CompleteChannelRunbookCheck(ChannelRunbookCheck{
 		Channel:       dashboard.ChannelRunbooks[0].Channel,
 		RunbookStatus: dashboard.ChannelRunbooks[0].Status,
+		CheckStatus:   "DONE",
 		Step:          dashboard.ChannelRunbooks[0].Steps[0],
 		StepIndex:     0,
 		ActionRef:     "Marketplace:DISPATCH",
+		Assignee:      dashboard.ChannelRunbooks[0].Owner,
+		DueAt:         "2026-06-15T12:00:00Z",
 		Actor:         "ops-a",
 		Note:          "检查来源和签名头",
 	})
@@ -560,7 +563,7 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list runbook checks: %v", err)
 	}
-	if len(checks) != 1 || checks[0].ActionRef != "Marketplace:DISPATCH" {
+	if len(checks) != 1 || checks[0].ActionRef != "Marketplace:DISPATCH" || checks[0].CheckStatus != "DONE" || checks[0].Assignee == "" || checks[0].DueAt != "2026-06-15T12:00:00Z" {
 		t.Fatalf("expected listed runbook check, got %#v", checks)
 	}
 	dashboard, err = st.Dashboard()

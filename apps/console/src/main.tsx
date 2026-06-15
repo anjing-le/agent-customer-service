@@ -369,10 +369,13 @@ type ChannelRunbookCheck = {
   id: string;
   channel: string;
   runbookStatus: string;
+  checkStatus: string;
   step: string;
   stepIndex: number;
   actionRef?: string;
   reportId?: string;
+  assignee?: string;
+  dueAt?: string;
   actor: string;
   note?: string;
   completedAt: string;
@@ -1311,9 +1314,12 @@ function App() {
         body: JSON.stringify({
           channel: runbook.channel,
           runbookStatus: runbook.status,
+          checkStatus: 'DONE',
           step,
           stepIndex,
           actionRef: `${runbook.channel}:${runbook.status}`,
+          assignee: runbook.owner,
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
           actor: 'ops-a',
           note: `completed ${runbook.channel}:${runbook.status} step ${stepIndex + 1}`
         })
@@ -2589,8 +2595,8 @@ function App() {
                         const completed = (item.checks ?? []).find((check) => check.stepIndex === stepIndex);
                         return (
                           <small key={`${item.channel}-${item.status}-${stepIndex}`}>
-                            {completed ? 'done' : 'todo'} · {step}
-                            {completed ? ` · ${completed.actor}` : ''}
+                            {completed ? completed.checkStatus.toLowerCase() : 'todo'} · {step}
+                            {completed ? ` · ${completed.assignee || completed.actor}` : ''}
                             {!completed && (
                               <button
                                 className="tinyButton inlineIconButton"
@@ -2659,7 +2665,7 @@ function App() {
               <div className="eventStrip">
                 {runbookCheckRows.slice(0, 8).map((check) => (
                   <span className="status" key={check.id}>
-                    {check.channel} · {check.runbookStatus} · #{check.stepIndex + 1} · {check.actor} · {check.completedAt.slice(5, 16).replace('T', ' ')}
+                    {check.channel} · {check.runbookStatus} · {check.checkStatus} · {check.assignee || check.actor} · {check.dueAt ? check.dueAt.slice(5, 16).replace('T', ' ') : check.completedAt.slice(5, 16).replace('T', ' ')}
                   </span>
                 ))}
               </div>

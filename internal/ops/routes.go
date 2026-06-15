@@ -497,6 +497,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			checks,
 			r.URL.Query().Get("channel"),
 			r.URL.Query().Get("status"),
+			r.URL.Query().Get("checkStatus"),
 			r.URL.Query().Get("actor"),
 			r.URL.Query().Get("actionRef"),
 		))
@@ -519,6 +520,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			checks,
 			r.URL.Query().Get("channel"),
 			r.URL.Query().Get("status"),
+			r.URL.Query().Get("checkStatus"),
 			r.URL.Query().Get("actor"),
 			r.URL.Query().Get("actionRef"),
 		))
@@ -538,10 +540,13 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		var req struct {
 			Channel       string `json:"channel"`
 			RunbookStatus string `json:"runbookStatus"`
+			CheckStatus   string `json:"checkStatus"`
 			Step          string `json:"step"`
 			StepIndex     int    `json:"stepIndex"`
 			ActionRef     string `json:"actionRef"`
 			ReportID      string `json:"reportId"`
+			Assignee      string `json:"assignee"`
+			DueAt         string `json:"dueAt"`
 			Actor         string `json:"actor"`
 			Note          string `json:"note"`
 		}
@@ -556,10 +561,13 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		check, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
 			Channel:       req.Channel,
 			RunbookStatus: req.RunbookStatus,
+			CheckStatus:   req.CheckStatus,
 			Step:          req.Step,
 			StepIndex:     req.StepIndex,
 			ActionRef:     req.ActionRef,
 			ReportID:      req.ReportID,
+			Assignee:      req.Assignee,
+			DueAt:         req.DueAt,
 			Actor:         req.Actor,
 			Note:          req.Note,
 		})
@@ -826,9 +834,10 @@ func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]by
 	return buf.Bytes(), nil
 }
 
-func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, actor string, actionRef string) []store.ChannelRunbookCheck {
+func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, checkStatus string, actor string, actionRef string) []store.ChannelRunbookCheck {
 	channel = strings.ToLower(strings.TrimSpace(channel))
 	status = strings.ToUpper(strings.TrimSpace(status))
+	checkStatus = strings.ToUpper(strings.TrimSpace(checkStatus))
 	actor = strings.ToLower(strings.TrimSpace(actor))
 	actionRef = strings.ToLower(strings.TrimSpace(actionRef))
 	if channel == "all" {
@@ -837,12 +846,18 @@ func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel stri
 	if status == "ALL" {
 		status = ""
 	}
+	if checkStatus == "ALL" {
+		checkStatus = ""
+	}
 	filtered := make([]store.ChannelRunbookCheck, 0, len(checks))
 	for _, check := range checks {
 		if channel != "" && !strings.EqualFold(check.Channel, channel) {
 			continue
 		}
 		if status != "" && !strings.EqualFold(check.RunbookStatus, status) {
+			continue
+		}
+		if checkStatus != "" && !strings.EqualFold(check.CheckStatus, checkStatus) {
 			continue
 		}
 		if actor != "" && !strings.Contains(strings.ToLower(check.Actor), actor) {
@@ -859,7 +874,7 @@ func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel stri
 func renderChannelRunbookChecksCSV(checks []store.ChannelRunbookCheck) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"id", "channel", "runbook_status", "step_index", "step", "action_ref", "report_id", "actor", "note", "completed_at"}); err != nil {
+	if err := writer.Write([]string{"id", "channel", "runbook_status", "check_status", "step_index", "step", "action_ref", "report_id", "assignee", "due_at", "actor", "note", "completed_at"}); err != nil {
 		return nil, err
 	}
 	for _, check := range checks {
@@ -867,10 +882,13 @@ func renderChannelRunbookChecksCSV(checks []store.ChannelRunbookCheck) ([]byte, 
 			check.ID,
 			check.Channel,
 			check.RunbookStatus,
+			check.CheckStatus,
 			fmt.Sprintf("%d", check.StepIndex),
 			check.Step,
 			check.ActionRef,
 			check.ReportID,
+			check.Assignee,
+			check.DueAt,
 			check.Actor,
 			check.Note,
 			check.CompletedAt,

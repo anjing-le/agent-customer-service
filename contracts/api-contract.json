@@ -628,10 +628,13 @@
       "fields": {
         "channel": "string",
         "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "checkStatus": "TODO|DONE|BLOCKED",
         "step": "string",
         "stepIndex": "number",
         "actionRef": "string",
         "reportId": "string",
+        "assignee": "string",
+        "dueAt": "RFC3339 string",
         "actor": "string",
         "note": "string"
       }
@@ -747,6 +750,7 @@
         "limit": "number",
         "channel": "string|ALL",
         "status": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE|ALL",
+        "checkStatus": "TODO|DONE|BLOCKED|ALL",
         "actor": "string",
         "actionRef": "string"
       }
@@ -1311,15 +1315,18 @@
       }
     },
     "ChannelRunbookCheck": {
-      "required": ["id", "channel", "runbookStatus", "step", "stepIndex", "actor", "completedAt"],
+      "required": ["id", "channel", "runbookStatus", "checkStatus", "step", "stepIndex", "actor", "completedAt"],
       "fields": {
         "id": "string",
         "channel": "string",
         "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "checkStatus": "TODO|DONE|BLOCKED",
         "step": "string",
         "stepIndex": "number",
         "actionRef": "string",
         "reportId": "string",
+        "assignee": "string",
+        "dueAt": "RFC3339 string",
         "actor": "string",
         "note": "string",
         "completedAt": "RFC3339 string"

@@ -553,10 +553,13 @@ type ChannelRunbookCheck struct {
 	ID            string `json:"id"`
 	Channel       string `json:"channel"`
 	RunbookStatus string `json:"runbookStatus"`
+	CheckStatus   string `json:"checkStatus"`
 	Step          string `json:"step"`
 	StepIndex     int    `json:"stepIndex"`
 	ActionRef     string `json:"actionRef,omitempty"`
 	ReportID      string `json:"reportId,omitempty"`
+	Assignee      string `json:"assignee,omitempty"`
+	DueAt         string `json:"dueAt,omitempty"`
 	Actor         string `json:"actor"`
 	Note          string `json:"note,omitempty"`
 	CompletedAt   string `json:"completedAt"`
@@ -2546,6 +2549,7 @@ func normalizeChannelRunbookCheck(check *ChannelRunbookCheck) {
 	}
 	check.Channel = fallback(strings.TrimSpace(check.Channel), "Unknown")
 	check.RunbookStatus = fallback(strings.ToUpper(strings.TrimSpace(check.RunbookStatus)), "DISPATCH")
+	check.CheckStatus = fallback(strings.ToUpper(strings.TrimSpace(check.CheckStatus)), "DONE")
 	check.Step = fallback(strings.TrimSpace(check.Step), "Runbook step")
 	if check.StepIndex < 0 {
 		check.StepIndex = 0
@@ -2553,10 +2557,24 @@ func normalizeChannelRunbookCheck(check *ChannelRunbookCheck) {
 	check.Actor = fallback(strings.TrimSpace(check.Actor), "operator")
 	check.ActionRef = strings.TrimSpace(check.ActionRef)
 	check.ReportID = strings.TrimSpace(check.ReportID)
+	check.Assignee = strings.TrimSpace(check.Assignee)
+	check.DueAt = normalizeOptionalRFC3339(check.DueAt)
 	check.Note = strings.TrimSpace(check.Note)
 	if strings.TrimSpace(check.CompletedAt) == "" {
 		check.CompletedAt = now.Format(time.RFC3339)
 	}
+}
+
+func normalizeOptionalRFC3339(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return value
+	}
+	return parsed.UTC().Format(time.RFC3339)
 }
 
 func normalizeRunbookCheckLimit(limit int) int {

@@ -420,18 +420,25 @@ func (s *PostgresStore) CompleteChannelRunbookCheck(check ChannelRunbookCheck) (
 		completedAt = time.Now().UTC()
 		check.CompletedAt = completedAt.Format(time.RFC3339)
 	}
+	dueAt := nullableTime(check.DueAt, time.Time{})
+	if parsed, err := time.Parse(time.RFC3339, check.DueAt); err == nil {
+		dueAt = nullableTime(check.DueAt, parsed.UTC())
+	}
 	if err := s.pool.QueryRow(context.Background(), `
-		insert into channel_runbook_checks (id, channel, runbook_status, step, step_index, action_ref, report_id, actor, note, completed_at)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		insert into channel_runbook_checks (id, channel, runbook_status, check_status, step, step_index, action_ref, report_id, assignee, due_at, actor, note, completed_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		on conflict (channel, runbook_status, step_index, action_ref)
 		do update set
+			check_status = excluded.check_status,
 			step = excluded.step,
 			report_id = excluded.report_id,
+			assignee = excluded.assignee,
+			due_at = excluded.due_at,
 			actor = excluded.actor,
 			note = excluded.note,
 			completed_at = excluded.completed_at
 		returning id
-	`, check.ID, check.Channel, check.RunbookStatus, check.Step, check.StepIndex, check.ActionRef, check.ReportID, check.Actor, check.Note, completedAt).Scan(&check.ID); err != nil {
+	`, check.ID, check.Channel, check.RunbookStatus, check.CheckStatus, check.Step, check.StepIndex, check.ActionRef, check.ReportID, check.Assignee, dueAt, check.Actor, check.Note, completedAt).Scan(&check.ID); err != nil {
 		return ChannelRunbookCheck{}, fmt.Errorf("complete channel runbook check: %w", err)
 	}
 	return check, nil
@@ -1419,7 +1426,7 @@ func (s *PostgresStore) ListChannelOpsReportEvents(limit int) ([]ChannelOpsRepor
 
 func (s *PostgresStore) ListChannelRunbookChecks(limit int) ([]ChannelRunbookCheck, error) {
 	rows, err := s.pool.Query(context.Background(), `
-		select id, channel, runbook_status, step, step_index, action_ref, report_id, actor, note, completed_at
+		select id, channel, runbook_status, check_status, step, step_index, action_ref, report_id, assignee, due_at, actor, note, completed_at
 		from channel_runbook_checks
 		order by completed_at desc, id desc
 		limit $1
@@ -1432,8 +1439,12 @@ func (s *PostgresStore) ListChannelRunbookChecks(limit int) ([]ChannelRunbookChe
 	for rows.Next() {
 		var item ChannelRunbookCheck
 		var completedAt time.Time
-		if err := rows.Scan(&item.ID, &item.Channel, &item.RunbookStatus, &item.Step, &item.StepIndex, &item.ActionRef, &item.ReportID, &item.Actor, &item.Note, &completedAt); err != nil {
+		var dueAt *time.Time
+		if err := rows.Scan(&item.ID, &item.Channel, &item.RunbookStatus, &item.CheckStatus, &item.Step, &item.StepIndex, &item.ActionRef, &item.ReportID, &item.Assignee, &dueAt, &item.Actor, &item.Note, &completedAt); err != nil {
 			return nil, err
+		}
+		if dueAt != nil {
+			item.DueAt = dueAt.UTC().Format(time.RFC3339)
 		}
 		item.CompletedAt = completedAt.UTC().Format(time.RFC3339)
 		checks = append(checks, item)

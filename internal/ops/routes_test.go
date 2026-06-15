@@ -217,16 +217,18 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if len(dashboard.ChannelRunbooks) == 0 || len(dashboard.ChannelRunbooks[0].Steps) == 0 {
 		t.Fatalf("expected runbook steps, got %#v", dashboard.ChannelRunbooks)
 	}
+	owner := dashboard.ChannelRunbooks[0].Owner
 
 	mux := http.NewServeMux()
 	Register(mux, st)
 
-	body := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","step":%q,"stepIndex":0,"actionRef":"%s:%s","actor":"ops-a","note":"done from report handoff"}`,
+	body := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","checkStatus":"DONE","step":%q,"stepIndex":0,"actionRef":"%s:%s","assignee":"%s","dueAt":"2026-06-15T12:00:00Z","actor":"ops-a","note":"done from report handoff"}`,
 		dashboard.ChannelRunbooks[0].Channel,
 		dashboard.ChannelRunbooks[0].Status,
 		dashboard.ChannelRunbooks[0].Steps[0],
 		dashboard.ChannelRunbooks[0].Channel,
 		dashboard.ChannelRunbooks[0].Status,
+		owner,
 	)
 	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/complete", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -235,7 +237,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	for _, expected := range []string{`"channel":"Marketplace"`, `"runbookStatus":"DISPATCH"`, `"stepIndex":0`, `"actor":"ops-a"`} {
+	for _, expected := range []string{`"channel":"Marketplace"`, `"runbookStatus":"DISPATCH"`, `"checkStatus":"DONE"`, `"stepIndex":0`, `"assignee":"` + owner + `"`, `"dueAt":"2026-06-15T12:00:00Z"`, `"actor":"ops-a"`} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
 		}
@@ -248,19 +250,19 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 		t.Fatalf("expected completed runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
 	}
 
-	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?channel=Marketplace&status=DISPATCH&actor=ops&actionRef=Marketplace", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?channel=Marketplace&status=DISPATCH&checkStatus=DONE&actor=ops&actionRef=Marketplace", nil)
 	listRec := httptest.NewRecorder()
 	mux.ServeHTTP(listRec, listReq)
 	if listRec.Code != http.StatusOK {
 		t.Fatalf("expected 200 list, got %d: %s", listRec.Code, listRec.Body.String())
 	}
-	for _, expected := range []string{`"channel":"Marketplace"`, `"runbookStatus":"DISPATCH"`, `"actor":"ops-a"`, `"actionRef":"Marketplace:DISPATCH"`} {
+	for _, expected := range []string{`"channel":"Marketplace"`, `"runbookStatus":"DISPATCH"`, `"checkStatus":"DONE"`, `"assignee":"` + owner + `"`, `"actor":"ops-a"`, `"actionRef":"Marketplace:DISPATCH"`} {
 		if !strings.Contains(listRec.Body.String(), expected) {
 			t.Fatalf("expected %s in list response, got %s", expected, listRec.Body.String())
 		}
 	}
 
-	exportReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks/export?channel=Marketplace&actor=ops", nil)
+	exportReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks/export?channel=Marketplace&checkStatus=DONE&actor=ops", nil)
 	exportRec := httptest.NewRecorder()
 	mux.ServeHTTP(exportRec, exportReq)
 	if exportRec.Code != http.StatusOK {
@@ -269,7 +271,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if !strings.Contains(exportRec.Header().Get("Content-Type"), "text/csv") {
 		t.Fatalf("expected csv export, got %s", exportRec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"id,channel,runbook_status,step_index,step,action_ref,report_id,actor,note,completed_at", "Marketplace,DISPATCH", "ops-a"} {
+	for _, expected := range []string{"id,channel,runbook_status,check_status,step_index,step,action_ref,report_id,assignee,due_at,actor,note,completed_at", "Marketplace,DISPATCH,DONE", owner, "ops-a"} {
 		if !strings.Contains(exportRec.Body.String(), expected) {
 			t.Fatalf("expected %s in export response, got %s", expected, exportRec.Body.String())
 		}
