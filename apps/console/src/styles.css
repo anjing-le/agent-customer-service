@@ -382,6 +382,17 @@ h2 {
   font-size: 12px;
 }
 
+.eventFilters select {
+  width: 132px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #cbd9d2;
+  border-radius: 6px;
+  color: #18211d;
+  background: #ffffff;
+  font-size: 12px;
+}
+
 .activeSession {
   display: grid;
   gap: 4px;

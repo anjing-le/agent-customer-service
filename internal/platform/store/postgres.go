@@ -268,6 +268,10 @@ func (s *PostgresStore) RecordChannelInboundAudit(audit ChannelInboundAudit) err
 	return nil
 }
 
+func (s *PostgresStore) ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, error) {
+	return s.listChannelInboundAudits(limit)
+}
+
 func (s *PostgresStore) RecordChannelFailure(event ChannelFailureEvent) error {
 	if strings.TrimSpace(event.Channel) == "" {
 		event.Channel = "Unknown"
@@ -1336,7 +1340,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
-	channelAudits, err := s.listChannelInboundAudits()
+	channelAudits, err := s.listChannelInboundAudits(20)
 	if err != nil {
 		return Dashboard{}, err
 	}
@@ -1763,13 +1767,14 @@ func (s *PostgresStore) listChannelFailureTrends() ([]ChannelFailureTrend, error
 	return trends, nil
 }
 
-func (s *PostgresStore) listChannelInboundAudits() ([]ChannelInboundAudit, error) {
+func (s *PostgresStore) listChannelInboundAudits(limit int) ([]ChannelInboundAudit, error) {
+	limit = normalizeChannelInboundAuditLimit(limit)
 	rows, err := s.pool.Query(context.Background(), `
 		select id, channel, external_conversation_id, external_message_id, origin, status, code, reason, replay_key, signature_preview, content_hash, created_at
 		from channel_inbound_audits
 		order by created_at desc, id desc
-		limit 20
-	`)
+		limit $1
+	`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list channel inbound audits: %w", err)
 	}

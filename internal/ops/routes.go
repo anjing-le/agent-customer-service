@@ -82,6 +82,42 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		_, _ = w.Write(report)
 	})
 
+	mux.HandleFunc("/api/ops/channel-inbound-audits", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		audits, err := st.ListChannelInboundAudits(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, filterChannelInboundAudits(audits, r.URL.Query().Get("channel"), r.URL.Query().Get("status"), r.URL.Query().Get("code")))
+	})
+
+	mux.HandleFunc("/api/ops/channel-inbound-audits/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 100
+		}
+		audits, err := st.ListChannelInboundAudits(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		report, err := renderChannelInboundAuditsCSV(filterChannelInboundAudits(audits, r.URL.Query().Get("channel"), r.URL.Query().Get("status"), r.URL.Query().Get("code")))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "report_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="agent-customer-service-channel-inbound-audits.csv"`)
+		_, _ = w.Write(report)
+	})
+
 	mux.HandleFunc("/api/ops/channel-ops-report-scheduler/compensate", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return
@@ -652,6 +688,66 @@ func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]by
 			event.Note,
 			event.Error,
 			event.CreatedAt,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func filterChannelInboundAudits(audits []store.ChannelInboundAudit, channel string, status string, code string) []store.ChannelInboundAudit {
+	channel = strings.ToLower(strings.TrimSpace(channel))
+	status = strings.ToUpper(strings.TrimSpace(status))
+	code = strings.ToLower(strings.TrimSpace(code))
+	if channel == "all" {
+		channel = ""
+	}
+	if status == "ALL" {
+		status = ""
+	}
+	if code == "all" {
+		code = ""
+	}
+	filtered := make([]store.ChannelInboundAudit, 0, len(audits))
+	for _, audit := range audits {
+		if channel != "" && !strings.EqualFold(audit.Channel, channel) {
+			continue
+		}
+		if status != "" && !strings.EqualFold(audit.Status, status) {
+			continue
+		}
+		if code != "" && !strings.Contains(strings.ToLower(audit.Code), code) {
+			continue
+		}
+		filtered = append(filtered, audit)
+	}
+	return filtered
+}
+
+func renderChannelInboundAuditsCSV(audits []store.ChannelInboundAudit) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"id", "channel", "status", "code", "reason", "origin", "external_conversation_id", "external_message_id", "replay_key", "signature_preview", "content_hash", "created_at"}); err != nil {
+		return nil, err
+	}
+	for _, audit := range audits {
+		if err := writer.Write([]string{
+			audit.ID,
+			audit.Channel,
+			audit.Status,
+			audit.Code,
+			audit.Reason,
+			audit.Origin,
+			audit.ExternalConversationID,
+			audit.ExternalMessageID,
+			audit.ReplayKey,
+			audit.SignaturePreview,
+			audit.ContentHash,
+			audit.CreatedAt,
 		}); err != nil {
 			return nil, err
 		}

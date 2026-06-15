@@ -85,6 +85,7 @@ type Runtime interface {
 	RecordChannelRateLimit(channel string, windowStart time.Time, limit int) (bool, int, error)
 	RecordChannelInbound(receipt ChannelInboundReceipt) (bool, error)
 	RecordChannelInboundAudit(audit ChannelInboundAudit) error
+	ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
 	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
 	ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error)
@@ -740,6 +741,17 @@ func (s *Store) RecordChannelInboundAudit(audit ChannelInboundAudit) error {
 		s.inboundAudits = s.inboundAudits[:100]
 	}
 	return nil
+}
+
+func (s *Store) ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit = normalizeChannelInboundAuditLimit(limit)
+	items := append([]ChannelInboundAudit(nil), s.inboundAudits...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
 func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
@@ -2313,6 +2325,16 @@ func normalizeReportEventLimit(limit int) int {
 	}
 	if limit > 50 {
 		return 50
+	}
+	return limit
+}
+
+func normalizeChannelInboundAuditLimit(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 100 {
+		return 100
 	}
 	return limit
 }

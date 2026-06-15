@@ -63,6 +63,8 @@
       "goPackage": "internal/ops",
       "routes": [
         { "name": "dashboard", "path": "/api/ops/dashboard", "methods": ["GET"] },
+        { "name": "listChannelInboundAudits", "path": "/api/ops/channel-inbound-audits", "methods": ["GET"] },
+        { "name": "exportChannelInboundAudits", "path": "/api/ops/channel-inbound-audits/export", "methods": ["GET"] },
         { "name": "testRule", "path": "/api/ops/rules/test", "methods": ["POST"] },
         { "name": "compareRuleVersions", "path": "/api/ops/rules/compare", "methods": ["POST"] },
         { "name": "approveRuleRelease", "path": "/api/ops/rules/approve", "methods": ["POST"] },

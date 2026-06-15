@@ -721,6 +721,9 @@ function App() {
   const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
   const [channelFailureSending, setChannelFailureSending] = useState('');
   const [channelFailureResult, setChannelFailureResult] = useState<ChannelFailureResult | null>(null);
+  const [inboundAuditStatusFilter, setInboundAuditStatusFilter] = useState<'ALL' | 'ACCEPTED' | 'REJECTED'>('ALL');
+  const [inboundAuditChannelFilter, setInboundAuditChannelFilter] = useState('ALL');
+  const [inboundAuditCodeFilter, setInboundAuditCodeFilter] = useState('');
   const [notificationStatusFilter, setNotificationStatusFilter] = useState<'ALL' | 'OPEN' | 'RETRYING' | 'SENT' | 'DEAD_LETTER' | 'ACKED'>('ALL');
   const [notificationChannelFilter, setNotificationChannelFilter] = useState('ALL');
   const [expandedNotificationId, setExpandedNotificationId] = useState('');
@@ -749,6 +752,8 @@ function App() {
   const signatureProfiles = channelProtocolExamples.platformSignatureProfiles as unknown as ChannelSignatureProfile[];
   const errorExamples = channelProtocolExamples.errorExamples as ChannelErrorExample[];
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
+  const auditStatusOptions = ['ALL', 'ACCEPTED', 'REJECTED'] as const;
+  const auditChannels = Array.from(new Set([...protocolMatrix.map((item) => item.channel), ...channelInboundAudits.map((item) => item.channel)])).sort();
   const notificationChannels = Array.from(new Set(channelNotifications.map((item) => item.channel))).sort();
   const notificationStatusOptions = ['ALL', 'OPEN', 'RETRYING', 'SENT', 'DEAD_LETTER', 'ACKED'] as const;
   const visibleNotifications = channelNotifications.filter((item) => {
@@ -811,6 +816,34 @@ function App() {
   const refreshReportEvents = async (status = reportEventStatusFilter, actor = reportEventActorFilter) => {
     const events = await api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery(status, actor)}`);
     setReportEvents(events);
+  };
+
+  const channelInboundAuditQuery = (
+    channel = inboundAuditChannelFilter,
+    status = inboundAuditStatusFilter,
+    code = inboundAuditCodeFilter,
+    limit = 20
+  ) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (channel !== 'ALL') {
+      params.set('channel', channel);
+    }
+    if (status !== 'ALL') {
+      params.set('status', status);
+    }
+    if (code.trim()) {
+      params.set('code', code.trim());
+    }
+    return params.toString();
+  };
+
+  const refreshInboundAudits = async (
+    channel = inboundAuditChannelFilter,
+    status = inboundAuditStatusFilter,
+    code = inboundAuditCodeFilter
+  ) => {
+    const audits = await api<ChannelInboundAudit[]>(`/api/ops/channel-inbound-audits?${channelInboundAuditQuery(channel, status, code)}`);
+    setDashboard((current) => current ? { ...current, channelInboundAudits: audits } : current);
   };
 
   const load = async () => {
@@ -1206,6 +1239,7 @@ function App() {
         trace: payload.data.agentMessage.trace
       });
       await load();
+      await refreshInboundAudits();
       await loadMessages(payload.data.conversation.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'channel demo failed');
@@ -1270,6 +1304,7 @@ function App() {
         reason: errorExample.reason
       });
       await load();
+      await refreshInboundAudits();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'channel failure demo failed');
     } finally {
@@ -1311,6 +1346,20 @@ function App() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `agent-customer-service-channel-ops-events-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadChannelInboundAudits = async () => {
+    const response = await fetch(`/api/ops/channel-inbound-audits/export?${channelInboundAuditQuery(inboundAuditChannelFilter, inboundAuditStatusFilter, inboundAuditCodeFilter, 100)}`);
+    if (!response.ok) {
+      throw new Error('download channel inbound audits failed');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-inbound-audits-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -1792,6 +1841,48 @@ function App() {
                 <h2>最近入站</h2>
               </div>
               <span className="status">{channelInboundAudits.length}</span>
+            </div>
+            <div className="eventFilters">
+              {auditStatusOptions.map((item) => (
+                <button
+                  className={inboundAuditStatusFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => {
+                    setInboundAuditStatusFilter(item);
+                    void refreshInboundAudits(inboundAuditChannelFilter, item, inboundAuditCodeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'));
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+              <select
+                aria-label="验收审计渠道"
+                value={inboundAuditChannelFilter}
+                onChange={(event) => {
+                  setInboundAuditChannelFilter(event.target.value);
+                  void refreshInboundAudits(event.target.value, inboundAuditStatusFilter, inboundAuditCodeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'));
+                }}
+              >
+                <option value="ALL">ALL</option>
+                {auditChannels.map((channel) => (
+                  <option value={channel} key={channel}>{channel}</option>
+                ))}
+              </select>
+              <input
+                aria-label="验收审计错误码"
+                value={inboundAuditCodeFilter}
+                onBlur={(event) => void refreshInboundAudits(inboundAuditChannelFilter, inboundAuditStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'))}
+                onChange={(event) => setInboundAuditCodeFilter(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void refreshInboundAudits(inboundAuditChannelFilter, inboundAuditStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'));
+                  }
+                }}
+                placeholder="code"
+              />
+              <button className="tinyButton" onClick={() => downloadChannelInboundAudits().catch((err) => setError(err instanceof Error ? err.message : 'download channel inbound audits failed'))} title="导出验收审计">
+                <Download size={14} />
+              </button>
             </div>
             <div className="tableList compactList">
               {channelInboundAudits.slice(0, 6).map((audit) => (

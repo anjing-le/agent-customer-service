@@ -728,6 +728,77 @@ func TestChannelOpsReportEventRoutesFilterAndExport(t *testing.T) {
 	}
 }
 
+func TestChannelInboundAuditRoutesFilterAndExport(t *testing.T) {
+	st := store.NewSeedStore()
+	if err := st.RecordChannelInboundAudit(store.ChannelInboundAudit{
+		ID:                     "audit-ok",
+		Channel:                "Douyin",
+		ExternalConversationID: "dy-open-1",
+		ExternalMessageID:      "dy-msg-1",
+		Origin:                 "https://open.douyin.com",
+		Status:                 "ACCEPTED",
+		Code:                   "accepted",
+		Reason:                 "channel inbound accepted",
+		ReplayKey:              "replay-ok",
+		SignaturePreview:       "abcdef123456",
+		ContentHash:            "content-ok",
+	}); err != nil {
+		t.Fatalf("record accepted audit: %v", err)
+	}
+	if err := st.RecordChannelInboundAudit(store.ChannelInboundAudit{
+		ID:                     "audit-bad",
+		Channel:                "WeChat",
+		ExternalConversationID: "wx-open-1",
+		ExternalMessageID:      "wx-msg-1",
+		Origin:                 "https://wechat.example.com",
+		Status:                 "REJECTED",
+		Code:                   "invalid_signature",
+		Reason:                 "channel signature verification failed",
+		ReplayKey:              "replay-bad",
+		SignaturePreview:       "bad-signatur",
+		ContentHash:            "content-bad",
+	}); err != nil {
+		t.Fatalf("record rejected audit: %v", err)
+	}
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/channel-inbound-audits?channel=WeChat&status=REJECTED&code=signature", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"id":"audit-bad"`, `"status":"REJECTED"`, `"code":"invalid_signature"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in filtered audits, got %s", expected, rec.Body.String())
+		}
+	}
+	if strings.Contains(rec.Body.String(), "audit-ok") {
+		t.Fatalf("expected filtered audits to omit accepted audit, got %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/ops/channel-inbound-audits/export?channel=Douyin&status=ACCEPTED", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Header().Get("Content-Type"), "text/csv") {
+		t.Fatalf("expected csv content type, got %s", rec.Header().Get("Content-Type"))
+	}
+	for _, expected := range []string{"id,channel,status,code,reason,origin,external_conversation_id,external_message_id,replay_key,signature_preview,content_hash,created_at", "audit-ok", "Douyin"} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in exported audits, got %s", expected, rec.Body.String())
+		}
+	}
+	if strings.Contains(rec.Body.String(), "audit-bad") {
+		t.Fatalf("expected exported audits to omit rejected audit, got %s", rec.Body.String())
+	}
+}
+
 func generatedReportID(body string) string {
 	const marker = `"id":"`
 	start := strings.Index(body, marker)

@@ -144,6 +144,22 @@
       "response": { "status": 200, "schema": "Dashboard" }
     },
     {
+      "id": "listChannelInboundAudits",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-inbound-audits",
+      "request": { "query": "ListChannelInboundAuditsQuery" },
+      "response": { "status": 200, "schema": "ChannelInboundAudit[]" }
+    },
+    {
+      "id": "exportChannelInboundAudits",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-inbound-audits/export",
+      "request": { "query": "ListChannelInboundAuditsQuery" },
+      "response": { "status": 200, "schema": "ChannelInboundAuditsExport" }
+    },
+    {
       "id": "testRule",
       "boundary": "ops",
       "method": "POST",
@@ -488,6 +504,21 @@
     "TestRuleRequest": {
       "fields": {
         "content": "string"
+      }
+    },
+    "ListChannelInboundAuditsQuery": {
+      "fields": {
+        "limit": "number",
+        "channel": "string",
+        "status": "ALL|ACCEPTED|REJECTED",
+        "code": "string"
+      }
+    },
+    "ChannelInboundAuditsExport": {
+      "required": ["content"],
+      "fields": {
+        "content": "text/csv response body",
+        "contentType": "text/csv"
       }
     },
     "RuleReleaseRequest": {
