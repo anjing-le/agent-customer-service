@@ -96,6 +96,7 @@ type Runtime interface {
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	CompleteChannelRunbookCheck(check ChannelRunbookCheck) (ChannelRunbookCheck, error)
+	ListChannelRunbookChecks(limit int) ([]ChannelRunbookCheck, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -1105,6 +1106,17 @@ func (s *Store) CompleteChannelRunbookCheck(check ChannelRunbookCheck) (ChannelR
 	}
 	s.runbookChecks = append([]ChannelRunbookCheck{check}, s.runbookChecks...)
 	return check, nil
+}
+
+func (s *Store) ListChannelRunbookChecks(limit int) ([]ChannelRunbookCheck, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit = normalizeRunbookCheckLimit(limit)
+	items := append([]ChannelRunbookCheck(nil), s.runbookChecks...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
 func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
@@ -2545,6 +2557,16 @@ func normalizeChannelRunbookCheck(check *ChannelRunbookCheck) {
 	if strings.TrimSpace(check.CompletedAt) == "" {
 		check.CompletedAt = now.Format(time.RFC3339)
 	}
+}
+
+func normalizeRunbookCheckLimit(limit int) int {
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 200 {
+		return 200
+	}
+	return limit
 }
 
 func sameChannelRunbookCheck(left ChannelRunbookCheck, right ChannelRunbookCheck) bool {

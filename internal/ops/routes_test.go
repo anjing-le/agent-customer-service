@@ -247,6 +247,33 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if len(dashboard.ChannelRunbooks[0].Checks) != 1 || dashboard.ChannelRunbooks[0].Checks[0].Actor != "ops-a" {
 		t.Fatalf("expected completed runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
 	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?channel=Marketplace&status=DISPATCH&actor=ops&actionRef=Marketplace", nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 list, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"Marketplace"`, `"runbookStatus":"DISPATCH"`, `"actor":"ops-a"`, `"actionRef":"Marketplace:DISPATCH"`} {
+		if !strings.Contains(listRec.Body.String(), expected) {
+			t.Fatalf("expected %s in list response, got %s", expected, listRec.Body.String())
+		}
+	}
+
+	exportReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks/export?channel=Marketplace&actor=ops", nil)
+	exportRec := httptest.NewRecorder()
+	mux.ServeHTTP(exportRec, exportReq)
+	if exportRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 export, got %d: %s", exportRec.Code, exportRec.Body.String())
+	}
+	if !strings.Contains(exportRec.Header().Get("Content-Type"), "text/csv") {
+		t.Fatalf("expected csv export, got %s", exportRec.Header().Get("Content-Type"))
+	}
+	for _, expected := range []string{"id,channel,runbook_status,step_index,step,action_ref,report_id,actor,note,completed_at", "Marketplace,DISPATCH", "ops-a"} {
+		if !strings.Contains(exportRec.Body.String(), expected) {
+			t.Fatalf("expected %s in export response, got %s", expected, exportRec.Body.String())
+		}
+	}
 }
 
 func TestUpdateChannelAlertPolicyRoute(t *testing.T) {

@@ -77,6 +77,10 @@ func (f failingRuntime) CompleteChannelRunbookCheck(store.ChannelRunbookCheck) (
 	return store.ChannelRunbookCheck{}, errors.New("database unavailable")
 }
 
+func (f failingRuntime) ListChannelRunbookChecks(int) ([]store.ChannelRunbookCheck, error) {
+	return nil, errors.New("database unavailable")
+}
+
 func (f failingRuntime) ReceiveChannelMessage(store.ChannelInboundMessage) (store.SendMessageResult, error) {
 	return store.SendMessageResult{}, errors.New("database unavailable")
 }

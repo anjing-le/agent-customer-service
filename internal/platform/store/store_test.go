@@ -556,6 +556,13 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if check.ID == "" || check.Actor != "ops-a" {
 		t.Fatalf("expected completed runbook check, got %#v", check)
 	}
+	checks, err := st.ListChannelRunbookChecks(10)
+	if err != nil {
+		t.Fatalf("list runbook checks: %v", err)
+	}
+	if len(checks) != 1 || checks[0].ActionRef != "Marketplace:DISPATCH" {
+		t.Fatalf("expected listed runbook check, got %#v", checks)
+	}
 	dashboard, err = st.Dashboard()
 	if err != nil {
 		t.Fatalf("dashboard after check: %v", err)

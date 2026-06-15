@@ -483,6 +483,54 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		httpjson.OK(w, notification)
 	})
 
+	mux.HandleFunc("/api/ops/channel-runbook-checks", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		checks, err := st.ListChannelRunbookChecks(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, filterChannelRunbookChecks(
+			checks,
+			r.URL.Query().Get("channel"),
+			r.URL.Query().Get("status"),
+			r.URL.Query().Get("actor"),
+			r.URL.Query().Get("actionRef"),
+		))
+	})
+
+	mux.HandleFunc("/api/ops/channel-runbook-checks/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 100
+		}
+		checks, err := st.ListChannelRunbookChecks(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		report, err := renderChannelRunbookChecksCSV(filterChannelRunbookChecks(
+			checks,
+			r.URL.Query().Get("channel"),
+			r.URL.Query().Get("status"),
+			r.URL.Query().Get("actor"),
+			r.URL.Query().Get("actionRef"),
+		))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "report_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="agent-customer-service-channel-runbook-checks.csv"`)
+		_, _ = w.Write(report)
+	})
+
 	mux.HandleFunc("/api/ops/channel-runbook-checks/complete", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return
@@ -767,6 +815,65 @@ func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]by
 			event.Note,
 			event.Error,
 			event.CreatedAt,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, actor string, actionRef string) []store.ChannelRunbookCheck {
+	channel = strings.ToLower(strings.TrimSpace(channel))
+	status = strings.ToUpper(strings.TrimSpace(status))
+	actor = strings.ToLower(strings.TrimSpace(actor))
+	actionRef = strings.ToLower(strings.TrimSpace(actionRef))
+	if channel == "all" {
+		channel = ""
+	}
+	if status == "ALL" {
+		status = ""
+	}
+	filtered := make([]store.ChannelRunbookCheck, 0, len(checks))
+	for _, check := range checks {
+		if channel != "" && !strings.EqualFold(check.Channel, channel) {
+			continue
+		}
+		if status != "" && !strings.EqualFold(check.RunbookStatus, status) {
+			continue
+		}
+		if actor != "" && !strings.Contains(strings.ToLower(check.Actor), actor) {
+			continue
+		}
+		if actionRef != "" && !strings.Contains(strings.ToLower(check.ActionRef), actionRef) {
+			continue
+		}
+		filtered = append(filtered, check)
+	}
+	return filtered
+}
+
+func renderChannelRunbookChecksCSV(checks []store.ChannelRunbookCheck) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"id", "channel", "runbook_status", "step_index", "step", "action_ref", "report_id", "actor", "note", "completed_at"}); err != nil {
+		return nil, err
+	}
+	for _, check := range checks {
+		if err := writer.Write([]string{
+			check.ID,
+			check.Channel,
+			check.RunbookStatus,
+			fmt.Sprintf("%d", check.StepIndex),
+			check.Step,
+			check.ActionRef,
+			check.ReportID,
+			check.Actor,
+			check.Note,
+			check.CompletedAt,
 		}); err != nil {
 			return nil, err
 		}

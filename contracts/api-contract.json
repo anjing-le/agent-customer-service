@@ -248,6 +248,22 @@
       "response": { "status": 200, "schema": "ChannelNotification" }
     },
     {
+      "id": "listChannelRunbookChecks",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-runbook-checks",
+      "request": { "query": "ListChannelRunbookChecksQuery" },
+      "response": { "status": 200, "schema": "ChannelRunbookCheck[]" }
+    },
+    {
+      "id": "exportChannelRunbookChecks",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-runbook-checks/export",
+      "request": { "query": "ListChannelRunbookChecksQuery" },
+      "response": { "status": 200, "schema": "ChannelRunbookChecksExport" }
+    },
+    {
       "id": "completeChannelRunbookCheck",
       "boundary": "ops",
       "method": "POST",
@@ -726,7 +742,23 @@
         "actor": "string"
       }
     },
+    "ListChannelRunbookChecksQuery": {
+      "fields": {
+        "limit": "number",
+        "channel": "string|ALL",
+        "status": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE|ALL",
+        "actor": "string",
+        "actionRef": "string"
+      }
+    },
     "ChannelOpsReportEventsExport": {
+      "required": ["content"],
+      "fields": {
+        "content": "text/csv response body",
+        "contentType": "text/csv"
+      }
+    },
+    "ChannelRunbookChecksExport": {
       "required": ["content"],
       "fields": {
         "content": "text/csv response body",

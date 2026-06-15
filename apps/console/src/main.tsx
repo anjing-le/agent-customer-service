@@ -783,8 +783,12 @@ function App() {
   const [reportScheduler, setReportScheduler] = useState<ChannelOpsReportScheduler | null>(null);
   const [reportEvents, setReportEvents] = useState<ChannelOpsReportEvent[]>([]);
   const [auditQualityEvents, setAuditQualityEvents] = useState<ChannelInboundAuditQualityEvent[]>([]);
+  const [runbookCheckRows, setRunbookCheckRows] = useState<ChannelRunbookCheck[]>([]);
   const [reportEventStatusFilter, setReportEventStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED'>('ALL');
   const [reportEventActorFilter, setReportEventActorFilter] = useState('');
+  const [runbookCheckChannelFilter, setRunbookCheckChannelFilter] = useState('ALL');
+  const [runbookCheckStatusFilter, setRunbookCheckStatusFilter] = useState('ALL');
+  const [runbookCheckActorFilter, setRunbookCheckActorFilter] = useState('');
   const [reportGenerating, setReportGenerating] = useState('');
   const [reportCompensating, setReportCompensating] = useState(false);
   const [channelDemoSending, setChannelDemoSending] = useState('');
@@ -817,6 +821,8 @@ function App() {
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
   const channelRunbooks = dashboard?.channelRunbooks ?? [];
+  const runbookCheckChannels = Array.from(new Set([...channelRunbooks.map((item) => item.channel), ...runbookCheckRows.map((item) => item.channel)])).sort();
+  const runbookCheckStatuses = Array.from(new Set([...channelRunbooks.map((item) => item.status), ...runbookCheckRows.map((item) => item.runbookStatus)])).sort();
   const acknowledgedNotificationIds = new Set(channelNotifications.filter((item) => item.status === 'ACKED' || item.ackedBy).map((item) => item.id));
   const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
   const notificationPolicyChanges = dashboard?.notificationPolicyChanges ?? [];
@@ -944,6 +950,34 @@ function App() {
     setReportEvents(events);
   };
 
+  const channelRunbookCheckQuery = (
+    channel = runbookCheckChannelFilter,
+    status = runbookCheckStatusFilter,
+    actor = runbookCheckActorFilter,
+    limit = 20
+  ) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (channel !== 'ALL') {
+      params.set('channel', channel);
+    }
+    if (status !== 'ALL') {
+      params.set('status', status);
+    }
+    if (actor.trim()) {
+      params.set('actor', actor.trim());
+    }
+    return params.toString();
+  };
+
+  const refreshRunbookChecks = async (
+    channel = runbookCheckChannelFilter,
+    status = runbookCheckStatusFilter,
+    actor = runbookCheckActorFilter
+  ) => {
+    const checks = await api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery(channel, status, actor)}`);
+    setRunbookCheckRows(checks);
+  };
+
   const channelInboundAuditQuery = (
     channel = inboundAuditChannelFilter,
     status = inboundAuditStatusFilter,
@@ -1004,14 +1038,15 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData, auditQualityEventData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData, auditQualityEventData, runbookCheckData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
         api<KnowledgeArticle[]>('/api/knowledge/articles'),
         api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
         api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6'),
         api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler'),
         api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery()}`),
-        api<ChannelInboundAuditQualityEvent[]>(`/api/ops/channel-inbound-audit-quality-events?${channelInboundAuditQualityEventQuery()}`)
+        api<ChannelInboundAuditQualityEvent[]>(`/api/ops/channel-inbound-audit-quality-events?${channelInboundAuditQualityEventQuery()}`),
+        api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery()}`)
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData ?? []);
@@ -1020,6 +1055,7 @@ function App() {
       setReportScheduler(schedulerData);
       setReportEvents(reportEventData ?? []);
       setAuditQualityEvents(auditQualityEventData ?? []);
+      setRunbookCheckRows(runbookCheckData ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1550,6 +1586,20 @@ function App() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `agent-customer-service-channel-ops-events-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadChannelRunbookChecks = async () => {
+    const response = await fetch(`/api/ops/channel-runbook-checks/export?${channelRunbookCheckQuery(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, 100)}`);
+    if (!response.ok) {
+      throw new Error('download channel runbook checks failed');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-runbook-checks-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -2562,6 +2612,58 @@ function App() {
               ))}
               {channelRunbooks.length === 0 && <p className="empty">暂无处置 Runbook</p>}
             </div>
+            <div className="filterRow">
+              {['ALL', ...runbookCheckChannels].map((item) => (
+                <button
+                  className={runbookCheckChannelFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => {
+                    setRunbookCheckChannelFilter(item);
+                    void refreshRunbookChecks(item, runbookCheckStatusFilter, runbookCheckActorFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="filterRow">
+              {['ALL', ...runbookCheckStatuses].map((item) => (
+                <button
+                  className={runbookCheckStatusFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => {
+                    setRunbookCheckStatusFilter(item);
+                    void refreshRunbookChecks(runbookCheckChannelFilter, item, runbookCheckActorFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+              <input
+                aria-label="Runbook 检查操作者"
+                value={runbookCheckActorFilter}
+                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
+                onChange={(event) => setRunbookCheckActorFilter(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  }
+                }}
+                placeholder="actor"
+              />
+              <button className="tinyButton" onClick={() => downloadChannelRunbookChecks().catch((err) => setError(err instanceof Error ? err.message : 'download channel runbook checks failed'))} title="导出 Runbook 检查">
+                <Download size={14} />
+              </button>
+            </div>
+            {runbookCheckRows.length > 0 && (
+              <div className="eventStrip">
+                {runbookCheckRows.slice(0, 8).map((check) => (
+                  <span className="status" key={check.id}>
+                    {check.channel} · {check.runbookStatus} · #{check.stepIndex + 1} · {check.actor} · {check.completedAt.slice(5, 16).replace('T', ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="panelDivider" />
             <div className="panelHeader compactHeader">
               <div>

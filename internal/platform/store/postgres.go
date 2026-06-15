@@ -1417,13 +1417,13 @@ func (s *PostgresStore) ListChannelOpsReportEvents(limit int) ([]ChannelOpsRepor
 	return scanChannelOpsReportEvents(rows)
 }
 
-func (s *PostgresStore) listChannelRunbookChecks() ([]ChannelRunbookCheck, error) {
+func (s *PostgresStore) ListChannelRunbookChecks(limit int) ([]ChannelRunbookCheck, error) {
 	rows, err := s.pool.Query(context.Background(), `
 		select id, channel, runbook_status, step, step_index, action_ref, report_id, actor, note, completed_at
 		from channel_runbook_checks
 		order by completed_at desc, id desc
-		limit 200
-	`)
+		limit $1
+	`, normalizeRunbookCheckLimit(limit))
 	if err != nil {
 		return nil, fmt.Errorf("list channel runbook checks: %w", err)
 	}
@@ -1528,7 +1528,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
-	runbookChecks, err := s.listChannelRunbookChecks()
+	runbookChecks, err := s.ListChannelRunbookChecks(200)
 	if err != nil {
 		return Dashboard{}, err
 	}
