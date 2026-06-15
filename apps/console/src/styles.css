@@ -167,6 +167,13 @@ h2 {
   background: #edf4f0;
 }
 
+.inlineIconButton {
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .dangerButton {
   color: #9f2f24;
   background: #f8e4de;

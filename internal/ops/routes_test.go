@@ -197,6 +197,58 @@ func TestAcknowledgeChannelNotificationRoute(t *testing.T) {
 	}
 }
 
+func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
+	st := store.NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("runbook-check-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ChannelRunbooks) == 0 || len(dashboard.ChannelRunbooks[0].Steps) == 0 {
+		t.Fatalf("expected runbook steps, got %#v", dashboard.ChannelRunbooks)
+	}
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	body := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","step":%q,"stepIndex":0,"actionRef":"%s:%s","actor":"ops-a","note":"done from report handoff"}`,
+		dashboard.ChannelRunbooks[0].Channel,
+		dashboard.ChannelRunbooks[0].Status,
+		dashboard.ChannelRunbooks[0].Steps[0],
+		dashboard.ChannelRunbooks[0].Channel,
+		dashboard.ChannelRunbooks[0].Status,
+	)
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/complete", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"Marketplace"`, `"runbookStatus":"DISPATCH"`, `"stepIndex":0`, `"actor":"ops-a"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard after check: %v", err)
+	}
+	if len(dashboard.ChannelRunbooks[0].Checks) != 1 || dashboard.ChannelRunbooks[0].Checks[0].Actor != "ops-a" {
+		t.Fatalf("expected completed runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
+	}
+}
+
 func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
 	st := store.NewSeedStore()
 	mux := http.NewServeMux()

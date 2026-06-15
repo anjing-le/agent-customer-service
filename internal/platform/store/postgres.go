@@ -413,6 +413,30 @@ func (s *PostgresStore) AcknowledgeChannelNotification(id, actor, note string) (
 	return s.channelNotification(id)
 }
 
+func (s *PostgresStore) CompleteChannelRunbookCheck(check ChannelRunbookCheck) (ChannelRunbookCheck, error) {
+	normalizeChannelRunbookCheck(&check)
+	completedAt, err := time.Parse(time.RFC3339, check.CompletedAt)
+	if err != nil {
+		completedAt = time.Now().UTC()
+		check.CompletedAt = completedAt.Format(time.RFC3339)
+	}
+	if err := s.pool.QueryRow(context.Background(), `
+		insert into channel_runbook_checks (id, channel, runbook_status, step, step_index, action_ref, report_id, actor, note, completed_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		on conflict (channel, runbook_status, step_index, action_ref)
+		do update set
+			step = excluded.step,
+			report_id = excluded.report_id,
+			actor = excluded.actor,
+			note = excluded.note,
+			completed_at = excluded.completed_at
+		returning id
+	`, check.ID, check.Channel, check.RunbookStatus, check.Step, check.StepIndex, check.ActionRef, check.ReportID, check.Actor, check.Note, completedAt).Scan(&check.ID); err != nil {
+		return ChannelRunbookCheck{}, fmt.Errorf("complete channel runbook check: %w", err)
+	}
+	return check, nil
+}
+
 func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (ChannelNotification, error) {
 	item, err := s.channelNotification(id)
 	if err != nil {
@@ -1393,6 +1417,33 @@ func (s *PostgresStore) ListChannelOpsReportEvents(limit int) ([]ChannelOpsRepor
 	return scanChannelOpsReportEvents(rows)
 }
 
+func (s *PostgresStore) listChannelRunbookChecks() ([]ChannelRunbookCheck, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, channel, runbook_status, step, step_index, action_ref, report_id, actor, note, completed_at
+		from channel_runbook_checks
+		order by completed_at desc, id desc
+		limit 200
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list channel runbook checks: %w", err)
+	}
+	defer rows.Close()
+	checks := make([]ChannelRunbookCheck, 0)
+	for rows.Next() {
+		var item ChannelRunbookCheck
+		var completedAt time.Time
+		if err := rows.Scan(&item.ID, &item.Channel, &item.RunbookStatus, &item.Step, &item.StepIndex, &item.ActionRef, &item.ReportID, &item.Actor, &item.Note, &completedAt); err != nil {
+			return nil, err
+		}
+		item.CompletedAt = completedAt.UTC().Format(time.RFC3339)
+		checks = append(checks, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return checks, nil
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err := s.expireNotificationPolicyChanges(); err != nil {
 		return Dashboard{}, err
@@ -1477,6 +1528,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	runbookChecks, err := s.listChannelRunbookChecks()
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -1523,7 +1578,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		AuditEvents:      auditEvents,
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
-		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications, channelAudits),
+		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications, channelAudits, runbookChecks),
 		PolicyEvents:     policyEvents,
 		PolicyChanges:    policyChanges,
 		Quality:          qualitySummary(messages, gaps, transfers, annotations),

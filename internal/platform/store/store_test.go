@@ -541,6 +541,28 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if dashboard.ChannelRunbooks[0].FailureCode != "channel_signature_invalid" || len(dashboard.ChannelRunbooks[0].Steps) == 0 {
 		t.Fatalf("expected runbook failure code and steps, got %#v", dashboard.ChannelRunbooks[0])
 	}
+	check, err := st.CompleteChannelRunbookCheck(ChannelRunbookCheck{
+		Channel:       dashboard.ChannelRunbooks[0].Channel,
+		RunbookStatus: dashboard.ChannelRunbooks[0].Status,
+		Step:          dashboard.ChannelRunbooks[0].Steps[0],
+		StepIndex:     0,
+		ActionRef:     "Marketplace:DISPATCH",
+		Actor:         "ops-a",
+		Note:          "检查来源和签名头",
+	})
+	if err != nil {
+		t.Fatalf("complete runbook check: %v", err)
+	}
+	if check.ID == "" || check.Actor != "ops-a" {
+		t.Fatalf("expected completed runbook check, got %#v", check)
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard after check: %v", err)
+	}
+	if len(dashboard.ChannelRunbooks[0].Checks) != 1 || dashboard.ChannelRunbooks[0].Checks[0].ActionRef != "Marketplace:DISPATCH" {
+		t.Fatalf("expected runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
+	}
 	acked, err := st.AcknowledgeChannelNotification(dashboard.Notifications[0].ID, "ops-a", "已通知渠道负责人")
 	if err != nil {
 		t.Fatalf("ack notification: %v", err)

@@ -76,6 +76,7 @@
         { "name": "assignReviewTask", "path": "/api/ops/review-tasks/assign", "methods": ["POST"] },
         { "name": "completeReviewTask", "path": "/api/ops/review-tasks/complete", "methods": ["POST"] },
         { "name": "ackChannelNotification", "path": "/api/ops/channel-notifications/ack", "methods": ["POST"] },
+        { "name": "completeChannelRunbookCheck", "path": "/api/ops/channel-runbook-checks/complete", "methods": ["POST"] },
         { "name": "dispatchChannelNotification", "path": "/api/ops/channel-notifications/dispatch", "methods": ["POST"] },
         { "name": "updateChannelAlertPolicy", "path": "/api/ops/channel-alert-policies/update", "methods": ["POST"] },
         { "name": "approveNotificationPolicyChange", "path": "/api/ops/channel-alert-policies/approve-change", "methods": ["POST"] },

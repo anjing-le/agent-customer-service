@@ -365,6 +365,19 @@ type ChannelNotification = {
   ackNote?: string;
   ackedAt?: string;
 };
+type ChannelRunbookCheck = {
+  id: string;
+  channel: string;
+  runbookStatus: string;
+  step: string;
+  stepIndex: number;
+  actionRef?: string;
+  reportId?: string;
+  actor: string;
+  note?: string;
+  completedAt: string;
+};
+
 type ChannelRunbook = {
   channel: string;
   severity: string;
@@ -376,6 +389,7 @@ type ChannelRunbook = {
   notificationId?: string;
   notificationState?: string;
   steps: string[];
+  checks?: ChannelRunbookCheck[] | null;
 };
 type ChannelProtocolExample = {
   id: string;
@@ -1250,6 +1264,27 @@ function App() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ack handoff failed');
+    }
+  };
+
+  const completeRunbookCheck = async (runbook: ChannelRunbook, step: string, stepIndex: number) => {
+    setError('');
+    try {
+      await api<ChannelRunbookCheck>('/api/ops/channel-runbook-checks/complete', {
+        method: 'POST',
+        body: JSON.stringify({
+          channel: runbook.channel,
+          runbookStatus: runbook.status,
+          step,
+          stepIndex,
+          actionRef: `${runbook.channel}:${runbook.status}`,
+          actor: 'ops-a',
+          note: `completed ${runbook.channel}:${runbook.status} step ${stepIndex + 1}`
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'complete runbook check failed');
     }
   };
 
@@ -2500,9 +2535,24 @@ function App() {
                     <small>{item.nextAction}</small>
                     <small>{item.escalation}</small>
                     <div className="runbookSteps">
-                      {item.steps.slice(0, 4).map((step) => (
-                        <small key={`${item.channel}-${step}`}>{step}</small>
-                      ))}
+                      {item.steps.slice(0, 4).map((step, stepIndex) => {
+                        const completed = (item.checks ?? []).find((check) => check.stepIndex === stepIndex);
+                        return (
+                          <small key={`${item.channel}-${item.status}-${stepIndex}`}>
+                            {completed ? 'done' : 'todo'} · {step}
+                            {completed ? ` · ${completed.actor}` : ''}
+                            {!completed && (
+                              <button
+                                className="tinyButton inlineIconButton"
+                                onClick={() => void completeRunbookCheck(item, step, stepIndex)}
+                                title="确认 Runbook 检查项"
+                              >
+                                <CheckCircle2 size={12} />
+                              </button>
+                            )}
+                          </small>
+                        );
+                      })}
                     </div>
                   </div>
                   <b className={statusClass(item.status === 'ESCALATE' ? 'HIGH' : item.status === 'RETRY' ? 'MEDIUM' : 'LOW')}>

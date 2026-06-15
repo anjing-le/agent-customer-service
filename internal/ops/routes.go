@@ -483,6 +483,45 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		httpjson.OK(w, notification)
 	})
 
+	mux.HandleFunc("/api/ops/channel-runbook-checks/complete", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Channel       string `json:"channel"`
+			RunbookStatus string `json:"runbookStatus"`
+			Step          string `json:"step"`
+			StepIndex     int    `json:"stepIndex"`
+			ActionRef     string `json:"actionRef"`
+			ReportID      string `json:"reportId"`
+			Actor         string `json:"actor"`
+			Note          string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		if strings.TrimSpace(req.Channel) == "" || strings.TrimSpace(req.Step) == "" {
+			httpjson.BadRequest(w, "channel and step are required")
+			return
+		}
+		check, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
+			Channel:       req.Channel,
+			RunbookStatus: req.RunbookStatus,
+			Step:          req.Step,
+			StepIndex:     req.StepIndex,
+			ActionRef:     req.ActionRef,
+			ReportID:      req.ReportID,
+			Actor:         req.Actor,
+			Note:          req.Note,
+		})
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, check)
+	})
+
 	mux.HandleFunc("/api/ops/channel-notifications/dispatch", func(w http.ResponseWriter, r *http.Request) {
 		if !httpjson.RequireMethod(w, r, http.MethodPost) {
 			return

@@ -248,6 +248,14 @@
       "response": { "status": 200, "schema": "ChannelNotification" }
     },
     {
+      "id": "completeChannelRunbookCheck",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-runbook-checks/complete",
+      "request": { "body": "CompleteChannelRunbookCheckRequest" },
+      "response": { "status": 200, "schema": "ChannelRunbookCheck" }
+    },
+    {
       "id": "dispatchChannelNotification",
       "boundary": "ops",
       "method": "POST",
@@ -595,6 +603,19 @@
       "required": ["id"],
       "fields": {
         "id": "string",
+        "actor": "string",
+        "note": "string"
+      }
+    },
+    "CompleteChannelRunbookCheckRequest": {
+      "required": ["channel", "runbookStatus", "step", "stepIndex"],
+      "fields": {
+        "channel": "string",
+        "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "step": "string",
+        "stepIndex": "number",
+        "actionRef": "string",
+        "reportId": "string",
         "actor": "string",
         "note": "string"
       }
@@ -1253,7 +1274,23 @@
         "escalation": "string",
         "notificationId": "string",
         "notificationState": "OPEN|RETRYING|DEAD_LETTER|SENT|ACKED",
-        "steps": "string[]"
+        "steps": "string[]",
+        "checks": "ChannelRunbookCheck[]"
+      }
+    },
+    "ChannelRunbookCheck": {
+      "required": ["id", "channel", "runbookStatus", "step", "stepIndex", "actor", "completedAt"],
+      "fields": {
+        "id": "string",
+        "channel": "string",
+        "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "step": "string",
+        "stepIndex": "number",
+        "actionRef": "string",
+        "reportId": "string",
+        "actor": "string",
+        "note": "string",
+        "completedAt": "RFC3339 string"
       }
     },
     "NotificationDeliveryAudit": {

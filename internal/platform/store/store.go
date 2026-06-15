@@ -95,6 +95,7 @@ type Runtime interface {
 	RollbackChannelAlertPolicy(channel string, actor string, note string, confirmation string) (ChannelAlertPolicy, error)
 	DispatchChannelNotification(id, outcome string) (ChannelNotification, error)
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
+	CompleteChannelRunbookCheck(check ChannelRunbookCheck) (ChannelRunbookCheck, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -132,6 +133,7 @@ type Store struct {
 	integrations    []ChannelIntegration
 	alertPolicies   []ChannelAlertPolicy
 	notifications   []ChannelNotification
+	runbookChecks   []ChannelRunbookCheck
 	channelReports  []ChannelOpsReport
 	reportEvents    []ChannelOpsReportEvent
 	auditEvents     []ChannelInboundAuditQualityEvent
@@ -533,16 +535,30 @@ type Metric struct {
 }
 
 type ChannelRunbook struct {
-	Channel           string   `json:"channel"`
-	Severity          string   `json:"severity"`
-	Status            string   `json:"status"`
-	FailureCode       string   `json:"failureCode"`
-	Owner             string   `json:"owner"`
-	NextAction        string   `json:"nextAction"`
-	Escalation        string   `json:"escalation"`
-	NotificationID    string   `json:"notificationId,omitempty"`
-	NotificationState string   `json:"notificationState,omitempty"`
-	Steps             []string `json:"steps"`
+	Channel           string                `json:"channel"`
+	Severity          string                `json:"severity"`
+	Status            string                `json:"status"`
+	FailureCode       string                `json:"failureCode"`
+	Owner             string                `json:"owner"`
+	NextAction        string                `json:"nextAction"`
+	Escalation        string                `json:"escalation"`
+	NotificationID    string                `json:"notificationId,omitempty"`
+	NotificationState string                `json:"notificationState,omitempty"`
+	Steps             []string              `json:"steps"`
+	Checks            []ChannelRunbookCheck `json:"checks"`
+}
+
+type ChannelRunbookCheck struct {
+	ID            string `json:"id"`
+	Channel       string `json:"channel"`
+	RunbookStatus string `json:"runbookStatus"`
+	Step          string `json:"step"`
+	StepIndex     int    `json:"stepIndex"`
+	ActionRef     string `json:"actionRef,omitempty"`
+	ReportID      string `json:"reportId,omitempty"`
+	Actor         string `json:"actor"`
+	Note          string `json:"note,omitempty"`
+	CompletedAt   string `json:"completedAt"`
 }
 
 type QualitySummary struct {
@@ -1076,6 +1092,21 @@ func (s *Store) AcknowledgeChannelNotification(id, actor, note string) (ChannelN
 	return ChannelNotification{}, fmt.Errorf("channel notification %s not found", id)
 }
 
+func (s *Store) CompleteChannelRunbookCheck(check ChannelRunbookCheck) (ChannelRunbookCheck, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalizeChannelRunbookCheck(&check)
+	for idx, item := range s.runbookChecks {
+		if sameChannelRunbookCheck(item, check) {
+			check.ID = item.ID
+			s.runbookChecks[idx] = check
+			return check, nil
+		}
+	}
+	s.runbookChecks = append([]ChannelRunbookCheck{check}, s.runbookChecks...)
+	return check, nil
+}
+
 func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1423,7 +1454,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		AuditEvents:      append([]ChannelInboundAuditQualityEvent(nil), s.auditEvents...),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
-		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications, s.inboundAudits),
+		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications, s.inboundAudits, s.runbookChecks),
 		PolicyEvents:     append([]NotificationPolicyEvent(nil), s.policyEvents...),
 		PolicyChanges:    append([]NotificationPolicyChange(nil), s.policyChanges...),
 		Quality:          quality,
@@ -2496,6 +2527,33 @@ func normalizeChannelOpsReportEvent(event *ChannelOpsReportEvent) {
 	}
 }
 
+func normalizeChannelRunbookCheck(check *ChannelRunbookCheck) {
+	now := time.Now().UTC()
+	if strings.TrimSpace(check.ID) == "" {
+		check.ID = fmt.Sprintf("channel_runbook_check_%d", now.UnixNano())
+	}
+	check.Channel = fallback(strings.TrimSpace(check.Channel), "Unknown")
+	check.RunbookStatus = fallback(strings.ToUpper(strings.TrimSpace(check.RunbookStatus)), "DISPATCH")
+	check.Step = fallback(strings.TrimSpace(check.Step), "Runbook step")
+	if check.StepIndex < 0 {
+		check.StepIndex = 0
+	}
+	check.Actor = fallback(strings.TrimSpace(check.Actor), "operator")
+	check.ActionRef = strings.TrimSpace(check.ActionRef)
+	check.ReportID = strings.TrimSpace(check.ReportID)
+	check.Note = strings.TrimSpace(check.Note)
+	if strings.TrimSpace(check.CompletedAt) == "" {
+		check.CompletedAt = now.Format(time.RFC3339)
+	}
+}
+
+func sameChannelRunbookCheck(left ChannelRunbookCheck, right ChannelRunbookCheck) bool {
+	return strings.EqualFold(left.Channel, right.Channel) &&
+		strings.EqualFold(left.RunbookStatus, right.RunbookStatus) &&
+		left.StepIndex == right.StepIndex &&
+		strings.EqualFold(left.ActionRef, right.ActionRef)
+}
+
 func normalizeChannelInboundAudit(audit *ChannelInboundAudit) {
 	now := time.Now().UTC()
 	if strings.TrimSpace(audit.ID) == "" {
@@ -3028,7 +3086,7 @@ func channelAlertCount(alerts []ChannelAlert) int {
 	return total
 }
 
-func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notifications []ChannelNotification, audits []ChannelInboundAudit) []ChannelRunbook {
+func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notifications []ChannelNotification, audits []ChannelInboundAudit, checks []ChannelRunbookCheck) []ChannelRunbook {
 	runbooks := make([]ChannelRunbook, 0)
 	for _, policy := range policies {
 		if !policy.Active {
@@ -3082,6 +3140,30 @@ func channelRunbooks(alerts []ChannelAlert, policies []ChannelAlertPolicy, notif
 		})
 	}
 	runbooks = append(runbooks, channelInboundAuditRunbooks(audits, policies)...)
+	return attachChannelRunbookChecks(runbooks, checks)
+}
+
+func attachChannelRunbookChecks(runbooks []ChannelRunbook, checks []ChannelRunbookCheck) []ChannelRunbook {
+	for idx := range runbooks {
+		matched := make([]ChannelRunbookCheck, 0)
+		for _, check := range checks {
+			if !strings.EqualFold(check.Channel, runbooks[idx].Channel) || !strings.EqualFold(check.RunbookStatus, runbooks[idx].Status) {
+				continue
+			}
+			if check.StepIndex >= 0 && check.StepIndex < len(runbooks[idx].Steps) {
+				matched = append(matched, check)
+				continue
+			}
+			for stepIdx, step := range runbooks[idx].Steps {
+				if strings.EqualFold(check.Step, step) {
+					check.StepIndex = stepIdx
+					matched = append(matched, check)
+					break
+				}
+			}
+		}
+		runbooks[idx].Checks = matched
+	}
 	return runbooks
 }
 
