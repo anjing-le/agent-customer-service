@@ -785,7 +785,8 @@ function App() {
   const protocolMatrix = channelProtocolMatrix.rows as ChannelProtocolMatrixRow[];
   const auditStatusOptions = ['ALL', 'ACCEPTED', 'REJECTED'] as const;
   const auditQualityEventStatusOptions = ['ALL', 'WATCH', 'ESCALATE'] as const;
-  const auditChannels = Array.from(new Set([...protocolMatrix.map((item) => item.channel), ...channelInboundAudits.map((item) => item.channel)])).sort();
+  const auditChannels = Array.from(new Set([...protocolMatrix.map((item) => item.channel), ...channelInboundAudits.map((item) => item.channel), ...auditQualityEvents.map((item) => item.channel)])).sort();
+  const alertPolicyByChannel = Object.fromEntries(channelAlertPolicies.map((policy) => [policy.channel, policy]));
   const auditQualityRows = auditChannels.map((channel) => {
     const items = channelInboundAudits.filter((audit) => audit.channel === channel);
     const total = items.length;
@@ -799,8 +800,45 @@ function App() {
         return acc;
       }, {});
     const topError = Object.entries(topCode).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0];
-    return { channel, total, accepted, rejected, acceptanceRate, topError: topError ? `${topError[0]}:${topError[1]}` : '' };
+    return { channel, total, accepted, rejected, acceptanceRate, topErrorCode: topError?.[0] ?? '', topErrorCount: topError?.[1] ?? 0, topError: topError ? `${topError[0]}:${topError[1]}` : '' };
   }).filter((item) => item.total > 0);
+  const auditQualityByChannel = Object.fromEntries(auditQualityRows.map((row) => [row.channel, row]));
+  const latestAuditEventByChannel = auditQualityEvents.reduce<Record<string, ChannelInboundAuditQualityEvent>>((acc, event) => {
+    const current = acc[event.channel];
+    if (!current || event.createdAt > current.createdAt) {
+      acc[event.channel] = event;
+    }
+    return acc;
+  }, {});
+  const auditRecoveryRows = Object.values(latestAuditEventByChannel).map((event) => {
+    const current = auditQualityByChannel[event.channel];
+    const policy = alertPolicyByChannel[event.channel];
+    const minSamples = policy?.inboundAuditMinSamples ?? event.minSamples;
+    const minAcceptanceRate = policy?.inboundAuditMinAcceptanceRate ?? event.minAcceptanceRate;
+    const maxErrorCount = policy?.inboundAuditMaxErrorCount ?? event.maxErrorCount;
+    const currentRate = current?.acceptanceRate ?? event.acceptanceRate;
+    const currentTotal = current?.total ?? 0;
+    const currentTopErrorCount = current?.topErrorCount ?? 0;
+    const recovered = currentTotal >= minSamples && currentRate >= minAcceptanceRate && currentTopErrorCount < maxErrorCount;
+    const state = recovered ? 'RECOVERED' : event.status === 'ESCALATE' ? 'ACTIVE' : 'WATCH';
+    return {
+      channel: event.channel,
+      state,
+      failureCode: event.failureCode,
+      eventRate: event.acceptanceRate,
+      currentRate,
+      currentTotal,
+      minSamples,
+      minAcceptanceRate,
+      maxErrorCount,
+      createdAt: event.createdAt
+    };
+  }).sort((left, right) => {
+    if (left.state !== right.state) {
+      return left.state === 'ACTIVE' ? -1 : right.state === 'ACTIVE' ? 1 : left.state === 'WATCH' ? -1 : 1;
+    }
+    return right.createdAt.localeCompare(left.createdAt);
+  });
   const notificationChannels = Array.from(new Set(channelNotifications.map((item) => item.channel))).sort();
   const notificationStatusOptions = ['ALL', 'OPEN', 'RETRYING', 'SENT', 'DEAD_LETTER', 'ACKED'] as const;
   const visibleNotifications = channelNotifications.filter((item) => {
@@ -935,12 +973,12 @@ function App() {
         api<ChannelInboundAuditQualityEvent[]>(`/api/ops/channel-inbound-audit-quality-events?${channelInboundAuditQualityEventQuery()}`)
       ]);
       setDashboard(dashboardData);
-      setKnowledge(knowledgeData);
-      setTrainingSamples(sampleData);
-      setChannelOpsReports(reportData);
+      setKnowledge(knowledgeData ?? []);
+      setTrainingSamples(sampleData ?? []);
+      setChannelOpsReports(reportData ?? []);
       setReportScheduler(schedulerData);
-      setReportEvents(reportEventData);
-      setAuditQualityEvents(auditQualityEventData);
+      setReportEvents(reportEventData ?? []);
+      setAuditQualityEvents(auditQualityEventData ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1448,7 +1486,7 @@ function App() {
   };
 
   const downloadChannelInboundAuditQualityEvents = async () => {
-    const response = await fetch(`/api/ops/channel-inbound-audit-quality-events/export?${channelInboundAuditQualityEventQuery(inboundAuditChannelFilter, 'ALL', inboundAuditCodeFilter, 100)}`);
+    const response = await fetch(`/api/ops/channel-inbound-audit-quality-events/export?${channelInboundAuditQualityEventQuery(inboundAuditChannelFilter, auditQualityEventStatusFilter, inboundAuditCodeFilter, 100)}`);
     if (!response.ok) {
       throw new Error('download channel inbound audit quality events failed');
     }
@@ -1958,6 +1996,7 @@ function App() {
                 onChange={(event) => {
                   setInboundAuditChannelFilter(event.target.value);
                   void refreshInboundAudits(event.target.value, inboundAuditStatusFilter, inboundAuditCodeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'));
+                  void refreshAuditQualityEvents(event.target.value, auditQualityEventStatusFilter, inboundAuditCodeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load audit quality events failed'));
                 }}
               >
                 <option value="ALL">ALL</option>
@@ -1968,11 +2007,15 @@ function App() {
               <input
                 aria-label="验收审计错误码"
                 value={inboundAuditCodeFilter}
-                onBlur={(event) => void refreshInboundAudits(inboundAuditChannelFilter, inboundAuditStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'))}
+                onBlur={(event) => {
+                  void refreshInboundAudits(inboundAuditChannelFilter, inboundAuditStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'));
+                  void refreshAuditQualityEvents(inboundAuditChannelFilter, auditQualityEventStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load audit quality events failed'));
+                }}
                 onChange={(event) => setInboundAuditCodeFilter(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     void refreshInboundAudits(inboundAuditChannelFilter, inboundAuditStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel inbound audits failed'));
+                    void refreshAuditQualityEvents(inboundAuditChannelFilter, auditQualityEventStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load audit quality events failed'));
                   }
                 }}
                 placeholder="code"
@@ -2015,6 +2058,23 @@ function App() {
                 <Download size={14} />
               </button>
             </div>
+            {auditRecoveryRows.length > 0 && (
+              <div className="auditRecoveryGrid">
+                {auditRecoveryRows.map((row) => (
+                  <article className="auditRecoveryRow" key={row.channel}>
+                    <div>
+                      <strong>{row.channel} · {row.state}</strong>
+                      <span>{row.failureCode} · last {row.eventRate}% · current {row.currentRate}%</span>
+                    </div>
+                    <div className="auditQualityBar">
+                      <span style={{ width: `${Math.min(100, row.currentRate)}%` }} />
+                      <em style={{ width: `${Math.max(0, 100 - row.currentRate)}%` }} />
+                    </div>
+                    <small>{row.currentTotal}/{row.minSamples} samples · min {row.minAcceptanceRate}% · same-code {row.maxErrorCount}</small>
+                  </article>
+                ))}
+              </div>
+            )}
             {auditQualityEvents.length > 0 && (
               <div className="eventStrip">
                 {auditQualityEvents.map((event) => (
@@ -2168,7 +2228,7 @@ function App() {
                     {report.summary.inboundAudit && (
                       <span>
                         inbound {report.summary.inboundAudit.accepted}/{report.summary.inboundAudit.total} accepted · {report.summary.inboundAudit.acceptanceRate}%
-                        {report.summary.inboundAudit.topErrorCodes.length > 0 ? ` · ${report.summary.inboundAudit.topErrorCodes.map((item) => `${item.code}:${item.count}`).join(' / ')}` : ''}
+                        {(report.summary.inboundAudit.topErrorCodes ?? []).length > 0 ? ` · ${(report.summary.inboundAudit.topErrorCodes ?? []).map((item) => `${item.code}:${item.count}`).join(' / ')}` : ''}
                       </span>
                     )}
                     <span>{report.summary.channels.length > 0 ? report.summary.channels.join(' / ') : 'ALL channels'}</span>

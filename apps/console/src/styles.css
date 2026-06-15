@@ -450,6 +450,44 @@ h2 {
   background: #d98b73;
 }
 
+.auditRecoveryGrid {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 2px;
+}
+
+.auditRecoveryRow {
+  display: grid;
+  grid-template-columns: minmax(128px, 0.9fr) minmax(120px, 1fr) minmax(160px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #dfe9e4;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.auditRecoveryRow div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.auditRecoveryRow strong,
+.auditRecoveryRow span,
+.auditRecoveryRow small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auditRecoveryRow span,
+.auditRecoveryRow small {
+  color: #64786d;
+  font-size: 12px;
+}
+
 .activeSession {
   display: grid;
   gap: 4px;
@@ -1237,6 +1275,10 @@ input {
   }
 
   .matrixRow {
+    grid-template-columns: 1fr;
+  }
+
+  .auditRecoveryRow {
     grid-template-columns: 1fr;
   }
 
