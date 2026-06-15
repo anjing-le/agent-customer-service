@@ -464,6 +464,15 @@ type ChannelOpsReportSummary = {
     acceptanceRate: number;
     topErrorCodes: Array<{ code: string; count: number }>;
   };
+  inboundAuditQuality?: {
+    eventCount: number;
+    active: number;
+    watch: number;
+    recovered: number;
+    activeChannels: string[] | null;
+    watchChannels: string[] | null;
+    recoveredChannels: string[] | null;
+  };
 };
 type ChannelOpsReport = {
   id: string;
@@ -533,6 +542,7 @@ type Dashboard = {
   channelAlerts: ChannelAlert[] | null;
   channelFailureTrends: ChannelFailureTrend[] | null;
   channelInboundAudits: ChannelInboundAudit[] | null;
+  channelInboundAuditQualityEvents: ChannelInboundAuditQualityEvent[] | null;
   channelAlertPolicies: ChannelAlertPolicy[] | null;
   channelNotifications: ChannelNotification[] | null;
   channelRunbooks: ChannelRunbook[] | null;
@@ -2231,7 +2241,13 @@ function App() {
                         {(report.summary.inboundAudit.topErrorCodes ?? []).length > 0 ? ` · ${(report.summary.inboundAudit.topErrorCodes ?? []).map((item) => `${item.code}:${item.count}`).join(' / ')}` : ''}
                       </span>
                     )}
-                    <span>{report.summary.channels.length > 0 ? report.summary.channels.join(' / ') : 'ALL channels'}</span>
+                    {report.summary.inboundAuditQuality && (
+                      <span>
+                        quality events {report.summary.inboundAuditQuality.eventCount} · active {report.summary.inboundAuditQuality.active} · watch {report.summary.inboundAuditQuality.watch} · recovered {report.summary.inboundAuditQuality.recovered}
+                        {(report.summary.inboundAuditQuality.activeChannels ?? []).length > 0 ? ` · ${report.summary.inboundAuditQuality.activeChannels?.join(' / ')}` : ''}
+                      </span>
+                    )}
+                    <span>{(report.summary.channels ?? []).length > 0 ? (report.summary.channels ?? []).join(' / ') : 'ALL channels'}</span>
                   </div>
                   <button className="tinyButton" onClick={() => downloadSavedChannelOpsReport(report).catch((err) => setError(err instanceof Error ? err.message : 'download saved channel ops report failed'))} title="下载历史日报">
                     <Download size={14} />

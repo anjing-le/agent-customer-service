@@ -738,7 +738,19 @@
         "retrying": "number",
         "deadLetters": "number",
         "channels": "string[]",
-        "inboundAudit": "ChannelInboundAuditSummary"
+        "inboundAudit": "ChannelInboundAuditSummary",
+        "inboundAuditQuality": "ChannelInboundAuditQualitySummary"
+      }
+    },
+    "ChannelInboundAuditQualitySummary": {
+      "fields": {
+        "eventCount": "number",
+        "active": "number",
+        "watch": "number",
+        "recovered": "number",
+        "activeChannels": "string[]",
+        "watchChannels": "string[]",
+        "recoveredChannels": "string[]"
       }
     },
     "ChannelInboundAuditSummary": {
@@ -1081,7 +1093,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelInboundAudits", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelInboundAudits", "channelInboundAuditQualityEvents", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -1093,6 +1105,7 @@
         "channelAlerts": "ChannelAlert[]",
         "channelFailureTrends": "ChannelFailureTrend[]",
         "channelInboundAudits": "ChannelInboundAudit[]",
+        "channelInboundAuditQualityEvents": "ChannelInboundAuditQualityEvent[]",
         "channelAlertPolicies": "ChannelAlertPolicy[]",
         "channelNotifications": "ChannelNotification[]",
         "channelRunbooks": "ChannelRunbook[]",

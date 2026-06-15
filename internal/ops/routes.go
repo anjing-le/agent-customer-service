@@ -910,7 +910,14 @@ func writeChannelOpsReport(w http.ResponseWriter, report store.ChannelOpsReport)
 }
 
 func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSummary {
-	summary := store.ChannelOpsReportSummary{}
+	summary := store.ChannelOpsReportSummary{
+		Channels: []string{},
+		InboundAuditQuality: store.ChannelInboundAuditQualitySummary{
+			ActiveChannels:    []string{},
+			WatchChannels:     []string{},
+			RecoveredChannels: []string{},
+		},
+	}
 	seenChannels := map[string]bool{}
 	for _, alert := range dashboard.ChannelAlerts {
 		summary.FailureCount += alert.Count
@@ -941,6 +948,13 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 		}
 	}
 	summary.InboundAudit = channelInboundAuditSummary(dashboard.ChannelAudits)
+	summary.InboundAuditQuality = channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	for _, channel := range append(append(summary.InboundAuditQuality.ActiveChannels, summary.InboundAuditQuality.WatchChannels...), summary.InboundAuditQuality.RecoveredChannels...) {
+		if channel != "" && !seenChannels[channel] {
+			seenChannels[channel] = true
+			summary.Channels = append(summary.Channels, channel)
+		}
+	}
 	return summary
 }
 
@@ -976,6 +990,94 @@ func channelInboundAuditSummary(audits []store.ChannelInboundAudit) store.Channe
 	return summary
 }
 
+func channelInboundAuditQualitySummary(audits []store.ChannelInboundAudit, policies []store.ChannelAlertPolicy, events []store.ChannelInboundAuditQualityEvent) store.ChannelInboundAuditQualitySummary {
+	summary := store.ChannelInboundAuditQualitySummary{
+		EventCount:        len(events),
+		ActiveChannels:    []string{},
+		WatchChannels:     []string{},
+		RecoveredChannels: []string{},
+	}
+	latestByChannel := map[string]store.ChannelInboundAuditQualityEvent{}
+	order := make([]string, 0)
+	for _, event := range events {
+		if strings.TrimSpace(event.Channel) == "" {
+			continue
+		}
+		if _, exists := latestByChannel[event.Channel]; !exists {
+			order = append(order, event.Channel)
+			latestByChannel[event.Channel] = event
+		}
+	}
+	for _, channel := range order {
+		event := latestByChannel[channel]
+		current := channelAuditQuality(audits, channel)
+		policy := channelAlertPolicyForReport(policies, channel)
+		minSamples := fallbackInt(policy.InboundAuditMinSamples, event.MinSamples)
+		minAcceptanceRate := fallbackInt(policy.InboundAuditMinAcceptanceRate, event.MinAcceptanceRate)
+		maxErrorCount := fallbackInt(policy.InboundAuditMaxErrorCount, event.MaxErrorCount)
+		recovered := current.Total >= minSamples && current.AcceptanceRate >= minAcceptanceRate && current.TopErrorCount < maxErrorCount
+		if recovered {
+			summary.Recovered++
+			summary.RecoveredChannels = append(summary.RecoveredChannels, channel)
+			continue
+		}
+		if strings.EqualFold(event.Status, "ESCALATE") {
+			summary.Active++
+			summary.ActiveChannels = append(summary.ActiveChannels, channel)
+			continue
+		}
+		summary.Watch++
+		summary.WatchChannels = append(summary.WatchChannels, channel)
+	}
+	return summary
+}
+
+type channelAuditQualitySnapshot struct {
+	Total          int
+	Accepted       int
+	AcceptanceRate int
+	TopErrorCount  int
+}
+
+func channelAuditQuality(audits []store.ChannelInboundAudit, channel string) channelAuditQualitySnapshot {
+	snapshot := channelAuditQualitySnapshot{}
+	errorCounts := map[string]int{}
+	for _, audit := range audits {
+		if !strings.EqualFold(audit.Channel, channel) {
+			continue
+		}
+		snapshot.Total++
+		if strings.EqualFold(audit.Status, "ACCEPTED") {
+			snapshot.Accepted++
+			continue
+		}
+		errorCounts[audit.Code]++
+		if errorCounts[audit.Code] > snapshot.TopErrorCount {
+			snapshot.TopErrorCount = errorCounts[audit.Code]
+		}
+	}
+	if snapshot.Total > 0 {
+		snapshot.AcceptanceRate = snapshot.Accepted * 100 / snapshot.Total
+	}
+	return snapshot
+}
+
+func channelAlertPolicyForReport(policies []store.ChannelAlertPolicy, channel string) store.ChannelAlertPolicy {
+	for _, policy := range policies {
+		if strings.EqualFold(policy.Channel, channel) {
+			return policy
+		}
+	}
+	return store.ChannelAlertPolicy{}
+}
+
+func fallbackInt(value int, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
+}
+
 func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.Time) string {
 	totalFailures := 0
 	for _, alert := range dashboard.ChannelAlerts {
@@ -995,6 +1097,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 		}
 	}
 	inboundAudit := channelInboundAuditSummary(dashboard.ChannelAudits)
+	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 
 	var b strings.Builder
 	b.WriteString("# Agent Customer Service Channel Ops Report\n\n")
@@ -1003,6 +1106,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString(fmt.Sprintf("- Channel failures: %d\n", totalFailures))
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
 	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
+	b.WriteString(fmt.Sprintf("- Inbound quality events: total=%d active=%d watch=%d recovered=%d\n", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered))
 	b.WriteString(fmt.Sprintf("- Notifications: open=%d retrying=%d dead_letter=%d\n\n", openNotifications, retryingNotifications, deadLetters))
 
 	b.WriteString("## Alerts\n\n")
@@ -1038,6 +1142,15 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 			}
 		}
 		b.WriteString("\n")
+	}
+
+	b.WriteString("## Inbound Quality Events\n\n")
+	if inboundQuality.EventCount == 0 {
+		b.WriteString("- No inbound quality threshold events.\n\n")
+	} else {
+		b.WriteString(fmt.Sprintf("- Active channels: %s\n", channelListOrNone(inboundQuality.ActiveChannels)))
+		b.WriteString(fmt.Sprintf("- Watch channels: %s\n", channelListOrNone(inboundQuality.WatchChannels)))
+		b.WriteString(fmt.Sprintf("- Recovered channels: %s\n\n", channelListOrNone(inboundQuality.RecoveredChannels)))
 	}
 
 	b.WriteString("## Runbooks\n\n")
@@ -1096,6 +1209,25 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 			return nil, err
 		}
 	}
+	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	if err := writer.Write([]string{"inbound_quality", "", "SUMMARY", "events", fmt.Sprintf("total=%d active=%d watch=%d recovered=%d", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered), "", "", ""}); err != nil {
+		return nil, err
+	}
+	for _, channel := range inboundQuality.ActiveChannels {
+		if err := writer.Write([]string{"inbound_quality_channel", channel, "ACTIVE", "", "", "", "still below threshold", ""}); err != nil {
+			return nil, err
+		}
+	}
+	for _, channel := range inboundQuality.WatchChannels {
+		if err := writer.Write([]string{"inbound_quality_channel", channel, "WATCH", "", "", "", "watch threshold trend", ""}); err != nil {
+			return nil, err
+		}
+	}
+	for _, channel := range inboundQuality.RecoveredChannels {
+		if err := writer.Write([]string{"inbound_quality_channel", channel, "RECOVERED", "", "", "", "current audit quality recovered", ""}); err != nil {
+			return nil, err
+		}
+	}
 	for _, runbook := range dashboard.ChannelRunbooks {
 		if err := writer.Write([]string{"runbook", runbook.Channel, runbook.Status, runbook.FailureCode, "", runbook.Owner, runbook.NextAction, runbook.Escalation}); err != nil {
 			return nil, err
@@ -1119,4 +1251,11 @@ func fallbackReportValue(value string) string {
 		return "-"
 	}
 	return value
+}
+
+func channelListOrNone(channels []string) string {
+	if len(channels) == 0 {
+		return "-"
+	}
+	return strings.Join(channels, ", ")
 }

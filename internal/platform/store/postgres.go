@@ -1457,6 +1457,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	auditEvents, err := s.ListChannelInboundAuditQualityEvents(20)
+	if err != nil {
+		return Dashboard{}, err
+	}
 	alertPolicies, err := s.listChannelAlertPolicies(channelAlerts)
 	if err != nil {
 		return Dashboard{}, err
@@ -1516,6 +1520,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		ChannelAlerts:    channelAlerts,
 		ChannelTrends:    channelTrends,
 		ChannelAudits:    channelAudits,
+		AuditEvents:      auditEvents,
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
 		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications, channelAudits),

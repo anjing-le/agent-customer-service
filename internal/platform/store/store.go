@@ -413,27 +413,28 @@ type TrainingSample struct {
 }
 
 type Dashboard struct {
-	Metrics          []Metric                   `json:"metrics"`
-	Conversations    []Conversation             `json:"conversations"`
-	KnowledgeGaps    []KnowledgeGap             `json:"knowledgeGaps"`
-	Rules            []Rule                     `json:"rules"`
-	Transfers        []TransferTicket           `json:"transfers"`
-	ChannelPolicies  []ChannelPolicy            `json:"channelPolicies"`
-	Integrations     []ChannelIntegration       `json:"integrations"`
-	ChannelAlerts    []ChannelAlert             `json:"channelAlerts"`
-	ChannelTrends    []ChannelFailureTrend      `json:"channelFailureTrends"`
-	ChannelAudits    []ChannelInboundAudit      `json:"channelInboundAudits"`
-	AlertPolicies    []ChannelAlertPolicy       `json:"channelAlertPolicies"`
-	Notifications    []ChannelNotification      `json:"channelNotifications"`
-	ChannelRunbooks  []ChannelRunbook           `json:"channelRunbooks"`
-	PolicyEvents     []NotificationPolicyEvent  `json:"notificationPolicyEvents"`
-	PolicyChanges    []NotificationPolicyChange `json:"notificationPolicyChanges"`
-	Quality          QualitySummary             `json:"quality"`
-	Annotations      []Annotation               `json:"annotations"`
-	ReviewTasks      []ReviewTask               `json:"reviewTasks"`
-	RuleApprovals    []RuleApproval             `json:"ruleApprovals"`
-	RuleEvents       []RuleReleaseEvent         `json:"ruleEvents"`
-	RuleObservations []RuleReleaseObservation   `json:"ruleObservations"`
+	Metrics          []Metric                          `json:"metrics"`
+	Conversations    []Conversation                    `json:"conversations"`
+	KnowledgeGaps    []KnowledgeGap                    `json:"knowledgeGaps"`
+	Rules            []Rule                            `json:"rules"`
+	Transfers        []TransferTicket                  `json:"transfers"`
+	ChannelPolicies  []ChannelPolicy                   `json:"channelPolicies"`
+	Integrations     []ChannelIntegration              `json:"integrations"`
+	ChannelAlerts    []ChannelAlert                    `json:"channelAlerts"`
+	ChannelTrends    []ChannelFailureTrend             `json:"channelFailureTrends"`
+	ChannelAudits    []ChannelInboundAudit             `json:"channelInboundAudits"`
+	AuditEvents      []ChannelInboundAuditQualityEvent `json:"channelInboundAuditQualityEvents"`
+	AlertPolicies    []ChannelAlertPolicy              `json:"channelAlertPolicies"`
+	Notifications    []ChannelNotification             `json:"channelNotifications"`
+	ChannelRunbooks  []ChannelRunbook                  `json:"channelRunbooks"`
+	PolicyEvents     []NotificationPolicyEvent         `json:"notificationPolicyEvents"`
+	PolicyChanges    []NotificationPolicyChange        `json:"notificationPolicyChanges"`
+	Quality          QualitySummary                    `json:"quality"`
+	Annotations      []Annotation                      `json:"annotations"`
+	ReviewTasks      []ReviewTask                      `json:"reviewTasks"`
+	RuleApprovals    []RuleApproval                    `json:"ruleApprovals"`
+	RuleEvents       []RuleReleaseEvent                `json:"ruleEvents"`
+	RuleObservations []RuleReleaseObservation          `json:"ruleObservations"`
 }
 
 type ChannelOpsReport struct {
@@ -446,13 +447,14 @@ type ChannelOpsReport struct {
 }
 
 type ChannelOpsReportSummary struct {
-	FailureCount      int                        `json:"failureCount"`
-	ActiveRunbooks    int                        `json:"activeRunbooks"`
-	OpenNotifications int                        `json:"openNotifications"`
-	Retrying          int                        `json:"retrying"`
-	DeadLetters       int                        `json:"deadLetters"`
-	Channels          []string                   `json:"channels"`
-	InboundAudit      ChannelInboundAuditSummary `json:"inboundAudit"`
+	FailureCount        int                               `json:"failureCount"`
+	ActiveRunbooks      int                               `json:"activeRunbooks"`
+	OpenNotifications   int                               `json:"openNotifications"`
+	Retrying            int                               `json:"retrying"`
+	DeadLetters         int                               `json:"deadLetters"`
+	Channels            []string                          `json:"channels"`
+	InboundAudit        ChannelInboundAuditSummary        `json:"inboundAudit"`
+	InboundAuditQuality ChannelInboundAuditQualitySummary `json:"inboundAuditQuality"`
 }
 
 type ChannelInboundAuditSummary struct {
@@ -466,6 +468,16 @@ type ChannelInboundAuditSummary struct {
 type ChannelInboundAuditCodeCount struct {
 	Code  string `json:"code"`
 	Count int    `json:"count"`
+}
+
+type ChannelInboundAuditQualitySummary struct {
+	EventCount        int      `json:"eventCount"`
+	Active            int      `json:"active"`
+	Watch             int      `json:"watch"`
+	Recovered         int      `json:"recovered"`
+	ActiveChannels    []string `json:"activeChannels"`
+	WatchChannels     []string `json:"watchChannels"`
+	RecoveredChannels []string `json:"recoveredChannels"`
 }
 
 type ChannelInboundAuditQualityEvent struct {
@@ -1392,6 +1404,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		ChannelAlerts:    channelAlerts,
 		ChannelTrends:    channelFailureTrends(s.channelFailures, time.Now().UTC()),
 		ChannelAudits:    append([]ChannelInboundAudit(nil), s.inboundAudits...),
+		AuditEvents:      append([]ChannelInboundAuditQualityEvent(nil), s.auditEvents...),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
 		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications, s.inboundAudits),
