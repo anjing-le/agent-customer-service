@@ -32,6 +32,20 @@
       "failureCodes": ["channel_rate_limited", "stale_signature", "duplicate_inbound"]
     },
     {
+      "id": "wecom-customer-service-callback",
+      "channel": "WeCom",
+      "adapterEndpoint": "POST /api/channels/wecom/inbound",
+      "signatureHeader": "X-WeCom-Signature",
+      "timestampHeader": "X-WeCom-Event-Time",
+      "replayHeader": "X-WeCom-Msg-ID",
+      "canonicalPayload": ["corpId", "msgId", "eventTime", "text"],
+      "sampleCanonicalPayload": ["corp-demo", "wecom-msg-example-1", "2026-06-14T03:10:00Z", "合同发票信息需要修改"],
+      "demoSecret": "wecom-demo-secret",
+      "sampleSignature": "7263cb3db55aa580d46af0dc33094b58f20f8296a22e8349d1fb6992aec6bf9b",
+      "retrySemantics": "WeCom callbacks may retry by msgId while the conversation identity is corpId + userId.",
+      "failureCodes": ["invalid_signature", "stale_signature", "duplicate_inbound"]
+    },
+    {
       "id": "marketplace-order-message-callback",
       "channel": "Marketplace",
       "adapterEndpoint": "POST /api/channels/marketplace/inbound",
@@ -129,6 +143,36 @@
         "body": "订单状态在哪里看？",
         "sentAt": "2026-06-14T03:10:00Z",
         "signature": "7d3aa2303fc1856febfe8f018850a59f3985fed6759dfec072333125cdd773a6"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    },
+    {
+      "id": "wecom-adapter-inbound",
+      "channel": "WeCom",
+      "endpoint": "POST /api/channels/wecom/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "https://qyapi.weixin.qq.com"
+      },
+      "secretRef": "ANJING_CHANNEL_WECOM_SECRET",
+      "demoSecret": "wecom-demo-secret",
+      "signatureInput": {
+        "channel": "WeCom",
+        "externalConversationId": "corp-demo:user-demo",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "合同发票信息需要修改"
+      },
+      "request": {
+        "corpId": "corp-demo",
+        "userId": "user-demo",
+        "msgId": "wecom-msg-example-1",
+        "agentId": "agent-cs",
+        "text": "合同发票信息需要修改",
+        "eventTime": "2026-06-14T03:10:00Z",
+        "signature": "62de1ad2c0d7b642f169a12359575f6b5664898a17f4f6512e4e8321c67feb25"
       },
       "expectedSuccess": {
         "status": 200,

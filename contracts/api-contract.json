@@ -66,6 +66,14 @@
       "response": { "status": 200, "schema": "SendMessageResult" }
     },
     {
+      "id": "receiveWeComInbound",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/wecom/inbound",
+      "request": { "body": "WeComInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
       "id": "receiveAppInbound",
       "boundary": "channels",
       "method": "POST",
@@ -352,6 +360,18 @@
         "text": "string",
         "timestamp": "RFC3339 string",
         "signature": "HMAC-SHA256 hex over normalized WeChat inbound payload"
+      }
+    },
+    "WeComInboundRequest": {
+      "required": ["corpId", "userId", "text", "eventTime", "signature"],
+      "fields": {
+        "corpId": "string",
+        "userId": "string",
+        "msgId": "string",
+        "agentId": "string",
+        "text": "string",
+        "eventTime": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex over normalized WeCom inbound payload"
       }
     },
     "AppInboundRequest": {

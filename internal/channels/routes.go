@@ -33,6 +33,16 @@ type wechatInboundRequest struct {
 	Signature string `json:"signature"`
 }
 
+type wecomInboundRequest struct {
+	CorpID    string `json:"corpId"`
+	UserID    string `json:"userId"`
+	MessageID string `json:"msgId"`
+	AgentID   string `json:"agentId"`
+	Text      string `json:"text"`
+	EventTime string `json:"eventTime"`
+	Signature string `json:"signature"`
+}
+
 type appInboundRequest struct {
 	DeviceID  string `json:"deviceId"`
 	MessageID string `json:"messageId"`
@@ -60,6 +70,7 @@ type Config struct {
 var defaultChannelSecrets = map[string]string{
 	"web":         "web-demo-secret",
 	"wechat":      "wechat-demo-secret",
+	"wecom":       "wecom-demo-secret",
 	"app":         "app-demo-secret",
 	"marketplace": "marketplace-demo-secret",
 }
@@ -86,6 +97,17 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			return
 		}
 		var req wechatInboundRequest
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		handleInbound(w, r, st, cfg, req.toInbound())
+	})
+	mux.HandleFunc("/api/channels/wecom/inbound", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req wecomInboundRequest
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
 			return
@@ -242,6 +264,18 @@ func (req wechatInboundRequest) toInbound() inboundRequest {
 		Customer:               req.Nickname,
 		Content:                req.Text,
 		Timestamp:              req.Timestamp,
+		Signature:              req.Signature,
+	}
+}
+
+func (req wecomInboundRequest) toInbound() inboundRequest {
+	return inboundRequest{
+		Channel:                "WeCom",
+		ExternalConversationID: strings.Join([]string{req.CorpID, req.UserID}, ":"),
+		ExternalMessageID:      req.MessageID,
+		Customer:               req.UserID,
+		Content:                req.Text,
+		Timestamp:              req.EventTime,
 		Signature:              req.Signature,
 	}
 }

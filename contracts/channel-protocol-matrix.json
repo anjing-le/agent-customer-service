@@ -41,6 +41,25 @@
       "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "stale_signature"]
     },
     {
+      "channel": "WeCom",
+      "adapterEndpoint": "POST /api/channels/wecom/inbound",
+      "successExampleId": "wecom-adapter-inbound",
+      "signatureProfileId": "wecom-customer-service-callback",
+      "conversationKey": "corpId + userId",
+      "messageKey": "msgId",
+      "customerField": "userId",
+      "contentField": "text",
+      "timestampField": "eventTime",
+      "origin": "https://qyapi.weixin.qq.com",
+      "secretRef": "ANJING_CHANNEL_WECOM_SECRET",
+      "signatureHeader": "X-WeCom-Signature",
+      "timestampHeader": "X-WeCom-Event-Time",
+      "replayKey": "channel + msgId",
+      "rateLimit": "50/min",
+      "retrySemantics": "enterprise callback retries by msgId and scopes conversation by corpId + userId",
+      "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_signature"]
+    },
+    {
       "channel": "Marketplace",
       "adapterEndpoint": "POST /api/channels/marketplace/inbound",
       "successExampleId": "marketplace-adapter-inbound",

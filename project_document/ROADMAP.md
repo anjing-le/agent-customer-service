@@ -32,18 +32,18 @@
 - 已支持 SSE 流式回复，控制台通过 stream endpoint 展示增量输出。
 - 已支持质量评估摘要和固定质量评估集，进入 quality gate。
 - 已支持人工质检标注，按 groundedness、safety、helpfulness 维度给助手回复打分，并回写 Dashboard 质量摘要。
-- 已支持渠道策略，Web/WeChat/App/Marketplace 可配置语气、风险加权和转人工 SLA，并进入控制台筛选。
+- 已支持渠道策略，Web/WeChat/WeCom/App/Marketplace 可配置语气、风险加权和转人工 SLA，并进入控制台筛选。
 - 已支持标注复盘面板和低分样本导出，运营可导出 prompt/answer/评分/备注作为复盘材料。
 - 已支持渠道 inbound 适配器，外部渠道消息通过 env 密钥、HMAC-SHA256 签名、timestamp 时间窗和 replay 记录后进入统一会话链路。
 - 已支持渠道集成治理视图，展示 secret ref、签名窗口、replay 开关和轮换提示，但不暴露密钥值。
 - 已支持 webhook 校验读取 `ChannelIntegration`，将 enabled、secret ref、签名窗口和 replay 开关接入运行时。
 - 已支持 `externalMessageId` 对账，真实渠道可用官方消息 ID 做幂等，缺省时退回签名载荷 replay key。
-- 已支持 WeChat/App/Marketplace adapter，将真实渠道字段归一到标准 inbound 链路。
+- 已支持 WeChat/WeCom/App/Marketplace adapter，将真实渠道字段归一到标准 inbound 链路。
 - 已支持 active/next secret ref 双密钥轮换窗口，控制台不暴露密钥值。
 - 已支持渠道来源白名单，声明 `Origin` 或 `X-Channel-Origin` 时必须命中 `allowedOrigins`。
 - 已支持渠道每分钟频率限制，超过 `rateLimitPerMinute` 返回 `channel_rate_limited`。
 - 已支持渠道通知出站治理，包含通知目标配置、target URL、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、配置变更审计、退避重试、外部回执、死信、确认、脱敏投递审计和控制台筛选。
-- 已支持真实平台回调协议差异和渠道验签样例集，包含平台签名头、时间头、replay 头、canonical payload、样例签名和重试语义。
+- 已支持真实平台回调协议差异和渠道验签样例集，包含 WeChat、WeCom、App、Marketplace 的平台签名头、时间头、replay 头、canonical payload、样例签名和重试语义。
 - 已支持渠道失败告警 Runbook 和运营处置步骤，根据告警策略、通知状态和死信情况生成下一步、升级条件和检查项。
 - 已支持渠道告警指标趋势图和控制台运营日报 JSON 导出，覆盖失败聚合、小时桶、通知状态、Runbook 和死信摘要。
 - 已支持渠道运营日报的 Markdown/CSV 服务端导出，可供脚本、CI 或运营工具直接下载。
@@ -51,7 +51,7 @@
 - 已支持渠道运营日报定时任务触发器和保留策略，`platform-all` / `ops-api` 可通过 env 开启后台生成并保留最近 N 份快照。
 - 已支持渠道运营日报调度状态可视化，控制台展示调度开关、格式、间隔、保留数量、最近运行结果和下一次运行时间。
 - 已支持渠道运营日报失败时的人工补偿动作，控制台可立即补生成并记录 `ChannelOpsReportEvent` 审计事件。
-- 下一步补更细的真实平台回调协议差异和渠道验签样例集。
+- 下一步补渠道运营日报补偿事件的筛选和导出。
 
 ## V3: 生产化扩展
 

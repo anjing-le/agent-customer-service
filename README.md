@@ -66,12 +66,15 @@ go run ./cmd/platform-all
 ```bash
 export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
 export ANJING_CHANNEL_WECHAT_NEXT_SECRET='your-next-wechat-secret'
+export ANJING_CHANNEL_WECOM_SECRET='your-wecom-secret'
+export ANJING_CHANNEL_WECOM_NEXT_SECRET='your-next-wecom-secret'
 export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
 ```
 
 真实渠道 adapter 入口会先归一字段，再复用标准 inbound 链路：
 
 - `/api/channels/wechat/inbound`
+- `/api/channels/wecom/inbound`
 - `/api/channels/app/inbound`
 - `/api/channels/marketplace/inbound`
 

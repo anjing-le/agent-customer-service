@@ -58,6 +58,7 @@ func Load(serviceName, defaultPort string) Config {
 			Secrets: map[string]string{
 				"web":         env("ANJING_CHANNEL_WEB_SECRET", "web-demo-secret"),
 				"wechat":      env("ANJING_CHANNEL_WECHAT_SECRET", "wechat-demo-secret"),
+				"wecom":       env("ANJING_CHANNEL_WECOM_SECRET", "wecom-demo-secret"),
 				"app":         env("ANJING_CHANNEL_APP_SECRET", "app-demo-secret"),
 				"marketplace": env("ANJING_CHANNEL_MARKETPLACE_SECRET", "marketplace-demo-secret"),
 			},

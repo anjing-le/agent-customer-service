@@ -33,6 +33,7 @@
       "routes": [
         { "name": "receiveInboundMessage", "path": "/api/channels/inbound", "methods": ["POST"], "console": false },
         { "name": "receiveWeChatInbound", "path": "/api/channels/wechat/inbound", "methods": ["POST"], "console": false },
+        { "name": "receiveWeComInbound", "path": "/api/channels/wecom/inbound", "methods": ["POST"], "console": false },
         { "name": "receiveAppInbound", "path": "/api/channels/app/inbound", "methods": ["POST"], "console": false },
         { "name": "receiveMarketplaceInbound", "path": "/api/channels/marketplace/inbound", "methods": ["POST"], "console": false }
       ]

@@ -50,6 +50,8 @@ go run ./cmd/platform-all
 export ANJING_CHANNEL_WEB_SECRET='your-web-secret'
 export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
 export ANJING_CHANNEL_WECHAT_NEXT_SECRET='your-next-wechat-secret'
+export ANJING_CHANNEL_WECOM_SECRET='your-wecom-secret'
+export ANJING_CHANNEL_WECOM_NEXT_SECRET='your-next-wecom-secret'
 export ANJING_CHANNEL_APP_SECRET='your-app-secret'
 export ANJING_CHANNEL_MARKETPLACE_SECRET='your-marketplace-secret'
 export ANJING_NOTIFICATION_MARKETPLACE_ONCALL_SECRET='your-notification-secret'
@@ -62,6 +64,7 @@ go run ./cmd/platform-all
 真实渠道 adapter 入口：
 
 - `/api/channels/wechat/inbound`
+- `/api/channels/wecom/inbound`
 - `/api/channels/app/inbound`
 - `/api/channels/marketplace/inbound`
 
@@ -86,6 +89,7 @@ export ANJING_CHANNEL_REPORT_RUN_ON_STARTUP=true
 ```bash
 ./scripts/demo-channel-inbound.sh
 ./scripts/demo-channel-inbound.sh http://localhost:10002 wechat-adapter-inbound
+./scripts/demo-channel-inbound.sh http://localhost:10002 wecom-adapter-inbound
 ```
 
 第一个参数是服务地址，默认 `http://localhost:10002`；第二个参数是样例 ID，默认 `all`。

@@ -186,6 +186,29 @@ func TestWeChatAdapterNormalizesInboundMessage(t *testing.T) {
 	}
 }
 
+func TestWeComAdapterNormalizesInboundMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "合同发票信息需要修改"
+	signature := ChannelSignature("WeCom", "corp-demo:user-demo", timestamp, content)
+	body := strings.NewReader(`{"corpId":"corp-demo","userId":"user-demo","msgId":"wecom-msg-1","agentId":"agent-cs","text":"` + content + `","eventTime":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/wecom/inbound", body)
+	req.Header.Set("X-Channel-Origin", "https://qyapi.weixin.qq.com")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"WeCom"`, `"conversationId":"conv_wecom_corp_demo_user_demo"`, `"agentMessage"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
 func TestAppAdapterNormalizesInboundMessage(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())

@@ -625,6 +625,11 @@ const signedDemoRequest = async (example: ChannelProtocolExample) => {
     request.msgId = `${request.msgId}-${unique}`;
     request.timestamp = timestamp;
     signatureInput.externalConversationId = request.openId;
+  } else if (example.endpoint.endsWith('/api/channels/wecom/inbound')) {
+    request.userId = `${request.userId}-${unique}`;
+    request.msgId = `${request.msgId}-${unique}`;
+    request.eventTime = timestamp;
+    signatureInput.externalConversationId = `${request.corpId}:${request.userId}`;
   } else if (example.endpoint.endsWith('/api/channels/app/inbound')) {
     request.deviceId = `${request.deviceId}-${unique}`;
     request.messageId = `${request.messageId}-${unique}`;

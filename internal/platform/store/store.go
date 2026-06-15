@@ -2059,6 +2059,7 @@ func defaultChannelPolicies() []ChannelPolicy {
 	return []ChannelPolicy{
 		{Channel: "Web", DisplayName: "Web 客服", Tone: "标准、清晰、可追溯", SLAMinutes: 30, RiskBoost: "NORMAL", EscalationNote: "网页渠道按标准客服 SLA 处理。", Enabled: true},
 		{Channel: "WeChat", DisplayName: "微信客服", Tone: "简洁、安抚、快速接管", SLAMinutes: 15, RiskBoost: "HIGH", EscalationNote: "微信投诉和催办要更快进入人工队列。", Enabled: true},
+		{Channel: "WeCom", DisplayName: "企业微信客服", Tone: "专业、内部协同、保留上下文", SLAMinutes: 12, RiskBoost: "HIGH", EscalationNote: "企业微信通常连接私域客户和内部协同，投诉和合同问题优先接管。", Enabled: true},
 		{Channel: "App", DisplayName: "App 客服", Tone: "直接、产品化、引导自助", SLAMinutes: 20, RiskBoost: "NORMAL", EscalationNote: "App 内问题优先引导订单和售后入口。", Enabled: true},
 		{Channel: "Marketplace", DisplayName: "平台店铺客服", Tone: "谨慎、合规、避免承诺", SLAMinutes: 10, RiskBoost: "HIGH", EscalationNote: "平台投诉可能影响店铺指标，优先升级。", Enabled: true},
 	}
@@ -2068,6 +2069,7 @@ func defaultChannelIntegrations(now string) []ChannelIntegration {
 	return []ChannelIntegration{
 		{Channel: "Web", DisplayName: "Web 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WEB_SECRET", NextSecretRef: "ANJING_CHANNEL_WEB_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://console.example.com"}, RateLimitPerMinute: 120, RotationHint: "按演示环境手动轮换 env secret", UpdatedAt: now},
 		{Channel: "WeChat", DisplayName: "微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECHAT_SECRET", NextSecretRef: "ANJING_CHANNEL_WECHAT_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://wechat.example.com"}, RateLimitPerMinute: 60, RotationHint: "生产接入时对齐微信回调 message id", UpdatedAt: now},
+		{Channel: "WeCom", DisplayName: "企业微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECOM_SECRET", NextSecretRef: "ANJING_CHANNEL_WECOM_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://qyapi.weixin.qq.com"}, RateLimitPerMinute: 50, RotationHint: "企业微信回调按 corpId + msgId 做对账并轮换 token", UpdatedAt: now},
 		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", NextSecretRef: "ANJING_CHANNEL_APP_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"app://agent-customer-service"}, RateLimitPerMinute: 90, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
 		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", NextSecretRef: "ANJING_CHANNEL_MARKETPLACE_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://marketplace.example.com"}, RateLimitPerMinute: 45, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
 	}
@@ -2077,6 +2079,7 @@ func defaultChannelAlertPolicies() []ChannelAlertPolicy {
 	return []ChannelAlertPolicy{
 		newDefaultChannelAlertPolicy("Web", "MEDIUM", 8, 60, "ops-webhook"),
 		newDefaultChannelAlertPolicy("WeChat", "HIGH", 5, 60, "wechat-oncall"),
+		newDefaultChannelAlertPolicy("WeCom", "HIGH", 4, 60, "wecom-oncall"),
 		newDefaultChannelAlertPolicy("App", "MEDIUM", 6, 60, "app-oncall"),
 		newDefaultChannelAlertPolicy("Marketplace", "HIGH", 3, 60, "marketplace-oncall"),
 	}
