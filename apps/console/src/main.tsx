@@ -313,6 +313,9 @@ type ChannelAlertPolicy = {
   secretRef: string;
   maxAttempts: number;
   backoffSeconds: number;
+  inboundAuditMinSamples: number;
+  inboundAuditMinAcceptanceRate: number;
+  inboundAuditMaxErrorCount: number;
   enabled: boolean;
   active: boolean;
   currentCount: number;
@@ -323,6 +326,9 @@ type NotificationPolicyDraft = {
   secretRef: string;
   maxAttempts: number;
   backoffSeconds: number;
+  inboundAuditMinSamples: number;
+  inboundAuditMinAcceptanceRate: number;
+  inboundAuditMaxErrorCount: number;
 };
 type ChannelNotification = {
   id: string;
@@ -910,7 +916,10 @@ function App() {
         targetUrl: policy.targetUrl,
         secretRef: policy.secretRef,
         maxAttempts: policy.maxAttempts,
-        backoffSeconds: policy.backoffSeconds
+        backoffSeconds: policy.backoffSeconds,
+        inboundAuditMinSamples: policy.inboundAuditMinSamples,
+        inboundAuditMinAcceptanceRate: policy.inboundAuditMinAcceptanceRate,
+        inboundAuditMaxErrorCount: policy.inboundAuditMaxErrorCount
       }
     ]));
     setNotificationPolicyDrafts(nextDrafts);
@@ -1137,8 +1146,11 @@ function App() {
           secretRef: draft.secretRef,
           maxAttempts: Number(draft.maxAttempts),
           backoffSeconds: Number(draft.backoffSeconds),
+          inboundAuditMinSamples: Number(draft.inboundAuditMinSamples),
+          inboundAuditMinAcceptanceRate: Number(draft.inboundAuditMinAcceptanceRate),
+          inboundAuditMaxErrorCount: Number(draft.inboundAuditMaxErrorCount),
           actor: 'ops-a',
-          note: '控制台更新通知目标配置'
+          note: '控制台更新通知与验收阈值配置'
         })
       });
       await load();
@@ -2093,7 +2105,10 @@ function App() {
                   targetUrl: policy.targetUrl,
                   secretRef: policy.secretRef,
                   maxAttempts: policy.maxAttempts,
-                  backoffSeconds: policy.backoffSeconds
+                  backoffSeconds: policy.backoffSeconds,
+                  inboundAuditMinSamples: policy.inboundAuditMinSamples,
+                  inboundAuditMinAcceptanceRate: policy.inboundAuditMinAcceptanceRate,
+                  inboundAuditMaxErrorCount: policy.inboundAuditMaxErrorCount
                 };
                 return (
                   <article className="tableRow" key={policy.channel}>
@@ -2102,6 +2117,7 @@ function App() {
                       <span>{policy.currentCount}/{policy.threshold} in {policy.windowMinutes}m</span>
                       <span>{policy.targetUrl} · {policy.secretRef}</span>
                       <span>{policy.maxAttempts} attempts · {policy.backoffSeconds}s base backoff</span>
+                      <span>inbound audit: {policy.inboundAuditMinSamples} samples · {policy.inboundAuditMinAcceptanceRate}% min · {policy.inboundAuditMaxErrorCount} same-code</span>
                       {policy.lastTriggeredAt && <span>{policy.lastTriggeredAt.slice(11, 19)}</span>}
                       <div className="policyConfig">
                         <input
@@ -2142,12 +2158,45 @@ function App() {
                             [policy.channel]: { ...draft, backoffSeconds: Number(event.target.value) }
                           }))}
                         />
+                        <input
+                          aria-label={`${policy.channel} inbound audit min samples`}
+                          min={1}
+                          max={100}
+                          type="number"
+                          value={draft.inboundAuditMinSamples}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, inboundAuditMinSamples: Number(event.target.value) }
+                          }))}
+                        />
+                        <input
+                          aria-label={`${policy.channel} inbound audit min acceptance rate`}
+                          min={1}
+                          max={100}
+                          type="number"
+                          value={draft.inboundAuditMinAcceptanceRate}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, inboundAuditMinAcceptanceRate: Number(event.target.value) }
+                          }))}
+                        />
+                        <input
+                          aria-label={`${policy.channel} inbound audit max error count`}
+                          min={1}
+                          max={100}
+                          type="number"
+                          value={draft.inboundAuditMaxErrorCount}
+                          onChange={(event) => setNotificationPolicyDrafts((current) => ({
+                            ...current,
+                            [policy.channel]: { ...draft, inboundAuditMaxErrorCount: Number(event.target.value) }
+                          }))}
+                        />
                       </div>
                     </div>
                     <div className="gapActions">
                       <em>{policy.severity}</em>
                       <b className={statusClass(policy.active ? 'HIGH' : 'LOW')}>{policy.active ? 'ACTIVE' : 'READY'}</b>
-                      <button className="tinyButton" onClick={() => updateChannelAlertPolicy(policy)} title="保存通知目标">
+                      <button className="tinyButton" onClick={() => updateChannelAlertPolicy(policy)} title="保存通知和验收阈值">
                         <Save size={14} />
                       </button>
                       <button className="tinyButton" onClick={() => rollbackChannelAlertPolicy(policy)} title="回滚通知目标">

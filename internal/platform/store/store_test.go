@@ -586,9 +586,57 @@ func TestChannelInboundAuditQualityCreatesRunbook(t *testing.T) {
 	}
 }
 
+func TestChannelInboundAuditRunbookUsesPolicyThresholds(t *testing.T) {
+	st := NewSeedStore()
+	audits := []ChannelInboundAudit{
+		{Channel: "Web", Status: "ACCEPTED", Code: "accepted"},
+		{Channel: "Web", Status: "ACCEPTED", Code: "accepted"},
+		{Channel: "Web", Status: "REJECTED", Code: "invalid_signature"},
+		{Channel: "Web", Status: "REJECTED", Code: "invalid_signature"},
+	}
+	for _, audit := range audits {
+		if err := st.RecordChannelInboundAudit(audit); err != nil {
+			t.Fatalf("record channel inbound audit: %v", err)
+		}
+	}
+
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	for _, item := range dashboard.ChannelRunbooks {
+		if item.Channel == "Web" && item.FailureCode == "invalid_signature" {
+			t.Fatalf("expected default Web sample threshold to suppress runbook, got %#v", dashboard.ChannelRunbooks)
+		}
+	}
+
+	policy, err := st.UpdateChannelAlertPolicy("Web", "", "", 3, 60, 3, 75, 3, "ops-a", "调低 Web 验收质量阈值")
+	if err != nil {
+		t.Fatalf("update channel alert policy: %v", err)
+	}
+	if policy.InboundAuditMinSamples != 3 || policy.InboundAuditMinAcceptanceRate != 75 || policy.InboundAuditMaxErrorCount != 3 {
+		t.Fatalf("expected configurable inbound audit thresholds, got %#v", policy)
+	}
+
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard after policy update: %v", err)
+	}
+	var found bool
+	for _, item := range dashboard.ChannelRunbooks {
+		if item.Channel == "Web" && item.FailureCode == "invalid_signature" && strings.Contains(item.NextAction, "75%") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected policy threshold to create runbook, got %#v", dashboard.ChannelRunbooks)
+	}
+}
+
 func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 	st := NewSeedStore()
-	policy, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/marketplace", "ANJING_NOTIFICATION_CUSTOM_SECRET", 5, 45, "ops-a", "切换到生产通知目标")
+	policy, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/marketplace", "ANJING_NOTIFICATION_CUSTOM_SECRET", 5, 45, 0, 0, 0, "ops-a", "切换到生产通知目标")
 	if err != nil {
 		t.Fatalf("update channel alert policy: %v", err)
 	}
@@ -673,7 +721,7 @@ func TestUpdateChannelAlertPolicyControlsNewNotifications(t *testing.T) {
 
 func TestRejectNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
 	st := NewSeedStore()
-	original, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/reject", "ANJING_NOTIFICATION_REJECT_SECRET", 5, 45, "ops-a", "待拒绝变更")
+	original, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/reject", "ANJING_NOTIFICATION_REJECT_SECRET", 5, 45, 0, 0, 0, "ops-a", "待拒绝变更")
 	if err != nil {
 		t.Fatalf("request channel alert policy update: %v", err)
 	}
@@ -712,7 +760,7 @@ func TestRejectNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
 
 func TestCancelNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
 	st := NewSeedStore()
-	original, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/cancel", "ANJING_NOTIFICATION_CANCEL_SECRET", 5, 45, "ops-a", "待撤销变更")
+	original, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/cancel", "ANJING_NOTIFICATION_CANCEL_SECRET", 5, 45, 0, 0, 0, "ops-a", "待撤销变更")
 	if err != nil {
 		t.Fatalf("request channel alert policy update: %v", err)
 	}
@@ -751,7 +799,7 @@ func TestCancelNotificationPolicyChangeKeepsCurrentPolicy(t *testing.T) {
 
 func TestExpiredNotificationPolicyChangeIsAudited(t *testing.T) {
 	st := NewSeedStore()
-	_, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/expired", "ANJING_NOTIFICATION_EXPIRED_SECRET", 5, 45, "ops-a", "待过期变更")
+	_, err := st.UpdateChannelAlertPolicy("Marketplace", "https://ops.example.com/hooks/expired", "ANJING_NOTIFICATION_EXPIRED_SECRET", 5, 45, 0, 0, 0, "ops-a", "待过期变更")
 	if err != nil {
 		t.Fatalf("request channel alert policy update: %v", err)
 	}

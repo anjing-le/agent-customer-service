@@ -45,7 +45,7 @@ func (f failingRuntime) RecordChannelFailure(store.ChannelFailureEvent) error {
 	return errors.New("database unavailable")
 }
 
-func (f failingRuntime) UpdateChannelAlertPolicy(string, string, string, int, int, string, string) (store.ChannelAlertPolicy, error) {
+func (f failingRuntime) UpdateChannelAlertPolicy(string, string, string, int, int, int, int, int, string, string) (store.ChannelAlertPolicy, error) {
 	return store.ChannelAlertPolicy{}, errors.New("database unavailable")
 }
 

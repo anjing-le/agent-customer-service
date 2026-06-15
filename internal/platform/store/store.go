@@ -87,7 +87,7 @@ type Runtime interface {
 	RecordChannelInboundAudit(audit ChannelInboundAudit) error
 	ListChannelInboundAudits(limit int) ([]ChannelInboundAudit, error)
 	RecordChannelFailure(event ChannelFailureEvent) error
-	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error)
+	UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, inboundAuditMinSamples int, inboundAuditMinAcceptanceRate int, inboundAuditMaxErrorCount int, actor string, note string) (ChannelAlertPolicy, error)
 	ApproveNotificationPolicyChange(id string, approver string, note string, confirmation string) (ChannelAlertPolicy, error)
 	RejectNotificationPolicyChange(id string, reviewer string, note string) (NotificationPolicyChange, error)
 	CancelNotificationPolicyChange(id string, actor string, note string) (NotificationPolicyChange, error)
@@ -575,19 +575,22 @@ type ChannelFailureTrend struct {
 }
 
 type ChannelAlertPolicy struct {
-	Channel         string `json:"channel"`
-	Severity        string `json:"severity"`
-	Threshold       int    `json:"threshold"`
-	WindowMinutes   int    `json:"windowMinutes"`
-	NotifyTarget    string `json:"notifyTarget"`
-	TargetURL       string `json:"targetUrl"`
-	SecretRef       string `json:"secretRef"`
-	MaxAttempts     int    `json:"maxAttempts"`
-	BackoffSeconds  int    `json:"backoffSeconds"`
-	Enabled         bool   `json:"enabled"`
-	Active          bool   `json:"active"`
-	CurrentCount    int    `json:"currentCount"`
-	LastTriggeredAt string `json:"lastTriggeredAt,omitempty"`
+	Channel                       string `json:"channel"`
+	Severity                      string `json:"severity"`
+	Threshold                     int    `json:"threshold"`
+	WindowMinutes                 int    `json:"windowMinutes"`
+	NotifyTarget                  string `json:"notifyTarget"`
+	TargetURL                     string `json:"targetUrl"`
+	SecretRef                     string `json:"secretRef"`
+	MaxAttempts                   int    `json:"maxAttempts"`
+	BackoffSeconds                int    `json:"backoffSeconds"`
+	InboundAuditMinSamples        int    `json:"inboundAuditMinSamples"`
+	InboundAuditMinAcceptanceRate int    `json:"inboundAuditMinAcceptanceRate"`
+	InboundAuditMaxErrorCount     int    `json:"inboundAuditMaxErrorCount"`
+	Enabled                       bool   `json:"enabled"`
+	Active                        bool   `json:"active"`
+	CurrentCount                  int    `json:"currentCount"`
+	LastTriggeredAt               string `json:"lastTriggeredAt,omitempty"`
 }
 
 type ChannelNotification struct {
@@ -790,18 +793,32 @@ func (s *Store) RecordChannelFailure(event ChannelFailureEvent) error {
 	return nil
 }
 
-func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error) {
+func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, inboundAuditMinSamples int, inboundAuditMinAcceptanceRate int, inboundAuditMaxErrorCount int, actor string, note string) (ChannelAlertPolicy, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	normalized := strings.TrimSpace(channel)
 	if normalized == "" {
 		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
 	}
+	targetURL = strings.TrimSpace(targetURL)
+	secretRef = strings.TrimSpace(secretRef)
+	maxAttempts = normalizeMaxAttempts(maxAttempts)
+	backoffSeconds = normalizeBackoffSeconds(backoffSeconds)
 	for idx := range s.alertPolicies {
 		if strings.EqualFold(s.alertPolicies[idx].Channel, normalized) {
 			before := s.alertPolicies[idx]
 			normalizeChannelAlertPolicy(&before)
-			if requiresNotificationPolicyApproval(before) {
+			inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount = normalizeInboundAuditThresholdInputs(before, inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount)
+			deliveryChanged := channelAlertPolicyDeliveryChanged(before, targetURL, secretRef, maxAttempts, backoffSeconds)
+			thresholdChanged := channelAlertPolicyInboundAuditThresholdChanged(before, inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount)
+			if requiresNotificationPolicyApproval(before) && deliveryChanged {
+				if thresholdChanged {
+					applyChannelAlertPolicyInboundAuditThresholds(&s.alertPolicies[idx], inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount)
+					afterThresholds := s.alertPolicies[idx]
+					normalizeChannelAlertPolicy(&afterThresholds)
+					event := newNotificationPolicyEvent(afterThresholds.Channel, "UPDATE_AUDIT_THRESHOLDS", actor, notificationPolicySummary(before), notificationPolicySummary(afterThresholds), note, time.Now().UTC().Format(time.RFC3339))
+					s.policyEvents = append([]NotificationPolicyEvent{event}, s.policyEvents...)
+				}
 				change := newNotificationPolicyChange(before, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
 				s.policyChanges = append([]NotificationPolicyChange{change}, s.policyChanges...)
 				event := newNotificationPolicyEvent(before.Channel, "REQUEST_APPROVAL", actor, notificationPolicySummary(before), notificationPolicyChangeSummary(change), note, time.Now().UTC().Format(time.RFC3339))
@@ -813,8 +830,9 @@ func (s *Store) UpdateChannelAlertPolicy(channel string, targetURL string, secre
 			}
 			s.alertPolicies[idx].TargetURL = fallback(targetURL, notificationTargetURL(s.alertPolicies[idx].NotifyTarget))
 			s.alertPolicies[idx].SecretRef = fallback(secretRef, notificationSecretRef(s.alertPolicies[idx].NotifyTarget))
-			s.alertPolicies[idx].MaxAttempts = normalizeMaxAttempts(maxAttempts)
-			s.alertPolicies[idx].BackoffSeconds = normalizeBackoffSeconds(backoffSeconds)
+			s.alertPolicies[idx].MaxAttempts = maxAttempts
+			s.alertPolicies[idx].BackoffSeconds = backoffSeconds
+			applyChannelAlertPolicyInboundAuditThresholds(&s.alertPolicies[idx], inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount)
 			after := s.alertPolicies[idx]
 			normalizeChannelAlertPolicy(&after)
 			event := newNotificationPolicyEvent(after.Channel, "UPDATE", actor, notificationPolicySummary(before), notificationPolicySummary(after), note, time.Now().UTC().Format(time.RFC3339))
@@ -1755,7 +1773,7 @@ func newNotificationPolicyChange(current ChannelAlertPolicy, targetURL, secretRe
 
 func notificationPolicySummary(policy ChannelAlertPolicy) string {
 	normalizeChannelAlertPolicy(&policy)
-	return fmt.Sprintf("targetUrl=%s secretRef=%s maxAttempts=%d backoffSeconds=%d", policy.TargetURL, policy.SecretRef, policy.MaxAttempts, policy.BackoffSeconds)
+	return fmt.Sprintf("targetUrl=%s secretRef=%s maxAttempts=%d backoffSeconds=%d inboundAuditMinSamples=%d inboundAuditMinAcceptanceRate=%d inboundAuditMaxErrorCount=%d", policy.TargetURL, policy.SecretRef, policy.MaxAttempts, policy.BackoffSeconds, policy.InboundAuditMinSamples, policy.InboundAuditMinAcceptanceRate, policy.InboundAuditMaxErrorCount)
 }
 
 func notificationPolicyChangeSummary(change NotificationPolicyChange) string {
@@ -2148,18 +2166,29 @@ func defaultChannelAlertPolicies() []ChannelAlertPolicy {
 }
 
 func newDefaultChannelAlertPolicy(channel, severity string, threshold, windowMinutes int, target string) ChannelAlertPolicy {
-	return ChannelAlertPolicy{
-		Channel:        channel,
-		Severity:       severity,
-		Threshold:      threshold,
-		WindowMinutes:  windowMinutes,
-		NotifyTarget:   target,
-		TargetURL:      notificationTargetURL(target),
-		SecretRef:      notificationSecretRef(target),
-		MaxAttempts:    3,
-		BackoffSeconds: 60,
-		Enabled:        true,
+	policy := ChannelAlertPolicy{
+		Channel:                       channel,
+		Severity:                      severity,
+		Threshold:                     threshold,
+		WindowMinutes:                 windowMinutes,
+		NotifyTarget:                  target,
+		TargetURL:                     notificationTargetURL(target),
+		SecretRef:                     notificationSecretRef(target),
+		MaxAttempts:                   3,
+		BackoffSeconds:                60,
+		InboundAuditMinSamples:        3,
+		InboundAuditMinAcceptanceRate: 80,
+		InboundAuditMaxErrorCount:     2,
+		Enabled:                       true,
 	}
+	switch channel {
+	case "Web", "App":
+		policy.InboundAuditMinSamples = 5
+	case "WeChat", "WeCom", "Marketplace", "Douyin", "Xiaohongshu":
+		policy.InboundAuditMinSamples = 4
+		policy.InboundAuditMinAcceptanceRate = 85
+	}
+	return policy
 }
 
 func channelIntegrationFor(integrations []ChannelIntegration, channel string) ChannelIntegration {
@@ -2657,6 +2686,76 @@ func normalizeChannelAlertPolicy(policy *ChannelAlertPolicy) {
 	policy.SecretRef = fallback(policy.SecretRef, notificationSecretRef(policy.NotifyTarget))
 	policy.MaxAttempts = normalizeMaxAttempts(policy.MaxAttempts)
 	policy.BackoffSeconds = normalizeBackoffSeconds(policy.BackoffSeconds)
+	policy.InboundAuditMinSamples = normalizeInboundAuditMinSamples(policy.InboundAuditMinSamples)
+	policy.InboundAuditMinAcceptanceRate = normalizeInboundAuditMinAcceptanceRate(policy.InboundAuditMinAcceptanceRate)
+	policy.InboundAuditMaxErrorCount = normalizeInboundAuditMaxErrorCount(policy.InboundAuditMaxErrorCount)
+}
+
+func applyChannelAlertPolicyInboundAuditThresholds(policy *ChannelAlertPolicy, minSamples int, minAcceptanceRate int, maxErrorCount int) {
+	policy.InboundAuditMinSamples = normalizeInboundAuditMinSamples(minSamples)
+	policy.InboundAuditMinAcceptanceRate = normalizeInboundAuditMinAcceptanceRate(minAcceptanceRate)
+	policy.InboundAuditMaxErrorCount = normalizeInboundAuditMaxErrorCount(maxErrorCount)
+}
+
+func channelAlertPolicyDeliveryChanged(policy ChannelAlertPolicy, targetURL string, secretRef string, maxAttempts int, backoffSeconds int) bool {
+	normalizeChannelAlertPolicy(&policy)
+	targetURL = fallback(strings.TrimSpace(targetURL), notificationTargetURL(policy.NotifyTarget))
+	secretRef = fallback(strings.TrimSpace(secretRef), notificationSecretRef(policy.NotifyTarget))
+	return policy.TargetURL != targetURL ||
+		policy.SecretRef != secretRef ||
+		policy.MaxAttempts != normalizeMaxAttempts(maxAttempts) ||
+		policy.BackoffSeconds != normalizeBackoffSeconds(backoffSeconds)
+}
+
+func channelAlertPolicyInboundAuditThresholdChanged(policy ChannelAlertPolicy, minSamples int, minAcceptanceRate int, maxErrorCount int) bool {
+	normalizeChannelAlertPolicy(&policy)
+	return policy.InboundAuditMinSamples != normalizeInboundAuditMinSamples(minSamples) ||
+		policy.InboundAuditMinAcceptanceRate != normalizeInboundAuditMinAcceptanceRate(minAcceptanceRate) ||
+		policy.InboundAuditMaxErrorCount != normalizeInboundAuditMaxErrorCount(maxErrorCount)
+}
+
+func normalizeInboundAuditThresholdInputs(policy ChannelAlertPolicy, minSamples int, minAcceptanceRate int, maxErrorCount int) (int, int, int) {
+	normalizeChannelAlertPolicy(&policy)
+	if minSamples <= 0 {
+		minSamples = policy.InboundAuditMinSamples
+	}
+	if minAcceptanceRate <= 0 {
+		minAcceptanceRate = policy.InboundAuditMinAcceptanceRate
+	}
+	if maxErrorCount <= 0 {
+		maxErrorCount = policy.InboundAuditMaxErrorCount
+	}
+	return normalizeInboundAuditMinSamples(minSamples), normalizeInboundAuditMinAcceptanceRate(minAcceptanceRate), normalizeInboundAuditMaxErrorCount(maxErrorCount)
+}
+
+func normalizeInboundAuditMinSamples(value int) int {
+	if value <= 0 {
+		return 3
+	}
+	if value > 100 {
+		return 100
+	}
+	return value
+}
+
+func normalizeInboundAuditMinAcceptanceRate(value int) int {
+	if value <= 0 {
+		return 80
+	}
+	if value > 100 {
+		return 100
+	}
+	return value
+}
+
+func normalizeInboundAuditMaxErrorCount(value int) int {
+	if value <= 0 {
+		return 2
+	}
+	if value > 100 {
+		return 100
+	}
+	return value
 }
 
 func normalizeMaxAttempts(value int) int {
@@ -2935,22 +3034,22 @@ func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []Channe
 	runbooks := make([]ChannelRunbook, 0)
 	for _, channel := range channelOrder {
 		quality := qualityByChannel[channel]
-		if quality.total < 3 || quality.rejected == 0 {
+		policy := notificationPolicyFor(policies, channel)
+		if quality.total < policy.InboundAuditMinSamples || quality.rejected == 0 {
 			continue
 		}
 		acceptanceRate := quality.accepted * 100 / quality.total
 		topCode := topInboundAuditCode(quality.codeCounts, quality.codeOrder)
 		topCodeCount := quality.codeCounts[topCode]
-		if acceptanceRate >= 80 && topCodeCount < 2 {
+		if acceptanceRate >= policy.InboundAuditMinAcceptanceRate && topCodeCount < policy.InboundAuditMaxErrorCount {
 			continue
 		}
-		policy := notificationPolicyFor(policies, channel)
 		severity := policy.Severity
 		status := "WATCH"
-		if acceptanceRate < 70 {
+		if acceptanceRate < policy.InboundAuditMinAcceptanceRate-10 {
 			severity = "HIGH"
 		}
-		if acceptanceRate < 50 {
+		if acceptanceRate < policy.InboundAuditMinAcceptanceRate-30 || topCodeCount >= policy.InboundAuditMaxErrorCount*2 {
 			status = "ESCALATE"
 		}
 		failureCode := topCode
@@ -2963,8 +3062,8 @@ func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []Channe
 			Status:      status,
 			FailureCode: failureCode,
 			Owner:       policy.NotifyTarget,
-			NextAction:  fmt.Sprintf("最近 %d 次入站验收率为 %d%%，复核验签、来源白名单、时间窗和 replay key。", quality.total, acceptanceRate),
-			Escalation:  "若验收率持续低于 80% 或同一错误码连续出现，升级 platform-owner 与渠道 owner。",
+			NextAction:  fmt.Sprintf("最近 %d 次入站验收率为 %d%%，当前阈值为 %d%%/%d 样本/%d 次同错码，复核验签、来源白名单、时间窗和 replay key。", quality.total, acceptanceRate, policy.InboundAuditMinAcceptanceRate, policy.InboundAuditMinSamples, policy.InboundAuditMaxErrorCount),
+			Escalation:  fmt.Sprintf("若验收率持续低于 %d%% 或同一错误码达到 %d 次，升级 platform-owner 与渠道 owner。", policy.InboundAuditMinAcceptanceRate, policy.InboundAuditMaxErrorCount),
 			Steps: []string{
 				"查看渠道验收审计筛选同一错误码的最近样本",
 				"核对 ChannelIntegration 的 allowed origins、active/next secret ref 和签名窗口",

@@ -583,6 +583,9 @@
         "secretRef": "string",
         "maxAttempts": "number",
         "backoffSeconds": "number",
+        "inboundAuditMinSamples": "number",
+        "inboundAuditMinAcceptanceRate": "number",
+        "inboundAuditMaxErrorCount": "number",
         "actor": "string",
         "note": "string"
       }
@@ -1109,7 +1112,7 @@
       }
     },
     "ChannelAlertPolicy": {
-      "required": ["channel", "severity", "threshold", "windowMinutes", "notifyTarget", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "enabled", "active", "currentCount"],
+      "required": ["channel", "severity", "threshold", "windowMinutes", "notifyTarget", "targetUrl", "secretRef", "maxAttempts", "backoffSeconds", "inboundAuditMinSamples", "inboundAuditMinAcceptanceRate", "inboundAuditMaxErrorCount", "enabled", "active", "currentCount"],
       "fields": {
         "channel": "string",
         "severity": "LOW|MEDIUM|HIGH|CRITICAL",
@@ -1120,6 +1123,9 @@
         "secretRef": "string",
         "maxAttempts": "number",
         "backoffSeconds": "number",
+        "inboundAuditMinSamples": "number",
+        "inboundAuditMinAcceptanceRate": "number",
+        "inboundAuditMaxErrorCount": "number",
         "enabled": "boolean",
         "active": "boolean",
         "currentCount": "number",

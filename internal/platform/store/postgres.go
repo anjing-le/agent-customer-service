@@ -363,7 +363,7 @@ func (s *PostgresStore) DispatchChannelNotification(id, outcome string) (Channel
 	return item, nil
 }
 
-func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, actor string, note string) (ChannelAlertPolicy, error) {
+func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL string, secretRef string, maxAttempts int, backoffSeconds int, inboundAuditMinSamples int, inboundAuditMinAcceptanceRate int, inboundAuditMaxErrorCount int, actor string, note string) (ChannelAlertPolicy, error) {
 	normalized := strings.TrimSpace(channel)
 	if normalized == "" {
 		return ChannelAlertPolicy{}, fmt.Errorf("channel is required")
@@ -383,7 +383,32 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 	if err != nil {
 		return ChannelAlertPolicy{}, err
 	}
-	if requiresNotificationPolicyApproval(before) {
+	inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount = normalizeInboundAuditThresholdInputs(before, inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount)
+	deliveryChanged := channelAlertPolicyDeliveryChanged(before, targetURL, secretRef, maxAttempts, backoffSeconds)
+	thresholdChanged := channelAlertPolicyInboundAuditThresholdChanged(before, inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount)
+	if requiresNotificationPolicyApproval(before) && deliveryChanged {
+		current := before
+		if thresholdChanged {
+			if _, err := tx.Exec(ctx, `
+				update channel_alert_policies
+				set inbound_audit_min_samples = $2,
+				    inbound_audit_min_acceptance_rate = $3,
+				    inbound_audit_max_error_count = $4,
+				    updated_at = now()
+				where lower(channel) = lower($1)
+			`, normalized, inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount); err != nil {
+				return ChannelAlertPolicy{}, fmt.Errorf("update channel alert policy audit thresholds: %w", err)
+			}
+			afterThresholds, err := channelAlertPolicyTx(ctx, tx, normalized)
+			if err != nil {
+				return ChannelAlertPolicy{}, err
+			}
+			event := newNotificationPolicyEvent(afterThresholds.Channel, "UPDATE_AUDIT_THRESHOLDS", actor, notificationPolicySummary(before), notificationPolicySummary(afterThresholds), note, time.Now().UTC().Format(time.RFC3339))
+			if err := insertNotificationPolicyEvent(ctx, tx, event); err != nil {
+				return ChannelAlertPolicy{}, err
+			}
+			current = afterThresholds
+		}
 		change := newNotificationPolicyChange(before, targetURL, secretRef, maxAttempts, backoffSeconds, actor, note, time.Now().UTC().Format(time.RFC3339))
 		if err := insertNotificationPolicyChange(ctx, tx, change); err != nil {
 			return ChannelAlertPolicy{}, err
@@ -399,7 +424,7 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 		if err != nil {
 			return ChannelAlertPolicy{}, err
 		}
-		return channelAlertPolicies([]ChannelAlertPolicy{before}, alerts)[0], nil
+		return channelAlertPolicies([]ChannelAlertPolicy{current}, alerts)[0], nil
 	}
 	if _, err := tx.Exec(ctx, `
 		update channel_alert_policies
@@ -407,9 +432,12 @@ func (s *PostgresStore) UpdateChannelAlertPolicy(channel string, targetURL strin
 		    secret_ref = $3,
 		    max_attempts = $4,
 		    backoff_seconds = $5,
+		    inbound_audit_min_samples = $6,
+		    inbound_audit_min_acceptance_rate = $7,
+		    inbound_audit_max_error_count = $8,
 		    updated_at = now()
 		where lower(channel) = lower($1)
-	`, normalized, targetURL, secretRef, maxAttempts, backoffSeconds); err != nil {
+	`, normalized, targetURL, secretRef, maxAttempts, backoffSeconds, inboundAuditMinSamples, inboundAuditMinAcceptanceRate, inboundAuditMaxErrorCount); err != nil {
 		return ChannelAlertPolicy{}, fmt.Errorf("update channel alert policy: %w", err)
 	}
 	after, err := channelAlertPolicyTx(ctx, tx, normalized)
@@ -1816,7 +1844,7 @@ func (s *PostgresStore) listChannelAlertPolicies(alerts []ChannelAlert) ([]Chann
 func channelAlertPolicyTx(ctx context.Context, q queryer, channel string) (ChannelAlertPolicy, error) {
 	var item ChannelAlertPolicy
 	if err := q.QueryRow(ctx, `
-		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, enabled
+		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, inbound_audit_min_samples, inbound_audit_min_acceptance_rate, inbound_audit_max_error_count, enabled
 		from channel_alert_policies
 		where lower(channel) = lower($1)
 	`, channel).Scan(
@@ -1829,6 +1857,9 @@ func channelAlertPolicyTx(ctx context.Context, q queryer, channel string) (Chann
 		&item.SecretRef,
 		&item.MaxAttempts,
 		&item.BackoffSeconds,
+		&item.InboundAuditMinSamples,
+		&item.InboundAuditMinAcceptanceRate,
+		&item.InboundAuditMaxErrorCount,
 		&item.Enabled,
 	); err != nil {
 		return ChannelAlertPolicy{}, fmt.Errorf("load channel alert policy: %w", err)
@@ -1839,7 +1870,7 @@ func channelAlertPolicyTx(ctx context.Context, q queryer, channel string) (Chann
 
 func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q queryer, alerts []ChannelAlert) ([]ChannelAlertPolicy, error) {
 	rows, err := q.Query(ctx, `
-		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, enabled
+		select channel, severity, threshold, window_minutes, notify_target, target_url, secret_ref, max_attempts, backoff_seconds, inbound_audit_min_samples, inbound_audit_min_acceptance_rate, inbound_audit_max_error_count, enabled
 		from channel_alert_policies
 		order by channel
 	`)
@@ -1861,6 +1892,9 @@ func (s *PostgresStore) listChannelAlertPoliciesTx(ctx context.Context, q querye
 			&item.SecretRef,
 			&item.MaxAttempts,
 			&item.BackoffSeconds,
+			&item.InboundAuditMinSamples,
+			&item.InboundAuditMinAcceptanceRate,
+			&item.InboundAuditMaxErrorCount,
 			&item.Enabled,
 		); err != nil {
 			return nil, err

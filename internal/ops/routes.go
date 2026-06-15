@@ -476,13 +476,16 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			return
 		}
 		var req struct {
-			Channel        string `json:"channel"`
-			TargetURL      string `json:"targetUrl"`
-			SecretRef      string `json:"secretRef"`
-			MaxAttempts    int    `json:"maxAttempts"`
-			BackoffSeconds int    `json:"backoffSeconds"`
-			Actor          string `json:"actor"`
-			Note           string `json:"note"`
+			Channel                       string `json:"channel"`
+			TargetURL                     string `json:"targetUrl"`
+			SecretRef                     string `json:"secretRef"`
+			MaxAttempts                   int    `json:"maxAttempts"`
+			BackoffSeconds                int    `json:"backoffSeconds"`
+			InboundAuditMinSamples        int    `json:"inboundAuditMinSamples"`
+			InboundAuditMinAcceptanceRate int    `json:"inboundAuditMinAcceptanceRate"`
+			InboundAuditMaxErrorCount     int    `json:"inboundAuditMaxErrorCount"`
+			Actor                         string `json:"actor"`
+			Note                          string `json:"note"`
 		}
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
@@ -492,7 +495,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			httpjson.BadRequest(w, "channel is required")
 			return
 		}
-		policy, err := st.UpdateChannelAlertPolicy(req.Channel, req.TargetURL, req.SecretRef, req.MaxAttempts, req.BackoffSeconds, req.Actor, req.Note)
+		policy, err := st.UpdateChannelAlertPolicy(req.Channel, req.TargetURL, req.SecretRef, req.MaxAttempts, req.BackoffSeconds, req.InboundAuditMinSamples, req.InboundAuditMinAcceptanceRate, req.InboundAuditMaxErrorCount, req.Actor, req.Note)
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return
