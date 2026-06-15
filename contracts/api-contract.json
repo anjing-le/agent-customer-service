@@ -295,6 +295,14 @@
       "response": { "status": 200, "schema": "ChannelOpsReportEvent[]" }
     },
     {
+      "id": "exportChannelOpsReportEvents",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-ops-report-events/export",
+      "request": { "query": "ListChannelOpsReportEventsQuery" },
+      "response": { "status": 200, "schema": "ChannelOpsReportEventsExport" }
+    },
+    {
       "id": "listChannelOpsReports",
       "boundary": "ops",
       "method": "GET",
@@ -589,7 +597,16 @@
     },
     "ListChannelOpsReportEventsQuery": {
       "fields": {
-        "limit": "number"
+        "limit": "number",
+        "status": "ALL|SUCCESS|FAILED",
+        "actor": "string"
+      }
+    },
+    "ChannelOpsReportEventsExport": {
+      "required": ["content"],
+      "fields": {
+        "content": "text/csv response body",
+        "contentType": "text/csv"
       }
     },
     "ChannelOpsReportExport": {

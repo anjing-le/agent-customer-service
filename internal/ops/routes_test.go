@@ -667,6 +667,67 @@ func TestChannelOpsReportCompensationRouteGeneratesReportAndEvent(t *testing.T) 
 	}
 }
 
+func TestChannelOpsReportEventRoutesFilterAndExport(t *testing.T) {
+	st := store.NewSeedStore()
+	if _, err := st.RecordChannelOpsReportEvent(store.ChannelOpsReportEvent{
+		Action:   "COMPENSATE",
+		Actor:    "ops-lead",
+		Status:   "SUCCESS",
+		ReportID: "report-ok",
+		Format:   "markdown",
+		Pruned:   1,
+		Note:     "manual success",
+	}); err != nil {
+		t.Fatalf("record success event: %v", err)
+	}
+	if _, err := st.RecordChannelOpsReportEvent(store.ChannelOpsReportEvent{
+		Action: "COMPENSATE",
+		Actor:  "qa-a",
+		Status: "FAILED",
+		Format: "csv",
+		Error:  "boom",
+	}); err != nil {
+		t.Fatalf("record failed event: %v", err)
+	}
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report-events?status=FAILED&actor=qa", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"actor":"qa-a"`, `"status":"FAILED"`, `"error":"boom"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in filtered events, got %s", expected, rec.Body.String())
+		}
+	}
+	if strings.Contains(rec.Body.String(), "report-ok") {
+		t.Fatalf("expected filtered events to omit success event, got %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report-events/export?status=SUCCESS&actor=ops", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Header().Get("Content-Type"), "text/csv") {
+		t.Fatalf("expected csv content type, got %s", rec.Header().Get("Content-Type"))
+	}
+	for _, expected := range []string{"id,action,actor,status,report_id,format,pruned,note,error,created_at", "ops-lead", "manual success"} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in exported events, got %s", expected, rec.Body.String())
+		}
+	}
+	if strings.Contains(rec.Body.String(), "qa-a") {
+		t.Fatalf("expected exported events to omit failed event, got %s", rec.Body.String())
+	}
+}
+
 func generatedReportID(body string) string {
 	const marker = `"id":"`
 	start := strings.Index(body, marker)

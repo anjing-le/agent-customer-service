@@ -32,7 +32,7 @@
 | `ChannelRunbook` | 渠道失败告警的运营处置步骤，由失败聚合、通知状态和告警策略派生，给出下一步、升级条件和检查项 | `Dashboard.channelRunbooks` |
 | `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
 | `ReportSchedulerStatus` | 渠道运营日报后台调度状态，暴露开关、格式、间隔、保留数量、最近运行结果和下一次运行时间 | `/api/ops/channel-ops-report-scheduler` |
-| `ChannelOpsReportEvent` | 渠道运营日报补偿事件，记录操作者、动作、结果、关联日报、prune 数量、备注和错误 | `/api/ops/channel-ops-report-events` |
+| `ChannelOpsReportEvent` | 渠道运营日报补偿事件，记录操作者、动作、结果、关联日报、prune 数量、备注和错误，支持按状态/操作者筛选和 CSV 导出 | `/api/ops/channel-ops-report-events` |
 | `NotificationDeliveryAudit` | 通知投递审计记录，只保存 attempt、目标、secret ref、签名预览、payload hash 和脱敏请求/响应摘要，不保存完整 signed payload 或密钥值 | `ChannelNotification.deliveryAudit` |
 | `TransferEvent` | 人工工单的创建、解决等留痕事件 | `TransferTicket.events` |
 | `Annotation` | 对助手消息的人工质检标注，包含结论、备注、标签和三维评分 | `/api/ops/annotations/submit` |

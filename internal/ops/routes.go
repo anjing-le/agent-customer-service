@@ -56,7 +56,30 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return
 		}
-		httpjson.OK(w, events)
+		httpjson.OK(w, filterChannelOpsReportEvents(events, r.URL.Query().Get("status"), r.URL.Query().Get("actor")))
+	})
+
+	mux.HandleFunc("/api/ops/channel-ops-report-events/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 50
+		}
+		events, err := st.ListChannelOpsReportEvents(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		report, err := renderChannelOpsReportEventsCSV(filterChannelOpsReportEvents(events, r.URL.Query().Get("status"), r.URL.Query().Get("actor")))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "report_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="agent-customer-service-channel-ops-events.csv"`)
+		_, _ = w.Write(report)
 	})
 
 	mux.HandleFunc("/api/ops/channel-ops-report-scheduler/compensate", func(w http.ResponseWriter, r *http.Request) {
@@ -590,6 +613,54 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		}
 		httpjson.OK(w, samples)
 	})
+}
+
+func filterChannelOpsReportEvents(events []store.ChannelOpsReportEvent, status string, actor string) []store.ChannelOpsReportEvent {
+	status = strings.ToUpper(strings.TrimSpace(status))
+	actor = strings.ToLower(strings.TrimSpace(actor))
+	if status == "ALL" {
+		status = ""
+	}
+	filtered := make([]store.ChannelOpsReportEvent, 0, len(events))
+	for _, event := range events {
+		if status != "" && !strings.EqualFold(event.Status, status) {
+			continue
+		}
+		if actor != "" && !strings.Contains(strings.ToLower(event.Actor), actor) {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	return filtered
+}
+
+func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"id", "action", "actor", "status", "report_id", "format", "pruned", "note", "error", "created_at"}); err != nil {
+		return nil, err
+	}
+	for _, event := range events {
+		if err := writer.Write([]string{
+			event.ID,
+			event.Action,
+			event.Actor,
+			event.Status,
+			event.ReportID,
+			event.Format,
+			fmt.Sprintf("%d", event.Pruned),
+			event.Note,
+			event.Error,
+			event.CreatedAt,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func buildChannelOpsReport(dashboard store.Dashboard, format string, generatedAt time.Time) (store.ChannelOpsReport, error) {

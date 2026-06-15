@@ -82,6 +82,7 @@
         { "name": "channelOpsReportScheduler", "path": "/api/ops/channel-ops-report-scheduler", "methods": ["GET"] },
         { "name": "compensateChannelOpsReport", "path": "/api/ops/channel-ops-report-scheduler/compensate", "methods": ["POST"] },
         { "name": "listChannelOpsReportEvents", "path": "/api/ops/channel-ops-report-events", "methods": ["GET"] },
+        { "name": "exportChannelOpsReportEvents", "path": "/api/ops/channel-ops-report-events/export", "methods": ["GET"] },
         { "name": "listChannelOpsReports", "path": "/api/ops/channel-ops-reports", "methods": ["GET"] },
         { "name": "generateChannelOpsReport", "path": "/api/ops/channel-ops-reports/generate", "methods": ["POST"] },
         { "name": "exportSavedChannelOpsReport", "path": "/api/ops/channel-ops-reports/export", "methods": ["GET"] }

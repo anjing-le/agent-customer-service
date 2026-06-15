@@ -368,6 +368,20 @@ h2 {
   margin: 8px 0 2px;
 }
 
+.eventFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 2px;
+}
+
+.eventFilters input {
+  width: 116px;
+  height: 28px;
+  font-size: 12px;
+}
+
 .activeSession {
   display: grid;
   gap: 4px;

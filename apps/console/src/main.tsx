@@ -698,6 +698,8 @@ function App() {
   const [channelOpsReports, setChannelOpsReports] = useState<ChannelOpsReport[]>([]);
   const [reportScheduler, setReportScheduler] = useState<ChannelOpsReportScheduler | null>(null);
   const [reportEvents, setReportEvents] = useState<ChannelOpsReportEvent[]>([]);
+  const [reportEventStatusFilter, setReportEventStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED'>('ALL');
+  const [reportEventActorFilter, setReportEventActorFilter] = useState('');
   const [reportGenerating, setReportGenerating] = useState('');
   const [reportCompensating, setReportCompensating] = useState(false);
   const [channelDemoSending, setChannelDemoSending] = useState('');
@@ -777,6 +779,23 @@ function App() {
   const openReviewCount = reviewTasks.filter((item) => item.status !== 'COMPLETED').length;
   const latestAssistantMessage = result?.agentMessage ?? [...history].reverse().find((item) => item.role === 'assistant');
   const hasApprovedRuleGate = (rule: Rule) => ruleApprovals.some((item) => item.ruleCode === rule.code && item.status === 'APPROVED' && item.sampleCount >= 3);
+  const reportEventStatusOptions = ['ALL', 'SUCCESS', 'FAILED'] as const;
+
+  const channelOpsEventQuery = (status = reportEventStatusFilter, actor = reportEventActorFilter, limit = 4) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (status !== 'ALL') {
+      params.set('status', status);
+    }
+    if (actor.trim()) {
+      params.set('actor', actor.trim());
+    }
+    return params.toString();
+  };
+
+  const refreshReportEvents = async (status = reportEventStatusFilter, actor = reportEventActorFilter) => {
+    const events = await api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery(status, actor)}`);
+    setReportEvents(events);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -788,7 +807,7 @@ function App() {
         api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
         api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6'),
         api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler'),
-        api<ChannelOpsReportEvent[]>('/api/ops/channel-ops-report-events?limit=4')
+        api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery()}`)
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData);
@@ -1266,6 +1285,20 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadChannelOpsReportEvents = async () => {
+    const response = await fetch(`/api/ops/channel-ops-report-events/export?${channelOpsEventQuery(reportEventStatusFilter, reportEventActorFilter, 50)}`);
+    if (!response.ok) {
+      throw new Error('download channel ops report events failed');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-ops-events-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   const generateChannelOpsReport = async (format: 'markdown' | 'csv') => {
     setReportGenerating(format);
     setError('');
@@ -1291,7 +1324,7 @@ function App() {
         body: JSON.stringify({ actor: 'ops-lead', note: '控制台补生成渠道运营日报' })
       });
       setReportScheduler(result.status);
-      setReportEvents((current) => [result.event, ...current.filter((item) => item.id !== result.event.id)].slice(0, 4));
+      await refreshReportEvents();
       if (result.report) {
         setChannelOpsReports((current) => [result.report as ChannelOpsReport, ...current.filter((item) => item.id !== result.report?.id)].slice(0, 6));
       }
@@ -1818,6 +1851,35 @@ function App() {
               {reportScheduler?.nextRunAt && <span>next {reportScheduler.nextRunAt.slice(5, 16).replace('T', ' ')}</span>}
               {reportScheduler?.lastReportId && <span>{reportScheduler.lastReportId}</span>}
               {reportScheduler?.lastError && <span className="dangerText">{reportScheduler.lastError}</span>}
+            </div>
+            <div className="eventFilters">
+              {reportEventStatusOptions.map((item) => (
+                <button
+                  className={reportEventStatusFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => {
+                    setReportEventStatusFilter(item);
+                    void refreshReportEvents(item, reportEventActorFilter).catch((err) => setError(err instanceof Error ? err.message : 'load channel ops report events failed'));
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+              <input
+                aria-label="补偿事件操作者"
+                value={reportEventActorFilter}
+                onBlur={(event) => void refreshReportEvents(reportEventStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel ops report events failed'))}
+                onChange={(event) => setReportEventActorFilter(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void refreshReportEvents(reportEventStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load channel ops report events failed'));
+                  }
+                }}
+                placeholder="actor"
+              />
+              <button className="tinyButton" onClick={() => downloadChannelOpsReportEvents().catch((err) => setError(err instanceof Error ? err.message : 'download channel ops report events failed'))} title="导出补偿事件">
+                <Download size={14} />
+              </button>
             </div>
             {reportEvents.length > 0 && (
               <div className="eventStrip">
