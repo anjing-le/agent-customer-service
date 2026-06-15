@@ -35,7 +35,9 @@
         { "name": "receiveWeChatInbound", "path": "/api/channels/wechat/inbound", "methods": ["POST"], "console": false },
         { "name": "receiveWeComInbound", "path": "/api/channels/wecom/inbound", "methods": ["POST"], "console": false },
         { "name": "receiveAppInbound", "path": "/api/channels/app/inbound", "methods": ["POST"], "console": false },
-        { "name": "receiveMarketplaceInbound", "path": "/api/channels/marketplace/inbound", "methods": ["POST"], "console": false }
+        { "name": "receiveMarketplaceInbound", "path": "/api/channels/marketplace/inbound", "methods": ["POST"], "console": false },
+        { "name": "receiveDouyinInbound", "path": "/api/channels/douyin/inbound", "methods": ["POST"], "console": false },
+        { "name": "receiveXiaohongshuInbound", "path": "/api/channels/xiaohongshu/inbound", "methods": ["POST"], "console": false }
       ]
     },
     {

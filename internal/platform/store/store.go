@@ -2062,6 +2062,8 @@ func defaultChannelPolicies() []ChannelPolicy {
 		{Channel: "WeCom", DisplayName: "企业微信客服", Tone: "专业、内部协同、保留上下文", SLAMinutes: 12, RiskBoost: "HIGH", EscalationNote: "企业微信通常连接私域客户和内部协同，投诉和合同问题优先接管。", Enabled: true},
 		{Channel: "App", DisplayName: "App 客服", Tone: "直接、产品化、引导自助", SLAMinutes: 20, RiskBoost: "NORMAL", EscalationNote: "App 内问题优先引导订单和售后入口。", Enabled: true},
 		{Channel: "Marketplace", DisplayName: "平台店铺客服", Tone: "谨慎、合规、避免承诺", SLAMinutes: 10, RiskBoost: "HIGH", EscalationNote: "平台投诉可能影响店铺指标，优先升级。", Enabled: true},
+		{Channel: "Douyin", DisplayName: "抖音客服", Tone: "短句、快速确认、避免营销承诺", SLAMinutes: 8, RiskBoost: "HIGH", EscalationNote: "直播和短视频渠道情绪扩散快，投诉和售后争议优先升级。", Enabled: true},
+		{Channel: "Xiaohongshu", DisplayName: "小红书客服", Tone: "温和、解释充分、注意口碑风险", SLAMinutes: 10, RiskBoost: "HIGH", EscalationNote: "种草和口碑场景要关注公开评价风险，争议内容优先接管。", Enabled: true},
 	}
 }
 
@@ -2072,6 +2074,8 @@ func defaultChannelIntegrations(now string) []ChannelIntegration {
 		{Channel: "WeCom", DisplayName: "企业微信客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_WECOM_SECRET", NextSecretRef: "ANJING_CHANNEL_WECOM_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://qyapi.weixin.qq.com"}, RateLimitPerMinute: 50, RotationHint: "企业微信回调按 corpId + msgId 做对账并轮换 token", UpdatedAt: now},
 		{Channel: "App", DisplayName: "App 客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_APP_SECRET", NextSecretRef: "ANJING_CHANNEL_APP_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"app://agent-customer-service"}, RateLimitPerMinute: 90, RotationHint: "App 版本发布时同步轮换 secret", UpdatedAt: now},
 		{Channel: "Marketplace", DisplayName: "平台店铺客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_MARKETPLACE_SECRET", NextSecretRef: "ANJING_CHANNEL_MARKETPLACE_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://marketplace.example.com"}, RateLimitPerMinute: 45, RotationHint: "按平台回调密钥周期轮换", UpdatedAt: now},
+		{Channel: "Douyin", DisplayName: "抖音客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_DOUYIN_SECRET", NextSecretRef: "ANJING_CHANNEL_DOUYIN_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://open.douyin.com"}, RateLimitPerMinute: 80, RotationHint: "按抖音开放平台回调 messageId 做幂等并轮换 secret", UpdatedAt: now},
+		{Channel: "Xiaohongshu", DisplayName: "小红书客服", Enabled: true, SecretSource: "env", SecretRef: "ANJING_CHANNEL_XIAOHONGSHU_SECRET", NextSecretRef: "ANJING_CHANNEL_XIAOHONGSHU_NEXT_SECRET", SignatureWindowSeconds: 300, ReplayProtection: true, AllowedOrigins: []string{"https://open.xiaohongshu.com"}, RateLimitPerMinute: 70, RotationHint: "按小红书开放平台 messageId 对账，口碑场景保留审计", UpdatedAt: now},
 	}
 }
 
@@ -2082,6 +2086,8 @@ func defaultChannelAlertPolicies() []ChannelAlertPolicy {
 		newDefaultChannelAlertPolicy("WeCom", "HIGH", 4, 60, "wecom-oncall"),
 		newDefaultChannelAlertPolicy("App", "MEDIUM", 6, 60, "app-oncall"),
 		newDefaultChannelAlertPolicy("Marketplace", "HIGH", 3, 60, "marketplace-oncall"),
+		newDefaultChannelAlertPolicy("Douyin", "HIGH", 4, 60, "douyin-oncall"),
+		newDefaultChannelAlertPolicy("Xiaohongshu", "HIGH", 4, 60, "xiaohongshu-oncall"),
 	}
 }
 

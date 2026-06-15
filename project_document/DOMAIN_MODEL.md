@@ -9,7 +9,7 @@
 | `Conversation` | 一条客服会话，记录客户、渠道、意图、风险和最后一句话 | `internal/platform/store` |
 | `ChannelInboundMessage` | 外部渠道进入系统的标准化消息，包含渠道、外部会话 ID、客户和内容 | `/api/channels/inbound` |
 | `ChannelInboundReceipt` | 渠道入站流水，记录 replay key、外部消息 ID、签名、时间戳和内容 hash，用于防重复提交和渠道对账 | `channel_inbound_events` |
-| `ChannelAdapterRequest` | 真实渠道回调的薄适配请求，例如 WeChat/WeCom/App/Marketplace 字段映射 | `/api/channels/*/inbound` 与 `contracts/channel-protocol-matrix.json` |
+| `ChannelAdapterRequest` | 真实渠道回调的薄适配请求，例如 WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu 字段映射 | `/api/channels/*/inbound` 与 `contracts/channel-protocol-matrix.json` |
 | `Message` | 用户或助手的一条消息，包含回复引擎、证据、兜底原因和 trace | `SendMessage` runtime |
 | `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
 | `KnowledgeArticle` | 可引用的可信知识 | seed store 或 PostgreSQL |
@@ -117,4 +117,4 @@ user message
 - 规则引擎是确定性轻量规则，尚未接完整表达式 DSL。
 - 当前没有鉴权、多租户和限流。
 - 模型客户端默认关闭，开启后只在有知识证据的路径参与生成；失败会自动回退到 `rag+rule`。
-- 渠道 adapter 已覆盖 WeChat/WeCom/App/Marketplace 的示例字段归一；密钥轮换支持 active/next secret ref 双密钥窗口，来源白名单支持 `Origin` / `X-Channel-Origin`。
+- 渠道 adapter 已覆盖 WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu 的示例字段归一；密钥轮换支持 active/next secret ref 双密钥窗口，来源白名单支持 `Origin` / `X-Channel-Origin`。

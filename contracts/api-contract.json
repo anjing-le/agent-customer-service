@@ -90,6 +90,22 @@
       "response": { "status": 200, "schema": "SendMessageResult" }
     },
     {
+      "id": "receiveDouyinInbound",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/douyin/inbound",
+      "request": { "body": "DouyinInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
+      "id": "receiveXiaohongshuInbound",
+      "boundary": "channels",
+      "method": "POST",
+      "path": "/api/channels/xiaohongshu/inbound",
+      "request": { "body": "XiaohongshuInboundRequest" },
+      "response": { "status": 200, "schema": "SendMessageResult" }
+    },
+    {
       "id": "listArticles",
       "boundary": "knowledge",
       "method": "GET",
@@ -350,7 +366,7 @@
     "ChannelInboundRequest": {
       "required": ["channel", "externalConversationId", "content", "timestamp", "signature"],
       "fields": {
-        "channel": "Web|WeChat|App|Marketplace",
+        "channel": "Web|WeChat|WeCom|App|Marketplace|Douyin|Xiaohongshu",
         "externalConversationId": "string",
         "externalMessageId": "string",
         "customer": "string",
@@ -402,6 +418,28 @@
         "message": "string",
         "occurredAt": "RFC3339 string",
         "signature": "HMAC-SHA256 hex over normalized Marketplace inbound payload"
+      }
+    },
+    "DouyinInboundRequest": {
+      "required": ["openId", "content", "eventTime", "signature"],
+      "fields": {
+        "openId": "string",
+        "messageId": "string",
+        "nickname": "string",
+        "content": "string",
+        "eventTime": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex over normalized Douyin inbound payload"
+      }
+    },
+    "XiaohongshuInboundRequest": {
+      "required": ["userId", "text", "timestamp", "signature"],
+      "fields": {
+        "userId": "string",
+        "messageId": "string",
+        "userName": "string",
+        "text": "string",
+        "timestamp": "RFC3339 string",
+        "signature": "HMAC-SHA256 hex over normalized Xiaohongshu inbound payload"
       }
     },
     "MessageStreamEvent": {

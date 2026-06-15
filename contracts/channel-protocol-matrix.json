@@ -77,6 +77,44 @@
       "rateLimit": "45/min",
       "retrySemantics": "order event retries by eventId",
       "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_timestamp"]
+    },
+    {
+      "channel": "Douyin",
+      "adapterEndpoint": "POST /api/channels/douyin/inbound",
+      "successExampleId": "douyin-adapter-inbound",
+      "signatureProfileId": "douyin-open-platform-callback",
+      "conversationKey": "openId",
+      "messageKey": "messageId",
+      "customerField": "nickname",
+      "contentField": "content",
+      "timestampField": "eventTime",
+      "origin": "https://open.douyin.com",
+      "secretRef": "ANJING_CHANNEL_DOUYIN_SECRET",
+      "signatureHeader": "X-Douyin-Signature",
+      "timestampHeader": "X-Douyin-Event-Time",
+      "replayKey": "channel + messageId",
+      "rateLimit": "80/min",
+      "retrySemantics": "live commerce callbacks retry by messageId during traffic spikes",
+      "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "invalid_signature"]
+    },
+    {
+      "channel": "Xiaohongshu",
+      "adapterEndpoint": "POST /api/channels/xiaohongshu/inbound",
+      "successExampleId": "xiaohongshu-adapter-inbound",
+      "signatureProfileId": "xiaohongshu-open-platform-callback",
+      "conversationKey": "userId",
+      "messageKey": "messageId",
+      "customerField": "userName",
+      "contentField": "text",
+      "timestampField": "timestamp",
+      "origin": "https://open.xiaohongshu.com",
+      "secretRef": "ANJING_CHANNEL_XIAOHONGSHU_SECRET",
+      "signatureHeader": "X-XHS-Signature",
+      "timestampHeader": "X-XHS-Timestamp",
+      "replayKey": "channel + messageId",
+      "rateLimit": "70/min",
+      "retrySemantics": "creator-note traffic retries by messageId and needs public-reputation audit context",
+      "errors": ["channel_origin_denied", "channel_rate_limited", "duplicate_inbound", "stale_signature"]
     }
   ]
 }

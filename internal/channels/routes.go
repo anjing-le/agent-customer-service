@@ -61,6 +61,24 @@ type marketplaceInboundRequest struct {
 	Signature  string `json:"signature"`
 }
 
+type douyinInboundRequest struct {
+	OpenID    string `json:"openId"`
+	MessageID string `json:"messageId"`
+	Nickname  string `json:"nickname"`
+	Content   string `json:"content"`
+	EventTime string `json:"eventTime"`
+	Signature string `json:"signature"`
+}
+
+type xiaohongshuInboundRequest struct {
+	UserID    string `json:"userId"`
+	MessageID string `json:"messageId"`
+	UserName  string `json:"userName"`
+	Text      string `json:"text"`
+	Timestamp string `json:"timestamp"`
+	Signature string `json:"signature"`
+}
+
 type Config struct {
 	Secrets         map[string]string
 	SignatureWindow time.Duration
@@ -73,6 +91,8 @@ var defaultChannelSecrets = map[string]string{
 	"wecom":       "wecom-demo-secret",
 	"app":         "app-demo-secret",
 	"marketplace": "marketplace-demo-secret",
+	"douyin":      "douyin-demo-secret",
+	"xiaohongshu": "xiaohongshu-demo-secret",
 }
 
 func Register(mux *http.ServeMux, st store.Runtime) {
@@ -130,6 +150,28 @@ func RegisterWithConfig(mux *http.ServeMux, st store.Runtime, cfg Config) {
 			return
 		}
 		var req marketplaceInboundRequest
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		handleInbound(w, r, st, cfg, req.toInbound())
+	})
+	mux.HandleFunc("/api/channels/douyin/inbound", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req douyinInboundRequest
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		handleInbound(w, r, st, cfg, req.toInbound())
+	})
+	mux.HandleFunc("/api/channels/xiaohongshu/inbound", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req xiaohongshuInboundRequest
 		if err := httpjson.Decode(r, &req); err != nil {
 			httpjson.BadRequest(w, err.Error())
 			return
@@ -300,6 +342,30 @@ func (req marketplaceInboundRequest) toInbound() inboundRequest {
 		Customer:               req.BuyerName,
 		Content:                req.Message,
 		Timestamp:              req.OccurredAt,
+		Signature:              req.Signature,
+	}
+}
+
+func (req douyinInboundRequest) toInbound() inboundRequest {
+	return inboundRequest{
+		Channel:                "Douyin",
+		ExternalConversationID: req.OpenID,
+		ExternalMessageID:      req.MessageID,
+		Customer:               req.Nickname,
+		Content:                req.Content,
+		Timestamp:              req.EventTime,
+		Signature:              req.Signature,
+	}
+}
+
+func (req xiaohongshuInboundRequest) toInbound() inboundRequest {
+	return inboundRequest{
+		Channel:                "Xiaohongshu",
+		ExternalConversationID: req.UserID,
+		ExternalMessageID:      req.MessageID,
+		Customer:               req.UserName,
+		Content:                req.Text,
+		Timestamp:              req.Timestamp,
 		Signature:              req.Signature,
 	}
 }

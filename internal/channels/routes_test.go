@@ -258,6 +258,52 @@ func TestMarketplaceAdapterUsesEventIDForReplay(t *testing.T) {
 	}
 }
 
+func TestDouyinAdapterNormalizesInboundMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "直播间下单后可以改地址吗？"
+	signature := ChannelSignature("Douyin", "dy-open-1", timestamp, content)
+	body := strings.NewReader(`{"openId":"dy-open-1","messageId":"douyin-msg-1","nickname":"抖音客户","content":"` + content + `","eventTime":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/douyin/inbound", body)
+	req.Header.Set("X-Channel-Origin", "https://open.douyin.com")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"Douyin"`, `"conversationId":"conv_douyin_dy_open_1"`, `"agentMessage"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
+func TestXiaohongshuAdapterNormalizesInboundMessage(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterWithConfig(mux, store.NewSeedStore(), testConfig())
+
+	timestamp := "2026-06-14T02:10:00Z"
+	content := "笔记里说的赠品怎么申请？"
+	signature := ChannelSignature("Xiaohongshu", "xhs-user-1", timestamp, content)
+	body := strings.NewReader(`{"userId":"xhs-user-1","messageId":"xhs-msg-1","userName":"小红书客户","text":"` + content + `","timestamp":"` + timestamp + `","signature":"` + signature + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/channels/xiaohongshu/inbound", body)
+	req.Header.Set("X-Channel-Origin", "https://open.xiaohongshu.com")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"channel":"Xiaohongshu"`, `"conversationId":"conv_xiaohongshu_xhs_user_1"`, `"agentMessage"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in response, got %s", expected, rec.Body.String())
+		}
+	}
+}
+
 func TestInboundRouteAcceptsConfiguredChannelSecret(t *testing.T) {
 	mux := http.NewServeMux()
 	cfg := testConfig()

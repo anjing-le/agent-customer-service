@@ -33,7 +33,7 @@
 - 命中投诉、催办、法律风险或人工诉求时创建人工 ticket。
 - 人工 ticket 返回创建和解决事件，便于复盘接管链路。
 - 人工 ticket 会返回 SLA 状态、等待分钟数和升级标记，控制台可筛选升级工单。
-- 渠道策略会影响转人工 SLA，控制台可按 Web、WeChat、App、Marketplace 筛选会话和工单。
+- 渠道策略会影响转人工 SLA，控制台可按 Web、WeChat、WeCom、App、Marketplace、Douyin、Xiaohongshu 筛选会话和工单。
 - 渠道集成配置只暴露 active/next secret ref、allowed origins、签名窗口和 replay 开关，不把密钥值返回给控制台；运行时用 secret ref 解析 env secret，并允许双密钥轮换窗口。
 - 渠道请求如果声明 `Origin` 或 `X-Channel-Origin`，必须命中 `allowedOrigins`，否则返回 `channel_origin_denied`。
 - 渠道请求超过 `rateLimitPerMinute` 时返回 `channel_rate_limited`，不继续进入 Agent 回复链路。

@@ -58,6 +58,34 @@
       "sampleSignature": "84f30a369be67f265c4fa242b385c2a845dd5e9c2b160cafaede2fccd7e9f9dd",
       "retrySemantics": "Marketplace retries order events at least once; eventId is the settlement-safe idempotency key.",
       "failureCodes": ["invalid_signature", "invalid_timestamp", "duplicate_inbound"]
+    },
+    {
+      "id": "douyin-open-platform-callback",
+      "channel": "Douyin",
+      "adapterEndpoint": "POST /api/channels/douyin/inbound",
+      "signatureHeader": "X-Douyin-Signature",
+      "timestampHeader": "X-Douyin-Event-Time",
+      "replayHeader": "X-Douyin-Message-ID",
+      "canonicalPayload": ["openId", "messageId", "eventTime", "content"],
+      "sampleCanonicalPayload": ["dy-open-profile-example", "douyin-msg-example-1", "2026-06-14T03:10:00Z", "直播间下单后可以改地址吗？"],
+      "demoSecret": "douyin-demo-secret",
+      "sampleSignature": "d0af2a2166b92feca5d74214e4c8778b85ac4a711734678048fb5d0efd14a283",
+      "retrySemantics": "Douyin callbacks can retry during live commerce spikes; messageId is the customer-service idempotency key.",
+      "failureCodes": ["invalid_signature", "stale_signature", "duplicate_inbound", "channel_rate_limited"]
+    },
+    {
+      "id": "xiaohongshu-open-platform-callback",
+      "channel": "Xiaohongshu",
+      "adapterEndpoint": "POST /api/channels/xiaohongshu/inbound",
+      "signatureHeader": "X-XHS-Signature",
+      "timestampHeader": "X-XHS-Timestamp",
+      "replayHeader": "X-XHS-Message-ID",
+      "canonicalPayload": ["userId", "messageId", "timestamp", "text"],
+      "sampleCanonicalPayload": ["xhs-user-profile-example", "xhs-msg-example-1", "2026-06-14T03:10:00Z", "笔记里说的赠品怎么申请？"],
+      "demoSecret": "xiaohongshu-demo-secret",
+      "sampleSignature": "33ef4014b2189a489d8aa32f63a78c39f4dd40d2ebb0f614550635bec0df8c88",
+      "retrySemantics": "Xiaohongshu callbacks may retry around creator-note traffic; messageId should be kept for public-reputation audits.",
+      "failureCodes": ["invalid_signature", "stale_signature", "duplicate_inbound", "channel_origin_denied"]
     }
   ],
   "examples": [
@@ -202,6 +230,64 @@
         "message": "可以修改收货地址吗？",
         "occurredAt": "2026-06-14T03:10:00Z",
         "signature": "25cd6c47d4c73b54e6a04bb7bdedf2c121de4ae2151ebafe69aa0f1bcc1e25d3"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    },
+    {
+      "id": "douyin-adapter-inbound",
+      "channel": "Douyin",
+      "endpoint": "POST /api/channels/douyin/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "https://open.douyin.com"
+      },
+      "secretRef": "ANJING_CHANNEL_DOUYIN_SECRET",
+      "demoSecret": "douyin-demo-secret",
+      "signatureInput": {
+        "channel": "Douyin",
+        "externalConversationId": "dy-open-example-1",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "直播间下单后可以改地址吗？"
+      },
+      "request": {
+        "openId": "dy-open-example-1",
+        "messageId": "douyin-msg-example-1",
+        "nickname": "抖音客户",
+        "content": "直播间下单后可以改地址吗？",
+        "eventTime": "2026-06-14T03:10:00Z",
+        "signature": "05805843fb1b94b7e6036446cc862445fc832f74cb3b3f1b7cd1570a155f7590"
+      },
+      "expectedSuccess": {
+        "status": 200,
+        "envelope": "success"
+      }
+    },
+    {
+      "id": "xiaohongshu-adapter-inbound",
+      "channel": "Xiaohongshu",
+      "endpoint": "POST /api/channels/xiaohongshu/inbound",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Channel-Origin": "https://open.xiaohongshu.com"
+      },
+      "secretRef": "ANJING_CHANNEL_XIAOHONGSHU_SECRET",
+      "demoSecret": "xiaohongshu-demo-secret",
+      "signatureInput": {
+        "channel": "Xiaohongshu",
+        "externalConversationId": "xhs-user-example-1",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "content": "笔记里说的赠品怎么申请？"
+      },
+      "request": {
+        "userId": "xhs-user-example-1",
+        "messageId": "xhs-msg-example-1",
+        "userName": "小红书客户",
+        "text": "笔记里说的赠品怎么申请？",
+        "timestamp": "2026-06-14T03:10:00Z",
+        "signature": "c3d99b82766a6190654658c719ece23a68928757aa64291087801c1312707b04"
       },
       "expectedSuccess": {
         "status": 200,

@@ -72,7 +72,7 @@
 
 ### Q18: 项目目前还有哪些不足？
 
-**A:** 当前已经接入可选模型生成、SSE 流式输出、`Message.trace`、渠道 inbound 入口、WeChat/App/Marketplace adapter、`ChannelIntegration` 运行时校验、来源白名单、active/next 密钥轮换窗口、签名时间窗、`externalMessageId` 对账、replay 防重复提交、渠道集成治理视图、渠道策略、人工工单 SLA、人工质检标注和低分复盘样本导出。但还没有向量检索、更完整的上下文压缩、更细的真实平台协议差异和频率限制。规则表达也比较简单，后续可以做规则版本、审核流、质检任务分配和灰度。当前阶段的价值是先把可靠客服 Agent 的领域边界、工程结构和运营闭环打稳。
+**A:** 当前已经接入可选模型生成、SSE 流式输出、`Message.trace`、渠道 inbound 入口、WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu adapter、`ChannelIntegration` 运行时校验、来源白名单、active/next 密钥轮换窗口、签名时间窗、`externalMessageId` 对账、replay 防重复提交、渠道集成治理视图、渠道策略、人工工单 SLA、人工质检标注和低分复盘样本导出。但还没有向量检索、更完整的上下文压缩、更细的生产级渠道验收审计。规则表达也比较简单，后续可以做规则版本、审核流、质检任务分配和灰度。当前阶段的价值是先把可靠客服 Agent 的领域边界、工程结构和运营闭环打稳。
 
 ## 二、AI 应用层面
 
