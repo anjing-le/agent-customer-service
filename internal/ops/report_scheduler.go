@@ -40,6 +40,12 @@ type ReportSchedulerStatus struct {
 	LastPruned   int    `json:"lastPruned"`
 }
 
+type ReportCompensationResult struct {
+	Event  store.ChannelOpsReportEvent `json:"event"`
+	Report store.ChannelOpsReport      `json:"report,omitempty"`
+	Status ReportSchedulerStatus       `json:"status"`
+}
+
 func NewReportScheduler(st store.Runtime, cfg ReportSchedulerConfig, logger *slog.Logger) *ReportScheduler {
 	cfg = normalizeReportSchedulerConfig(cfg)
 	if logger == nil {
@@ -88,6 +94,40 @@ func (s *ReportScheduler) RunOnce(ctx context.Context) (store.ChannelOpsReport, 
 		return store.ChannelOpsReport{}, 0, err
 	}
 	return report, pruned, nil
+}
+
+func (s *ReportScheduler) Compensate(ctx context.Context, actor, note string) (ReportCompensationResult, error) {
+	report, pruned, err := s.RunOnce(ctx)
+	if err != nil {
+		s.recordRunFailure(err)
+		event, recordErr := s.st.RecordChannelOpsReportEvent(store.ChannelOpsReportEvent{
+			Action: "COMPENSATE",
+			Actor:  actor,
+			Status: "FAILED",
+			Format: s.cfg.Format,
+			Note:   note,
+			Error:  err.Error(),
+		})
+		if recordErr != nil {
+			return ReportCompensationResult{Event: event, Status: s.Status()}, recordErr
+		}
+		return ReportCompensationResult{Event: event, Status: s.Status()}, err
+	}
+	s.recordRunSuccess(report, pruned)
+	event, err := s.st.RecordChannelOpsReportEvent(store.ChannelOpsReportEvent{
+		Action:   "COMPENSATE",
+		Actor:    actor,
+		Status:   "SUCCESS",
+		ReportID: report.ID,
+		Format:   report.Format,
+		Pruned:   pruned,
+		Note:     note,
+	})
+	if err != nil {
+		return ReportCompensationResult{Report: report, Status: s.Status()}, err
+	}
+	s.logger.Info("channel ops report compensated", "id", report.ID, "actor", actor, "pruned", pruned)
+	return ReportCompensationResult{Event: event, Report: report, Status: s.Status()}, nil
 }
 
 func (s *ReportScheduler) loop(ctx context.Context) {

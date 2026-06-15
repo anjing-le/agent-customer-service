@@ -72,3 +72,31 @@ func TestReportSchedulerStatusTracksRunResult(t *testing.T) {
 		t.Fatalf("expected successful run status, got %#v", status)
 	}
 }
+
+func TestReportSchedulerCompensateRecordsAuditEvent(t *testing.T) {
+	st := store.NewSeedStore()
+	scheduler := NewReportScheduler(st, ReportSchedulerConfig{
+		Enabled:  false,
+		Format:   "markdown",
+		Interval: time.Hour,
+		Retain:   5,
+	}, nil)
+
+	result, err := scheduler.Compensate(context.Background(), "ops-lead", "补生成日报")
+	if err != nil {
+		t.Fatalf("compensate report: %v", err)
+	}
+	if result.Event.Action != "COMPENSATE" || result.Event.Actor != "ops-lead" || result.Event.Status != "SUCCESS" || result.Event.ReportID == "" {
+		t.Fatalf("expected compensation audit event, got %#v", result.Event)
+	}
+	if result.Report.ID != result.Event.ReportID {
+		t.Fatalf("expected event to reference report, got %#v", result)
+	}
+	events, err := st.ListChannelOpsReportEvents(10)
+	if err != nil {
+		t.Fatalf("list report events: %v", err)
+	}
+	if len(events) != 1 || events[0].ID != result.Event.ID {
+		t.Fatalf("expected stored compensation event, got %#v", events)
+	}
+}

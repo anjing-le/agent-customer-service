@@ -631,6 +631,42 @@ func TestChannelOpsReportSchedulerRouteReturnsStatus(t *testing.T) {
 	}
 }
 
+func TestChannelOpsReportCompensationRouteGeneratesReportAndEvent(t *testing.T) {
+	st := store.NewSeedStore()
+	scheduler := NewReportScheduler(st, ReportSchedulerConfig{
+		Enabled:  false,
+		Format:   "markdown",
+		Interval: time.Hour,
+		Retain:   10,
+	}, nil)
+	mux := http.NewServeMux()
+	RegisterWithReportScheduler(mux, st, scheduler)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-ops-report-scheduler/compensate", strings.NewReader(`{"actor":"ops-lead","note":"补偿日报"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{`"action":"COMPENSATE"`, `"actor":"ops-lead"`, `"status":"SUCCESS"`, `"reportId":"`, `"lastStatus":"SUCCESS"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in compensation response, got %s", expected, rec.Body.String())
+		}
+	}
+
+	eventsReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-ops-report-events?limit=3", nil)
+	eventsRec := httptest.NewRecorder()
+	mux.ServeHTTP(eventsRec, eventsReq)
+
+	if eventsRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", eventsRec.Code, eventsRec.Body.String())
+	}
+	if !strings.Contains(eventsRec.Body.String(), `"action":"COMPENSATE"`) || !strings.Contains(eventsRec.Body.String(), `"note":"补偿日报"`) {
+		t.Fatalf("expected compensation event list, got %s", eventsRec.Body.String())
+	}
+}
+
 func generatedReportID(body string) string {
 	const marker = `"id":"`
 	start := strings.Index(body, marker)

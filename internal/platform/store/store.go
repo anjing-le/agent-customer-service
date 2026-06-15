@@ -111,6 +111,8 @@ type Runtime interface {
 	ListChannelOpsReports(limit int) ([]ChannelOpsReport, error)
 	ChannelOpsReport(id string) (ChannelOpsReport, error)
 	PruneChannelOpsReports(retain int) (int, error)
+	RecordChannelOpsReportEvent(event ChannelOpsReportEvent) (ChannelOpsReportEvent, error)
+	ListChannelOpsReportEvents(limit int) ([]ChannelOpsReportEvent, error)
 	Dashboard() (Dashboard, error)
 }
 
@@ -128,6 +130,7 @@ type Store struct {
 	alertPolicies   []ChannelAlertPolicy
 	notifications   []ChannelNotification
 	channelReports  []ChannelOpsReport
+	reportEvents    []ChannelOpsReportEvent
 	policyEvents    []NotificationPolicyEvent
 	policyChanges   []NotificationPolicyChange
 	ruleApprovals   []RuleApproval
@@ -443,6 +446,19 @@ type ChannelOpsReportSummary struct {
 	Retrying          int      `json:"retrying"`
 	DeadLetters       int      `json:"deadLetters"`
 	Channels          []string `json:"channels"`
+}
+
+type ChannelOpsReportEvent struct {
+	ID        string `json:"id"`
+	Action    string `json:"action"`
+	Actor     string `json:"actor"`
+	Status    string `json:"status"`
+	ReportID  string `json:"reportId,omitempty"`
+	Format    string `json:"format"`
+	Pruned    int    `json:"pruned"`
+	Note      string `json:"note,omitempty"`
+	Error     string `json:"error,omitempty"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type Metric struct {
@@ -1194,6 +1210,28 @@ func (s *Store) PruneChannelOpsReports(retain int) (int, error) {
 	pruned := len(s.channelReports) - retain
 	s.channelReports = append([]ChannelOpsReport(nil), s.channelReports[:retain]...)
 	return pruned, nil
+}
+
+func (s *Store) RecordChannelOpsReportEvent(event ChannelOpsReportEvent) (ChannelOpsReportEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalizeChannelOpsReportEvent(&event)
+	s.reportEvents = append([]ChannelOpsReportEvent{event}, s.reportEvents...)
+	if len(s.reportEvents) > 100 {
+		s.reportEvents = s.reportEvents[:100]
+	}
+	return event, nil
+}
+
+func (s *Store) ListChannelOpsReportEvents(limit int) ([]ChannelOpsReportEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit = normalizeReportEventLimit(limit)
+	items := append([]ChannelOpsReportEvent(nil), s.reportEvents...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
 func (s *Store) Dashboard() (Dashboard, error) {
@@ -2230,6 +2268,16 @@ func normalizeReportRetention(retain int) int {
 	return retain
 }
 
+func normalizeReportEventLimit(limit int) int {
+	if limit <= 0 {
+		return 10
+	}
+	if limit > 50 {
+		return 50
+	}
+	return limit
+}
+
 func normalizeChannelOpsReport(report *ChannelOpsReport) {
 	now := time.Now().UTC()
 	if strings.TrimSpace(report.ID) == "" {
@@ -2251,6 +2299,20 @@ func normalizeChannelOpsReport(report *ChannelOpsReport) {
 	}
 	if strings.TrimSpace(report.GeneratedAt) == "" {
 		report.GeneratedAt = now.Format(time.RFC3339)
+	}
+}
+
+func normalizeChannelOpsReportEvent(event *ChannelOpsReportEvent) {
+	now := time.Now().UTC()
+	if strings.TrimSpace(event.ID) == "" {
+		event.ID = fmt.Sprintf("channel_ops_event_%d", now.UnixNano())
+	}
+	event.Action = fallback(strings.ToUpper(strings.TrimSpace(event.Action)), "COMPENSATE")
+	event.Actor = fallback(strings.TrimSpace(event.Actor), "operator")
+	event.Status = fallback(strings.ToUpper(strings.TrimSpace(event.Status)), "SUCCESS")
+	event.Format = fallback(strings.ToLower(strings.TrimSpace(event.Format)), "markdown")
+	if strings.TrimSpace(event.CreatedAt) == "" {
+		event.CreatedAt = now.Format(time.RFC3339)
 	}
 }
 

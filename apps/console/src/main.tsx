@@ -459,6 +459,23 @@ type ChannelOpsReportScheduler = {
   lastError?: string;
   lastPruned: number;
 };
+type ChannelOpsReportEvent = {
+  id: string;
+  action: string;
+  actor: string;
+  status: 'SUCCESS' | 'FAILED';
+  reportId?: string;
+  format: 'markdown' | 'csv';
+  pruned: number;
+  note?: string;
+  error?: string;
+  createdAt: string;
+};
+type ChannelOpsReportCompensationResult = {
+  event: ChannelOpsReportEvent;
+  report?: ChannelOpsReport;
+  status: ChannelOpsReportScheduler;
+};
 type Dashboard = {
   metrics: Metric[];
   conversations: Conversation[] | null;
@@ -675,7 +692,9 @@ function App() {
   const [trainingSamples, setTrainingSamples] = useState<TrainingSample[]>([]);
   const [channelOpsReports, setChannelOpsReports] = useState<ChannelOpsReport[]>([]);
   const [reportScheduler, setReportScheduler] = useState<ChannelOpsReportScheduler | null>(null);
+  const [reportEvents, setReportEvents] = useState<ChannelOpsReportEvent[]>([]);
   const [reportGenerating, setReportGenerating] = useState('');
+  const [reportCompensating, setReportCompensating] = useState(false);
   const [channelDemoSending, setChannelDemoSending] = useState('');
   const [channelDemoResult, setChannelDemoResult] = useState<ChannelDemoResult | null>(null);
   const [channelFailureSending, setChannelFailureSending] = useState('');
@@ -758,18 +777,20 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
         api<KnowledgeArticle[]>('/api/knowledge/articles'),
         api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
         api<ChannelOpsReport[]>('/api/ops/channel-ops-reports?limit=6'),
-        api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler')
+        api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler'),
+        api<ChannelOpsReportEvent[]>('/api/ops/channel-ops-report-events?limit=4')
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData);
       setTrainingSamples(sampleData);
       setChannelOpsReports(reportData);
       setReportScheduler(schedulerData);
+      setReportEvents(reportEventData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1253,6 +1274,26 @@ function App() {
       setError(err instanceof Error ? err.message : 'generate channel ops report failed');
     } finally {
       setReportGenerating('');
+    }
+  };
+
+  const compensateChannelOpsReport = async () => {
+    setReportCompensating(true);
+    setError('');
+    try {
+      const result = await api<ChannelOpsReportCompensationResult>('/api/ops/channel-ops-report-scheduler/compensate', {
+        method: 'POST',
+        body: JSON.stringify({ actor: 'ops-lead', note: '控制台补生成渠道运营日报' })
+      });
+      setReportScheduler(result.status);
+      setReportEvents((current) => [result.event, ...current.filter((item) => item.id !== result.event.id)].slice(0, 4));
+      if (result.report) {
+        setChannelOpsReports((current) => [result.report as ChannelOpsReport, ...current.filter((item) => item.id !== result.report?.id)].slice(0, 6));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'compensate channel ops report failed');
+    } finally {
+      setReportCompensating(false);
     }
   };
 
@@ -1758,6 +1799,9 @@ function App() {
                 <button className="tinyButton" disabled={reportGenerating === 'csv'} onClick={() => void generateChannelOpsReport('csv')} title="生成 CSV 日报">
                   <Save size={14} />
                 </button>
+                <button className="tinyButton" disabled={reportCompensating} onClick={() => void compensateChannelOpsReport()} title="补生成日报">
+                  <RefreshCcw size={14} />
+                </button>
               </div>
             </div>
             <div className="schedulerStrip">
@@ -1770,6 +1814,15 @@ function App() {
               {reportScheduler?.lastReportId && <span>{reportScheduler.lastReportId}</span>}
               {reportScheduler?.lastError && <span className="dangerText">{reportScheduler.lastError}</span>}
             </div>
+            {reportEvents.length > 0 && (
+              <div className="eventStrip">
+                {reportEvents.map((event) => (
+                  <span className={event.status === 'FAILED' ? 'status danger' : 'status'} key={event.id}>
+                    {event.action} · {event.actor} · {event.status} · {event.createdAt.slice(5, 16).replace('T', ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="tableList compactList">
               {channelOpsReports.map((report) => (
                 <article className="tableRow" key={report.id}>

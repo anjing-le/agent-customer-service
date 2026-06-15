@@ -2,6 +2,7 @@ package ops
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -43,6 +44,43 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			return
 		}
 		httpjson.OK(w, scheduler.Status())
+	})
+
+	mux.HandleFunc("/api/ops/channel-ops-report-events", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		events, err := st.ListChannelOpsReportEvents(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, events)
+	})
+
+	mux.HandleFunc("/api/ops/channel-ops-report-scheduler/compensate", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodPost) {
+			return
+		}
+		var req struct {
+			Actor string `json:"actor"`
+			Note  string `json:"note"`
+		}
+		if err := httpjson.Decode(r, &req); err != nil {
+			httpjson.BadRequest(w, err.Error())
+			return
+		}
+		activeScheduler := scheduler
+		if activeScheduler == nil {
+			activeScheduler = NewReportScheduler(st, ReportSchedulerConfig{}, nil)
+		}
+		result, err := activeScheduler.Compensate(context.Background(), req.Actor, req.Note)
+		if err != nil && result.Event.ID == "" {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, result)
 	})
 
 	mux.HandleFunc("/api/ops/channel-ops-report/export", func(w http.ResponseWriter, r *http.Request) {

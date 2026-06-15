@@ -361,6 +361,13 @@ h2 {
   color: #8d2b1f;
 }
 
+.eventStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 2px;
+}
+
 .activeSession {
   display: grid;
   gap: 4px;

@@ -1229,6 +1229,36 @@ func (s *PostgresStore) PruneChannelOpsReports(retain int) (int, error) {
 	return int(tag.RowsAffected()), nil
 }
 
+func (s *PostgresStore) RecordChannelOpsReportEvent(event ChannelOpsReportEvent) (ChannelOpsReportEvent, error) {
+	normalizeChannelOpsReportEvent(&event)
+	createdAt, err := time.Parse(time.RFC3339, event.CreatedAt)
+	if err != nil {
+		createdAt = time.Now().UTC()
+		event.CreatedAt = createdAt.Format(time.RFC3339)
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into channel_ops_report_events (id, action, actor, status, report_id, format, pruned, note, error, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, event.ID, event.Action, event.Actor, event.Status, event.ReportID, event.Format, event.Pruned, event.Note, event.Error, createdAt); err != nil {
+		return ChannelOpsReportEvent{}, fmt.Errorf("record channel ops report event: %w", err)
+	}
+	return event, nil
+}
+
+func (s *PostgresStore) ListChannelOpsReportEvents(limit int) ([]ChannelOpsReportEvent, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, action, actor, status, report_id, format, pruned, note, error, created_at
+		from channel_ops_report_events
+		order by created_at desc, id desc
+		limit $1
+	`, normalizeReportEventLimit(limit))
+	if err != nil {
+		return nil, fmt.Errorf("list channel ops report events: %w", err)
+	}
+	defer rows.Close()
+	return scanChannelOpsReportEvents(rows)
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err := s.expireNotificationPolicyChanges(); err != nil {
 		return Dashboard{}, err
@@ -2285,6 +2315,23 @@ func scanChannelOpsReports(rows pgx.Rows) ([]ChannelOpsReport, error) {
 			}
 		}
 		item.GeneratedAt = generatedAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func scanChannelOpsReportEvents(rows pgx.Rows) ([]ChannelOpsReportEvent, error) {
+	items := make([]ChannelOpsReportEvent, 0)
+	for rows.Next() {
+		var item ChannelOpsReportEvent
+		var createdAt time.Time
+		if err := rows.Scan(&item.ID, &item.Action, &item.Actor, &item.Status, &item.ReportID, &item.Format, &item.Pruned, &item.Note, &item.Error, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan channel ops report event: %w", err)
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {

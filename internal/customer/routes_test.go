@@ -149,6 +149,14 @@ func (f failingRuntime) PruneChannelOpsReports(int) (int, error) {
 	return 0, errors.New("database unavailable")
 }
 
+func (f failingRuntime) RecordChannelOpsReportEvent(store.ChannelOpsReportEvent) (store.ChannelOpsReportEvent, error) {
+	return store.ChannelOpsReportEvent{}, errors.New("database unavailable")
+}
+
+func (f failingRuntime) ListChannelOpsReportEvents(int) ([]store.ChannelOpsReportEvent, error) {
+	return nil, errors.New("database unavailable")
+}
+
 func (f failingRuntime) Dashboard() (store.Dashboard, error) {
 	return store.Dashboard{}, errors.New("database unavailable")
 }

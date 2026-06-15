@@ -271,6 +271,22 @@
       "response": { "status": 200, "schema": "ChannelOpsReportScheduler" }
     },
     {
+      "id": "compensateChannelOpsReport",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-ops-report-scheduler/compensate",
+      "request": { "body": "CompensateChannelOpsReportRequest" },
+      "response": { "status": 200, "schema": "ChannelOpsReportCompensationResult" }
+    },
+    {
+      "id": "listChannelOpsReportEvents",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-ops-report-events",
+      "request": { "query": "ListChannelOpsReportEventsQuery" },
+      "response": { "status": 200, "schema": "ChannelOpsReportEvent[]" }
+    },
+    {
       "id": "listChannelOpsReports",
       "boundary": "ops",
       "method": "GET",
@@ -545,6 +561,17 @@
         "id": "string"
       }
     },
+    "CompensateChannelOpsReportRequest": {
+      "fields": {
+        "actor": "string",
+        "note": "string"
+      }
+    },
+    "ListChannelOpsReportEventsQuery": {
+      "fields": {
+        "limit": "number"
+      }
+    },
     "ChannelOpsReportExport": {
       "required": ["content"],
       "fields": {
@@ -587,6 +614,29 @@
         "lastStatus": "DISABLED|PENDING|SUCCESS|FAILED",
         "lastError": "string",
         "lastPruned": "number"
+      }
+    },
+    "ChannelOpsReportEvent": {
+      "required": ["id", "action", "actor", "status", "format", "pruned", "createdAt"],
+      "fields": {
+        "id": "string",
+        "action": "COMPENSATE",
+        "actor": "string",
+        "status": "SUCCESS|FAILED",
+        "reportId": "string",
+        "format": "markdown|csv",
+        "pruned": "number",
+        "note": "string",
+        "error": "string",
+        "createdAt": "RFC3339 string"
+      }
+    },
+    "ChannelOpsReportCompensationResult": {
+      "required": ["event", "status"],
+      "fields": {
+        "event": "ChannelOpsReportEvent",
+        "report": "ChannelOpsReport",
+        "status": "ChannelOpsReportScheduler"
       }
     },
     "Conversation": {
