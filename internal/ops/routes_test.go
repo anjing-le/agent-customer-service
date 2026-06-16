@@ -222,7 +222,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	mux := http.NewServeMux()
 	Register(mux, st)
 
-	body := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","checkStatus":"DONE","step":%q,"stepIndex":0,"actionRef":"%s:%s","assignee":"%s","dueAt":"2026-06-15T12:00:00Z","actor":"ops-a","note":"done from report handoff"}`,
+	body := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","step":%q,"stepIndex":0,"actionRef":"%s:%s","assignee":"%s","dueAt":"2026-06-15T12:00:00Z","actor":"ops-a","note":"done from report handoff"}`,
 		dashboard.ChannelRunbooks[0].Channel,
 		dashboard.ChannelRunbooks[0].Status,
 		dashboard.ChannelRunbooks[0].Steps[0],
@@ -275,6 +275,34 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 		if !strings.Contains(exportRec.Body.String(), expected) {
 			t.Fatalf("expected %s in export response, got %s", expected, exportRec.Body.String())
 		}
+	}
+
+	blockBody := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","step":%q,"stepIndex":0,"actionRef":"%s:%s","assignee":"%s","actor":"ops-a","note":"waiting for channel owner"}`,
+		dashboard.ChannelRunbooks[0].Channel,
+		dashboard.ChannelRunbooks[0].Status,
+		dashboard.ChannelRunbooks[0].Steps[0],
+		dashboard.ChannelRunbooks[0].Channel,
+		dashboard.ChannelRunbooks[0].Status,
+		owner,
+	)
+	blockReq := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/block", strings.NewReader(blockBody))
+	blockRec := httptest.NewRecorder()
+	mux.ServeHTTP(blockRec, blockReq)
+	if blockRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 block, got %d: %s", blockRec.Code, blockRec.Body.String())
+	}
+	if !strings.Contains(blockRec.Body.String(), `"checkStatus":"BLOCKED"`) || !strings.Contains(blockRec.Body.String(), "waiting for channel owner") {
+		t.Fatalf("expected blocked runbook check, got %s", blockRec.Body.String())
+	}
+
+	recoverReq := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/recover", strings.NewReader(blockBody))
+	recoverRec := httptest.NewRecorder()
+	mux.ServeHTTP(recoverRec, recoverReq)
+	if recoverRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 recover, got %d: %s", recoverRec.Code, recoverRec.Body.String())
+	}
+	if !strings.Contains(recoverRec.Body.String(), `"checkStatus":"DONE"`) || !strings.Contains(recoverRec.Body.String(), "waiting for channel owner") {
+		t.Fatalf("expected recovered runbook check, got %s", recoverRec.Body.String())
 	}
 }
 

@@ -1306,29 +1306,58 @@ function App() {
     }
   };
 
-  const completeRunbookCheck = async (runbook: ChannelRunbook, step: string, stepIndex: number) => {
+  const updateRunbookCheckStatus = async (
+    runbook: ChannelRunbook,
+    step: string,
+    stepIndex: number,
+    path: '/api/ops/channel-runbook-checks/complete' | '/api/ops/channel-runbook-checks/block' | '/api/ops/channel-runbook-checks/recover',
+    note: string
+  ) => {
     setError('');
     try {
-      await api<ChannelRunbookCheck>('/api/ops/channel-runbook-checks/complete', {
+      await api<ChannelRunbookCheck>(path, {
         method: 'POST',
         body: JSON.stringify({
           channel: runbook.channel,
           runbookStatus: runbook.status,
-          checkStatus: 'DONE',
           step,
           stepIndex,
           actionRef: `${runbook.channel}:${runbook.status}`,
           assignee: runbook.owner,
           dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
           actor: 'ops-a',
-          note: `completed ${runbook.channel}:${runbook.status} step ${stepIndex + 1}`
+          note
         })
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'complete runbook check failed');
+      setError(err instanceof Error ? err.message : 'update runbook check failed');
     }
   };
+
+  const completeRunbookCheck = async (runbook: ChannelRunbook, step: string, stepIndex: number) => updateRunbookCheckStatus(
+    runbook,
+    step,
+    stepIndex,
+    '/api/ops/channel-runbook-checks/complete',
+    `completed ${runbook.channel}:${runbook.status} step ${stepIndex + 1}`
+  );
+
+  const blockRunbookCheck = async (runbook: ChannelRunbook, step: string, stepIndex: number) => updateRunbookCheckStatus(
+    runbook,
+    step,
+    stepIndex,
+    '/api/ops/channel-runbook-checks/block',
+    `blocked ${runbook.channel}:${runbook.status} step ${stepIndex + 1}: waiting for channel owner`
+  );
+
+  const recoverRunbookCheck = async (runbook: ChannelRunbook, step: string, stepIndex: number) => updateRunbookCheckStatus(
+    runbook,
+    step,
+    stepIndex,
+    '/api/ops/channel-runbook-checks/recover',
+    `recovered ${runbook.channel}:${runbook.status} step ${stepIndex + 1}`
+  );
 
   const dispatchChannelNotification = async (notification: ChannelNotification, outcome: 'SUCCESS' | 'webhook_timeout') => {
     setError('');
@@ -2604,6 +2633,24 @@ function App() {
                                 title="确认 Runbook 检查项"
                               >
                                 <CheckCircle2 size={12} />
+                              </button>
+                            )}
+                            {!completed && (
+                              <button
+                                className="tinyButton inlineIconButton dangerButton"
+                                onClick={() => void blockRunbookCheck(item, step, stepIndex)}
+                                title="标记 Runbook 检查阻塞"
+                              >
+                                <CircleX size={12} />
+                              </button>
+                            )}
+                            {completed?.checkStatus === 'BLOCKED' && (
+                              <button
+                                className="tinyButton inlineIconButton"
+                                onClick={() => void recoverRunbookCheck(item, step, stepIndex)}
+                                title="恢复 Runbook 检查项"
+                              >
+                                <RefreshCcw size={12} />
                               </button>
                             )}
                           </small>

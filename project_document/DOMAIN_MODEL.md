@@ -89,7 +89,7 @@ user message
 | `RecordChannelInboundAudit` | 记录渠道请求验收结果，成功和拒绝都可复盘 |
 | `ListChannelInboundAuditQualityEvents` | 查询渠道验收质量越线事件，用于运营复盘和导出 |
 | `AcknowledgeChannelNotification` | 确认渠道通知事件 |
-| `CompleteChannelRunbookCheck` / `ListChannelRunbookChecks` | 确认 Runbook 检查项完成，并按渠道、Runbook 状态、检查状态、操作者或 action ref 查询处置记录 |
+| `CompleteChannelRunbookCheck` / `BlockChannelRunbookCheck` / `RecoverChannelRunbookCheck` / `ListChannelRunbookChecks` | 确认、阻塞、恢复 Runbook 检查项，并按渠道、Runbook 状态、检查状态、操作者或 action ref 查询处置记录 |
 | `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
 | `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |
 | `ResolveKnowledgeGap` | 关闭知识缺口 |

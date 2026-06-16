@@ -534,48 +534,15 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 	})
 
 	mux.HandleFunc("/api/ops/channel-runbook-checks/complete", func(w http.ResponseWriter, r *http.Request) {
-		if !httpjson.RequireMethod(w, r, http.MethodPost) {
-			return
-		}
-		var req struct {
-			Channel       string `json:"channel"`
-			RunbookStatus string `json:"runbookStatus"`
-			CheckStatus   string `json:"checkStatus"`
-			Step          string `json:"step"`
-			StepIndex     int    `json:"stepIndex"`
-			ActionRef     string `json:"actionRef"`
-			ReportID      string `json:"reportId"`
-			Assignee      string `json:"assignee"`
-			DueAt         string `json:"dueAt"`
-			Actor         string `json:"actor"`
-			Note          string `json:"note"`
-		}
-		if err := httpjson.Decode(r, &req); err != nil {
-			httpjson.BadRequest(w, err.Error())
-			return
-		}
-		if strings.TrimSpace(req.Channel) == "" || strings.TrimSpace(req.Step) == "" {
-			httpjson.BadRequest(w, "channel and step are required")
-			return
-		}
-		check, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
-			Channel:       req.Channel,
-			RunbookStatus: req.RunbookStatus,
-			CheckStatus:   req.CheckStatus,
-			Step:          req.Step,
-			StepIndex:     req.StepIndex,
-			ActionRef:     req.ActionRef,
-			ReportID:      req.ReportID,
-			Assignee:      req.Assignee,
-			DueAt:         req.DueAt,
-			Actor:         req.Actor,
-			Note:          req.Note,
-		})
-		if err != nil {
-			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
-			return
-		}
-		httpjson.OK(w, check)
+		handleChannelRunbookCheckStatus(w, r, st, "DONE", "Runbook check completed")
+	})
+
+	mux.HandleFunc("/api/ops/channel-runbook-checks/block", func(w http.ResponseWriter, r *http.Request) {
+		handleChannelRunbookCheckStatus(w, r, st, "BLOCKED", "Runbook check blocked")
+	})
+
+	mux.HandleFunc("/api/ops/channel-runbook-checks/recover", func(w http.ResponseWriter, r *http.Request) {
+		handleChannelRunbookCheckStatus(w, r, st, "DONE", "Runbook check recovered")
 	})
 
 	mux.HandleFunc("/api/ops/channel-notifications/dispatch", func(w http.ResponseWriter, r *http.Request) {
@@ -784,6 +751,57 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		}
 		httpjson.OK(w, samples)
 	})
+}
+
+func handleChannelRunbookCheckStatus(w http.ResponseWriter, r *http.Request, st store.Runtime, checkStatus string, defaultNote string) {
+	if !httpjson.RequireMethod(w, r, http.MethodPost) {
+		return
+	}
+	var req struct {
+		Channel       string `json:"channel"`
+		RunbookStatus string `json:"runbookStatus"`
+		Step          string `json:"step"`
+		StepIndex     int    `json:"stepIndex"`
+		ActionRef     string `json:"actionRef"`
+		ReportID      string `json:"reportId"`
+		Assignee      string `json:"assignee"`
+		DueAt         string `json:"dueAt"`
+		Actor         string `json:"actor"`
+		Note          string `json:"note"`
+	}
+	if err := httpjson.Decode(r, &req); err != nil {
+		httpjson.BadRequest(w, err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Channel) == "" || strings.TrimSpace(req.Step) == "" {
+		httpjson.BadRequest(w, "channel and step are required")
+		return
+	}
+	check, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
+		Channel:       req.Channel,
+		RunbookStatus: req.RunbookStatus,
+		CheckStatus:   checkStatus,
+		Step:          req.Step,
+		StepIndex:     req.StepIndex,
+		ActionRef:     req.ActionRef,
+		ReportID:      req.ReportID,
+		Assignee:      req.Assignee,
+		DueAt:         req.DueAt,
+		Actor:         req.Actor,
+		Note:          fallbackString(req.Note, defaultNote),
+	})
+	if err != nil {
+		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	httpjson.OK(w, check)
+}
+
+func fallbackString(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func filterChannelOpsReportEvents(events []store.ChannelOpsReportEvent, status string, actor string) []store.ChannelOpsReportEvent {

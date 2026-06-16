@@ -268,7 +268,23 @@
       "boundary": "ops",
       "method": "POST",
       "path": "/api/ops/channel-runbook-checks/complete",
-      "request": { "body": "CompleteChannelRunbookCheckRequest" },
+      "request": { "body": "UpdateChannelRunbookCheckStatusRequest" },
+      "response": { "status": 200, "schema": "ChannelRunbookCheck" }
+    },
+    {
+      "id": "blockChannelRunbookCheck",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-runbook-checks/block",
+      "request": { "body": "UpdateChannelRunbookCheckStatusRequest" },
+      "response": { "status": 200, "schema": "ChannelRunbookCheck" }
+    },
+    {
+      "id": "recoverChannelRunbookCheck",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-runbook-checks/recover",
+      "request": { "body": "UpdateChannelRunbookCheckStatusRequest" },
       "response": { "status": 200, "schema": "ChannelRunbookCheck" }
     },
     {
@@ -623,12 +639,11 @@
         "note": "string"
       }
     },
-    "CompleteChannelRunbookCheckRequest": {
+    "UpdateChannelRunbookCheckStatusRequest": {
       "required": ["channel", "runbookStatus", "step", "stepIndex"],
       "fields": {
         "channel": "string",
         "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
-        "checkStatus": "TODO|DONE|BLOCKED",
         "step": "string",
         "stepIndex": "number",
         "actionRef": "string",
