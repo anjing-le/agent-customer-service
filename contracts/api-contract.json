@@ -1326,7 +1326,17 @@
         "notificationId": "string",
         "notificationState": "OPEN|RETRYING|DEAD_LETTER|SENT|ACKED",
         "steps": "string[]",
-        "checks": "ChannelRunbookCheck[]"
+        "checks": "ChannelRunbookCheck[]",
+        "checkSummary": "ChannelRunbookSummary"
+      }
+    },
+    "ChannelRunbookSummary": {
+      "required": ["total", "done", "blocked", "todo"],
+      "fields": {
+        "total": "number",
+        "done": "number",
+        "blocked": "number",
+        "todo": "number"
       }
     },
     "ChannelRunbookCheck": {

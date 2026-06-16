@@ -547,6 +547,14 @@ type ChannelRunbook struct {
 	NotificationState string                `json:"notificationState,omitempty"`
 	Steps             []string              `json:"steps"`
 	Checks            []ChannelRunbookCheck `json:"checks"`
+	CheckSummary      ChannelRunbookSummary `json:"checkSummary"`
+}
+
+type ChannelRunbookSummary struct {
+	Total   int `json:"total"`
+	Done    int `json:"done"`
+	Blocked int `json:"blocked"`
+	Todo    int `json:"todo"`
 }
 
 type ChannelRunbookCheck struct {
@@ -3203,8 +3211,33 @@ func attachChannelRunbookChecks(runbooks []ChannelRunbook, checks []ChannelRunbo
 			}
 		}
 		runbooks[idx].Checks = matched
+		runbooks[idx].CheckSummary = channelRunbookSummary(len(runbooks[idx].Steps), matched)
 	}
 	return runbooks
+}
+
+func channelRunbookSummary(total int, checks []ChannelRunbookCheck) ChannelRunbookSummary {
+	summary := ChannelRunbookSummary{Total: total}
+	seen := map[int]string{}
+	for _, check := range checks {
+		if check.StepIndex < 0 || check.StepIndex >= total {
+			continue
+		}
+		seen[check.StepIndex] = strings.ToUpper(strings.TrimSpace(check.CheckStatus))
+	}
+	for _, status := range seen {
+		switch status {
+		case "DONE":
+			summary.Done++
+		case "BLOCKED":
+			summary.Blocked++
+		}
+	}
+	summary.Todo = total - len(seen)
+	if summary.Todo < 0 {
+		summary.Todo = 0
+	}
+	return summary
 }
 
 func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []ChannelAlertPolicy) []ChannelRunbook {

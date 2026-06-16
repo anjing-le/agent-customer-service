@@ -1002,6 +1002,15 @@ input {
   white-space: normal;
 }
 
+.runbookProgress {
+  justify-items: end;
+  text-align: right;
+}
+
+.runbookProgress small {
+  max-width: 96px;
+}
+
 .alertRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

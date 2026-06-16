@@ -249,6 +249,9 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if len(dashboard.ChannelRunbooks[0].Checks) != 1 || dashboard.ChannelRunbooks[0].Checks[0].Actor != "ops-a" {
 		t.Fatalf("expected completed runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
 	}
+	if dashboard.ChannelRunbooks[0].CheckSummary.Done != 1 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 0 {
+		t.Fatalf("expected completed runbook summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
+	}
 
 	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?channel=Marketplace&status=DISPATCH&checkStatus=DONE&actor=ops&actionRef=Marketplace", nil)
 	listRec := httptest.NewRecorder()
@@ -293,6 +296,13 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	}
 	if !strings.Contains(blockRec.Body.String(), `"checkStatus":"BLOCKED"`) || !strings.Contains(blockRec.Body.String(), "waiting for channel owner") {
 		t.Fatalf("expected blocked runbook check, got %s", blockRec.Body.String())
+	}
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard after block: %v", err)
+	}
+	if dashboard.ChannelRunbooks[0].CheckSummary.Done != 0 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 1 {
+		t.Fatalf("expected blocked runbook summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
 	}
 
 	recoverReq := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/recover", strings.NewReader(blockBody))

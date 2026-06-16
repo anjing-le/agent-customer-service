@@ -573,6 +573,12 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if len(dashboard.ChannelRunbooks[0].Checks) != 1 || dashboard.ChannelRunbooks[0].Checks[0].ActionRef != "Marketplace:DISPATCH" {
 		t.Fatalf("expected runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
 	}
+	if dashboard.ChannelRunbooks[0].CheckSummary.Total != len(dashboard.ChannelRunbooks[0].Steps) ||
+		dashboard.ChannelRunbooks[0].CheckSummary.Done != 1 ||
+		dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 0 ||
+		dashboard.ChannelRunbooks[0].CheckSummary.Todo != len(dashboard.ChannelRunbooks[0].Steps)-1 {
+		t.Fatalf("expected runbook summary after check, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
+	}
 	acked, err := st.AcknowledgeChannelNotification(dashboard.Notifications[0].ID, "ops-a", "已通知渠道负责人")
 	if err != nil {
 		t.Fatalf("ack notification: %v", err)

@@ -393,6 +393,12 @@ type ChannelRunbook = {
   notificationState?: string;
   steps: string[];
   checks?: ChannelRunbookCheck[] | null;
+  checkSummary: {
+    total: number;
+    done: number;
+    blocked: number;
+    todo: number;
+  };
 };
 type ChannelProtocolExample = {
   id: string;
@@ -2658,9 +2664,13 @@ function App() {
                       })}
                     </div>
                   </div>
-                  <b className={statusClass(item.status === 'ESCALATE' ? 'HIGH' : item.status === 'RETRY' ? 'MEDIUM' : 'LOW')}>
-                    {item.notificationState || item.severity}
-                  </b>
+                  <div className="runbookProgress">
+                    <b className={statusClass(item.status === 'ESCALATE' ? 'HIGH' : item.status === 'RETRY' ? 'MEDIUM' : 'LOW')}>
+                      {item.notificationState || item.severity}
+                    </b>
+                    <small>{item.checkSummary.done}/{item.checkSummary.total} done</small>
+                    {item.checkSummary.blocked > 0 && <small className="dangerText">{item.checkSummary.blocked} blocked</small>}
+                  </div>
                 </article>
               ))}
               {channelRunbooks.length === 0 && <p className="empty">暂无处置 Runbook</p>}
