@@ -280,7 +280,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 		}
 	}
 
-	blockBody := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","step":%q,"stepIndex":0,"actionRef":"%s:%s","assignee":"%s","actor":"ops-a","note":"waiting for channel owner"}`,
+	blockBody := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","step":%q,"stepIndex":0,"actionRef":"%s:%s","assignee":"%s","dueAt":"2020-01-01T00:00:00Z","actor":"ops-a","note":"waiting for channel owner"}`,
 		dashboard.ChannelRunbooks[0].Channel,
 		dashboard.ChannelRunbooks[0].Status,
 		dashboard.ChannelRunbooks[0].Steps[0],
@@ -301,7 +301,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dashboard after block: %v", err)
 	}
-	if dashboard.ChannelRunbooks[0].CheckSummary.Done != 0 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 1 {
+	if dashboard.ChannelRunbooks[0].CheckSummary.Done != 0 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 1 || dashboard.ChannelRunbooks[0].CheckSummary.Overdue != 1 {
 		t.Fatalf("expected blocked runbook summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
 	}
 
@@ -600,6 +600,34 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 			t.Fatalf("record rejected audit: %v", err)
 		}
 	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard before report: %v", err)
+	}
+	var reportRunbook store.ChannelRunbook
+	for _, item := range dashboard.ChannelRunbooks {
+		if item.Channel == "Marketplace" && item.Status == "ESCALATE" {
+			reportRunbook = item
+			break
+		}
+	}
+	if reportRunbook.Channel == "" || len(reportRunbook.Steps) == 0 {
+		t.Fatalf("expected report runbook steps, got %#v", dashboard.ChannelRunbooks)
+	}
+	if _, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
+		Channel:       reportRunbook.Channel,
+		RunbookStatus: reportRunbook.Status,
+		CheckStatus:   "BLOCKED",
+		Step:          reportRunbook.Steps[0],
+		StepIndex:     0,
+		ActionRef:     reportRunbook.Channel + ":" + reportRunbook.Status,
+		Assignee:      reportRunbook.Owner,
+		DueAt:         "2020-01-01T00:00:00Z",
+		Actor:         "ops-a",
+		Note:          "waiting for channel owner",
+	}); err != nil {
+		t.Fatalf("block report runbook check: %v", err)
+	}
 	mux := http.NewServeMux()
 	Register(mux, st)
 
@@ -613,7 +641,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
 		t.Fatalf("expected markdown content type, got %s", rec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Runbook progress: done=0 blocked=0 todo=", "Progress: done=0 blocked=0 todo=", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Runbook progress: done=0 blocked=1 overdue=1 todo=", "Progress: done=0 blocked=1 overdue=1 todo=", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in markdown report, got %s", expected, rec.Body.String())
 		}
@@ -632,7 +660,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "section,channel,status,code,count,owner,next_action,escalation") {
 		t.Fatalf("expected csv header, got %s", rec.Body.String())
 	}
-	for _, expected := range []string{"runbook_summary,,SUMMARY,progress,done=0 blocked=0 todo=", "runbook,Marketplace,ESCALATE", "done=0 blocked=0 todo=", "inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
+	for _, expected := range []string{"runbook_summary,,SUMMARY,progress,done=0 blocked=1 overdue=1 todo=", "runbook,Marketplace,ESCALATE", "done=0 blocked=1 overdue=1 todo=", "inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in csv report, got %s", expected, rec.Body.String())
 		}

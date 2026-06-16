@@ -1148,6 +1148,7 @@ func channelOpsRunbookSummary(runbooks []store.ChannelRunbook) store.ChannelRunb
 		summary.Total += runbook.CheckSummary.Total
 		summary.Done += runbook.CheckSummary.Done
 		summary.Blocked += runbook.CheckSummary.Blocked
+		summary.Overdue += runbook.CheckSummary.Overdue
 		summary.Todo += runbook.CheckSummary.Todo
 	}
 	return summary
@@ -1491,7 +1492,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString("- Window: last 24 hours\n")
 	b.WriteString(fmt.Sprintf("- Channel failures: %d\n", totalFailures))
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
-	b.WriteString(fmt.Sprintf("- Runbook progress: done=%d blocked=%d todo=%d total=%d\n", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Todo, runbookSummary.Total))
+	b.WriteString(fmt.Sprintf("- Runbook progress: done=%d blocked=%d overdue=%d todo=%d total=%d\n", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Overdue, runbookSummary.Todo, runbookSummary.Total))
 	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
 	b.WriteString(fmt.Sprintf("- Inbound quality events: total=%d active=%d watch=%d recovered=%d\n", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered))
 	b.WriteString(fmt.Sprintf("- Handoff priorities: %d\n", len(handoffPriorities)))
@@ -1562,7 +1563,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 			b.WriteString(fmt.Sprintf("### %s · %s\n\n", runbook.Channel, runbook.Status))
 			b.WriteString(fmt.Sprintf("- Owner: %s\n", runbook.Owner))
 			b.WriteString(fmt.Sprintf("- Failure code: %s\n", runbook.FailureCode))
-			b.WriteString(fmt.Sprintf("- Progress: done=%d blocked=%d todo=%d total=%d\n", runbook.CheckSummary.Done, runbook.CheckSummary.Blocked, runbook.CheckSummary.Todo, runbook.CheckSummary.Total))
+			b.WriteString(fmt.Sprintf("- Progress: done=%d blocked=%d overdue=%d todo=%d total=%d\n", runbook.CheckSummary.Done, runbook.CheckSummary.Blocked, runbook.CheckSummary.Overdue, runbook.CheckSummary.Todo, runbook.CheckSummary.Total))
 			b.WriteString(fmt.Sprintf("- Next action: %s\n", runbook.NextAction))
 			b.WriteString(fmt.Sprintf("- Escalation: %s\n", runbook.Escalation))
 			for _, step := range runbook.Steps {
@@ -1613,7 +1614,7 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 	}
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
-	if err := writer.Write([]string{"runbook_summary", "", "SUMMARY", "progress", fmt.Sprintf("done=%d blocked=%d todo=%d total=%d", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Todo, runbookSummary.Total), "", "", ""}); err != nil {
+	if err := writer.Write([]string{"runbook_summary", "", "SUMMARY", "progress", fmt.Sprintf("done=%d blocked=%d overdue=%d todo=%d total=%d", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Overdue, runbookSummary.Todo, runbookSummary.Total), "", "", ""}); err != nil {
 		return nil, err
 	}
 	if err := writer.Write([]string{"inbound_quality", "", "SUMMARY", "events", fmt.Sprintf("total=%d active=%d watch=%d recovered=%d", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered), "", "", ""}); err != nil {
@@ -1641,7 +1642,7 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 		}
 	}
 	for _, runbook := range dashboard.ChannelRunbooks {
-		progress := fmt.Sprintf("done=%d blocked=%d todo=%d total=%d", runbook.CheckSummary.Done, runbook.CheckSummary.Blocked, runbook.CheckSummary.Todo, runbook.CheckSummary.Total)
+		progress := fmt.Sprintf("done=%d blocked=%d overdue=%d todo=%d total=%d", runbook.CheckSummary.Done, runbook.CheckSummary.Blocked, runbook.CheckSummary.Overdue, runbook.CheckSummary.Todo, runbook.CheckSummary.Total)
 		if err := writer.Write([]string{"runbook", runbook.Channel, runbook.Status, runbook.FailureCode, progress, runbook.Owner, runbook.NextAction, runbook.Escalation}); err != nil {
 			return nil, err
 		}

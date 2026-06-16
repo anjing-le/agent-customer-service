@@ -555,6 +555,7 @@ type ChannelRunbookSummary struct {
 	Total   int `json:"total"`
 	Done    int `json:"done"`
 	Blocked int `json:"blocked"`
+	Overdue int `json:"overdue"`
 	Todo    int `json:"todo"`
 }
 
@@ -3219,19 +3220,23 @@ func attachChannelRunbookChecks(runbooks []ChannelRunbook, checks []ChannelRunbo
 
 func channelRunbookSummary(total int, checks []ChannelRunbookCheck) ChannelRunbookSummary {
 	summary := ChannelRunbookSummary{Total: total}
-	seen := map[int]string{}
+	seen := map[int]ChannelRunbookCheck{}
 	for _, check := range checks {
 		if check.StepIndex < 0 || check.StepIndex >= total {
 			continue
 		}
-		seen[check.StepIndex] = strings.ToUpper(strings.TrimSpace(check.CheckStatus))
+		seen[check.StepIndex] = check
 	}
-	for _, status := range seen {
-		switch status {
+	now := time.Now().UTC()
+	for _, check := range seen {
+		switch strings.ToUpper(strings.TrimSpace(check.CheckStatus)) {
 		case "DONE":
 			summary.Done++
 		case "BLOCKED":
 			summary.Blocked++
+		}
+		if channelRunbookCheckOverdue(check, now) {
+			summary.Overdue++
 		}
 	}
 	summary.Todo = total - len(seen)
@@ -3239,6 +3244,17 @@ func channelRunbookSummary(total int, checks []ChannelRunbookCheck) ChannelRunbo
 		summary.Todo = 0
 	}
 	return summary
+}
+
+func channelRunbookCheckOverdue(check ChannelRunbookCheck, now time.Time) bool {
+	if strings.EqualFold(strings.TrimSpace(check.CheckStatus), "DONE") || strings.TrimSpace(check.DueAt) == "" {
+		return false
+	}
+	dueAt, err := time.Parse(time.RFC3339, check.DueAt)
+	if err != nil {
+		return false
+	}
+	return dueAt.Before(now)
 }
 
 func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []ChannelAlertPolicy) []ChannelRunbook {

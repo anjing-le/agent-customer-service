@@ -1332,11 +1332,12 @@
       }
     },
     "ChannelRunbookSummary": {
-      "required": ["total", "done", "blocked", "todo"],
+      "required": ["total", "done", "blocked", "overdue", "todo"],
       "fields": {
         "total": "number",
         "done": "number",
         "blocked": "number",
+        "overdue": "number",
         "todo": "number"
       }
     },

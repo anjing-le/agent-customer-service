@@ -32,7 +32,7 @@
 | `NotificationPolicyEvent` | 通知策略变更审计事件，记录操作者、动作、改前/改后摘要、备注和时间 | `Dashboard.notificationPolicyEvents` |
 | `ChannelNotification` | 渠道告警出站通知事件，记录目标 URL、secret ref、HMAC 签名、发送次数、退避重试、外部回执、投递审计摘要、死信原因和运营确认 | `Dashboard.channelNotifications` |
 | `ChannelRunbook` | 渠道失败告警与入站验收质量的运营处置步骤，由失败聚合、通知状态、告警策略和按渠道配置的验收质量阈值派生，给出下一步、升级条件、检查项、完成/阻塞摘要和已完成检查记录 | `Dashboard.channelRunbooks` |
-| `ChannelRunbookSummary` | Runbook 检查项处置摘要，统计 total、done、blocked、todo，用于 Dashboard 和控制台展示渠道处置进度 | `ChannelRunbook.checkSummary` |
+| `ChannelRunbookSummary` | Runbook 检查项处置摘要，统计 total、done、blocked、overdue、todo，用于 Dashboard、日报和控制台展示渠道处置进度与逾期风险 | `ChannelRunbook.checkSummary` |
 | `ChannelRunbookCheck` | Runbook 检查项处置记录，保存 channel、runbook status、check status、step index、action ref、负责人、截止时间、操作者和完成时间，用于把日报交接建议落到具体处置步骤，并支持筛选和 CSV 导出 | `/api/ops/channel-runbook-checks` |
 | `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、Runbook 处置进度、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
 | `ChannelInboundAuditSummary` | 渠道验收摘要，统计 accepted/rejected、验收率和高频错误码，用于 Dashboard 日报和运营交接 | `ChannelOpsReport.summary.inboundAudit` |
@@ -90,7 +90,7 @@ user message
 | `RecordChannelInboundAudit` | 记录渠道请求验收结果，成功和拒绝都可复盘 |
 | `ListChannelInboundAuditQualityEvents` | 查询渠道验收质量越线事件，用于运营复盘和导出 |
 | `AcknowledgeChannelNotification` | 确认渠道通知事件 |
-| `CompleteChannelRunbookCheck` / `BlockChannelRunbookCheck` / `RecoverChannelRunbookCheck` / `ListChannelRunbookChecks` | 确认、阻塞、恢复 Runbook 检查项，并按渠道、Runbook 状态、检查状态、操作者或 action ref 查询处置记录 |
+| `CompleteChannelRunbookCheck` / `BlockChannelRunbookCheck` / `RecoverChannelRunbookCheck` / `ListChannelRunbookChecks` | 确认、阻塞、恢复 Runbook 检查项，并按渠道、Runbook 状态、检查状态、操作者或 action ref 查询处置记录；未完成且 dueAt 已过期的检查项会进入 overdue 汇总 |
 | `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
 | `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |
 | `ResolveKnowledgeGap` | 关闭知识缺口 |

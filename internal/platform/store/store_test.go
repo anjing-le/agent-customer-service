@@ -576,6 +576,7 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if dashboard.ChannelRunbooks[0].CheckSummary.Total != len(dashboard.ChannelRunbooks[0].Steps) ||
 		dashboard.ChannelRunbooks[0].CheckSummary.Done != 1 ||
 		dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 0 ||
+		dashboard.ChannelRunbooks[0].CheckSummary.Overdue != 0 ||
 		dashboard.ChannelRunbooks[0].CheckSummary.Todo != len(dashboard.ChannelRunbooks[0].Steps)-1 {
 		t.Fatalf("expected runbook summary after check, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
 	}
