@@ -812,6 +812,7 @@
         "channels": "string[]",
         "inboundAudit": "ChannelInboundAuditSummary",
         "inboundAuditQuality": "ChannelInboundAuditQualitySummary",
+        "runbookSummary": "ChannelRunbookSummary",
         "handoffPriorities": "ChannelOpsHandoffPriority[]"
       }
     },

@@ -458,6 +458,7 @@ type ChannelOpsReportSummary struct {
 	Channels            []string                          `json:"channels"`
 	InboundAudit        ChannelInboundAuditSummary        `json:"inboundAudit"`
 	InboundAuditQuality ChannelInboundAuditQualitySummary `json:"inboundAuditQuality"`
+	RunbookSummary      ChannelRunbookSummary             `json:"runbookSummary"`
 	HandoffPriorities   []ChannelOpsHandoffPriority       `json:"handoffPriorities"`
 }
 

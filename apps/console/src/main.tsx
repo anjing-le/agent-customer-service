@@ -495,6 +495,12 @@ type ChannelOpsReportSummary = {
   retrying: number;
   deadLetters: number;
   channels: string[];
+  runbookSummary?: {
+    total: number;
+    done: number;
+    blocked: number;
+    todo: number;
+  };
   handoffPriorities?: ChannelOpsHandoffPriority[] | null;
   inboundAudit?: {
     total: number;
@@ -2403,6 +2409,11 @@ function App() {
                     <div>
                       <strong>{report.format.toUpperCase()} · {report.generatedAt.slice(0, 16).replace('T', ' ')}</strong>
                       <span>{report.summary.failureCount} failures · {report.summary.activeRunbooks} runbooks · {report.summary.openNotifications + report.summary.retrying} open notices</span>
+                      {report.summary.runbookSummary && (
+                        <span>
+                          runbook {report.summary.runbookSummary.done}/{report.summary.runbookSummary.total} done · {report.summary.runbookSummary.blocked} blocked · {report.summary.runbookSummary.todo} todo
+                        </span>
+                      )}
                       {report.summary.inboundAudit && (
                         <span>
                           inbound {report.summary.inboundAudit.accepted}/{report.summary.inboundAudit.total} accepted · {report.summary.inboundAudit.acceptanceRate}%

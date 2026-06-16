@@ -1131,12 +1131,24 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 	}
 	summary.InboundAudit = channelInboundAuditSummary(dashboard.ChannelAudits)
 	summary.InboundAuditQuality = channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	summary.RunbookSummary = channelOpsRunbookSummary(dashboard.ChannelRunbooks)
 	summary.HandoffPriorities = channelOpsHandoffPriorities(dashboard)
 	for _, channel := range append(append(summary.InboundAuditQuality.ActiveChannels, summary.InboundAuditQuality.WatchChannels...), summary.InboundAuditQuality.RecoveredChannels...) {
 		if channel != "" && !seenChannels[channel] {
 			seenChannels[channel] = true
 			summary.Channels = append(summary.Channels, channel)
 		}
+	}
+	return summary
+}
+
+func channelOpsRunbookSummary(runbooks []store.ChannelRunbook) store.ChannelRunbookSummary {
+	var summary store.ChannelRunbookSummary
+	for _, runbook := range runbooks {
+		summary.Total += runbook.CheckSummary.Total
+		summary.Done += runbook.CheckSummary.Done
+		summary.Blocked += runbook.CheckSummary.Blocked
+		summary.Todo += runbook.CheckSummary.Todo
 	}
 	return summary
 }
@@ -1470,6 +1482,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	}
 	inboundAudit := channelInboundAuditSummary(dashboard.ChannelAudits)
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
 	handoffPriorities := channelOpsHandoffPriorities(dashboard)
 
 	var b strings.Builder
@@ -1478,6 +1491,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString("- Window: last 24 hours\n")
 	b.WriteString(fmt.Sprintf("- Channel failures: %d\n", totalFailures))
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
+	b.WriteString(fmt.Sprintf("- Runbook progress: done=%d blocked=%d todo=%d total=%d\n", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Todo, runbookSummary.Total))
 	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
 	b.WriteString(fmt.Sprintf("- Inbound quality events: total=%d active=%d watch=%d recovered=%d\n", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered))
 	b.WriteString(fmt.Sprintf("- Handoff priorities: %d\n", len(handoffPriorities)))
@@ -1548,6 +1562,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 			b.WriteString(fmt.Sprintf("### %s · %s\n\n", runbook.Channel, runbook.Status))
 			b.WriteString(fmt.Sprintf("- Owner: %s\n", runbook.Owner))
 			b.WriteString(fmt.Sprintf("- Failure code: %s\n", runbook.FailureCode))
+			b.WriteString(fmt.Sprintf("- Progress: done=%d blocked=%d todo=%d total=%d\n", runbook.CheckSummary.Done, runbook.CheckSummary.Blocked, runbook.CheckSummary.Todo, runbook.CheckSummary.Total))
 			b.WriteString(fmt.Sprintf("- Next action: %s\n", runbook.NextAction))
 			b.WriteString(fmt.Sprintf("- Escalation: %s\n", runbook.Escalation))
 			for _, step := range runbook.Steps {
@@ -1597,6 +1612,10 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 		}
 	}
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
+	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
+	if err := writer.Write([]string{"runbook_summary", "", "SUMMARY", "progress", fmt.Sprintf("done=%d blocked=%d todo=%d total=%d", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Todo, runbookSummary.Total), "", "", ""}); err != nil {
+		return nil, err
+	}
 	if err := writer.Write([]string{"inbound_quality", "", "SUMMARY", "events", fmt.Sprintf("total=%d active=%d watch=%d recovered=%d", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered), "", "", ""}); err != nil {
 		return nil, err
 	}
@@ -1622,7 +1641,8 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 		}
 	}
 	for _, runbook := range dashboard.ChannelRunbooks {
-		if err := writer.Write([]string{"runbook", runbook.Channel, runbook.Status, runbook.FailureCode, "", runbook.Owner, runbook.NextAction, runbook.Escalation}); err != nil {
+		progress := fmt.Sprintf("done=%d blocked=%d todo=%d total=%d", runbook.CheckSummary.Done, runbook.CheckSummary.Blocked, runbook.CheckSummary.Todo, runbook.CheckSummary.Total)
+		if err := writer.Write([]string{"runbook", runbook.Channel, runbook.Status, runbook.FailureCode, progress, runbook.Owner, runbook.NextAction, runbook.Escalation}); err != nil {
 			return nil, err
 		}
 	}

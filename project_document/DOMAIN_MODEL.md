@@ -34,7 +34,7 @@
 | `ChannelRunbook` | 渠道失败告警与入站验收质量的运营处置步骤，由失败聚合、通知状态、告警策略和按渠道配置的验收质量阈值派生，给出下一步、升级条件、检查项、完成/阻塞摘要和已完成检查记录 | `Dashboard.channelRunbooks` |
 | `ChannelRunbookSummary` | Runbook 检查项处置摘要，统计 total、done、blocked、todo，用于 Dashboard 和控制台展示渠道处置进度 | `ChannelRunbook.checkSummary` |
 | `ChannelRunbookCheck` | Runbook 检查项处置记录，保存 channel、runbook status、check status、step index、action ref、负责人、截止时间、操作者和完成时间，用于把日报交接建议落到具体处置步骤，并支持筛选和 CSV 导出 | `/api/ops/channel-runbook-checks` |
-| `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
+| `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、Runbook 处置进度、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
 | `ChannelInboundAuditSummary` | 渠道验收摘要，统计 accepted/rejected、验收率和高频错误码，用于 Dashboard 日报和运营交接 | `ChannelOpsReport.summary.inboundAudit` |
 | `ChannelOpsHandoffPriority` | 运营日报交接优先级，按 ACTIVE 验收越线、死信、高频失败和重试通知排序，给出原因、下一步动作、通知确认 ID 和 Runbook 复核锚点 | `ChannelOpsReport.summary.handoffPriorities` |
 | `ReportSchedulerStatus` | 渠道运营日报后台调度状态，暴露开关、格式、间隔、保留数量、最近运行结果和下一次运行时间 | `/api/ops/channel-ops-report-scheduler` |
