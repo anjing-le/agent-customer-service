@@ -1875,6 +1875,15 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
+  const demoStages = [
+    { label: '脚手架基线', detail: 'Go / React / PostgreSQL' },
+    { label: '客服主链路', detail: '多轮会话与历史' },
+    { label: 'RAG 与规则', detail: '证据优先与兜底' },
+    { label: '渠道验收', detail: '签名 / 限流 / replay' },
+    { label: 'Runbook', detail: '分派 / 阻塞 / 审计' },
+    { label: '日报交接', detail: 'Markdown / CSV' }
+  ] as const;
+
   return (
     <main className="shell">
       <aside className="nav">
@@ -1901,6 +1910,24 @@ function App() {
             </button>
           </div>
         </header>
+
+        <section className="journeyBand" aria-label="课堂演示主线">
+          <div className="journeyLead">
+            <p className="sectionLabel">课堂主线</p>
+            <strong>脚手架承载工程习惯，客服 Agent 只讲业务增量</strong>
+          </div>
+          <ol className="journeySteps">
+            {demoStages.map((stage, index) => (
+              <li key={stage.label}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <strong>{stage.label}</strong>
+                  <small>{stage.detail}</small>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
 
         {error && <div className="notice"><AlertTriangle size={18} /> {error}</div>}
 
