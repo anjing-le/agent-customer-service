@@ -806,6 +806,7 @@ function App() {
   const [runbookCheckChannelFilter, setRunbookCheckChannelFilter] = useState('ALL');
   const [runbookCheckStatusFilter, setRunbookCheckStatusFilter] = useState('ALL');
   const [runbookCheckActorFilter, setRunbookCheckActorFilter] = useState('');
+  const [runbookCheckOverdueOnly, setRunbookCheckOverdueOnly] = useState(false);
   const [reportGenerating, setReportGenerating] = useState('');
   const [reportCompensating, setReportCompensating] = useState(false);
   const [channelDemoSending, setChannelDemoSending] = useState('');
@@ -840,6 +841,13 @@ function App() {
   const channelRunbooks = dashboard?.channelRunbooks ?? [];
   const runbookCheckChannels = Array.from(new Set([...channelRunbooks.map((item) => item.channel), ...runbookCheckRows.map((item) => item.channel)])).sort();
   const runbookCheckStatuses = Array.from(new Set([...channelRunbooks.map((item) => item.status), ...runbookCheckRows.map((item) => item.runbookStatus)])).sort();
+  const runbookCheckIsOverdue = (check: ChannelRunbookCheck) => {
+    if (!check.dueAt || check.checkStatus === 'DONE') {
+      return false;
+    }
+    const dueAt = Date.parse(check.dueAt);
+    return Number.isFinite(dueAt) && dueAt < Date.now();
+  };
   const acknowledgedNotificationIds = new Set(channelNotifications.filter((item) => item.status === 'ACKED' || item.ackedBy).map((item) => item.id));
   const notificationPolicyEvents = dashboard?.notificationPolicyEvents ?? [];
   const notificationPolicyChanges = dashboard?.notificationPolicyChanges ?? [];
@@ -971,6 +979,7 @@ function App() {
     channel = runbookCheckChannelFilter,
     status = runbookCheckStatusFilter,
     actor = runbookCheckActorFilter,
+    overdueOnly = runbookCheckOverdueOnly,
     limit = 20
   ) => {
     const params = new URLSearchParams({ limit: String(limit) });
@@ -983,15 +992,19 @@ function App() {
     if (actor.trim()) {
       params.set('actor', actor.trim());
     }
+    if (overdueOnly) {
+      params.set('overdue', 'true');
+    }
     return params.toString();
   };
 
   const refreshRunbookChecks = async (
     channel = runbookCheckChannelFilter,
     status = runbookCheckStatusFilter,
-    actor = runbookCheckActorFilter
+    actor = runbookCheckActorFilter,
+    overdueOnly = runbookCheckOverdueOnly
   ) => {
-    const checks = await api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery(channel, status, actor)}`);
+    const checks = await api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery(channel, status, actor, overdueOnly)}`);
     setRunbookCheckRows(checks);
   };
 
@@ -1640,7 +1653,7 @@ function App() {
   };
 
   const downloadChannelRunbookChecks = async () => {
-    const response = await fetch(`/api/ops/channel-runbook-checks/export?${channelRunbookCheckQuery(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, 100)}`);
+    const response = await fetch(`/api/ops/channel-runbook-checks/export?${channelRunbookCheckQuery(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckOverdueOnly, 100)}`);
     if (!response.ok) {
       throw new Error('download channel runbook checks failed');
     }
@@ -2696,7 +2709,7 @@ function App() {
                   key={item}
                   onClick={() => {
                     setRunbookCheckChannelFilter(item);
-                    void refreshRunbookChecks(item, runbookCheckStatusFilter, runbookCheckActorFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookChecks(item, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                   }}
                 >
                   {item}
@@ -2710,7 +2723,7 @@ function App() {
                   key={item}
                   onClick={() => {
                     setRunbookCheckStatusFilter(item);
-                    void refreshRunbookChecks(runbookCheckChannelFilter, item, runbookCheckActorFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookChecks(runbookCheckChannelFilter, item, runbookCheckActorFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                   }}
                 >
                   {item}
@@ -2719,15 +2732,25 @@ function App() {
               <input
                 aria-label="Runbook 检查操作者"
                 value={runbookCheckActorFilter}
-                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
+                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
                 onChange={(event) => setRunbookCheckActorFilter(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
-                    void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                   }
                 }}
                 placeholder="actor"
               />
+              <button
+                className={runbookCheckOverdueOnly ? 'filterButton active' : 'filterButton'}
+                onClick={() => {
+                  const next = !runbookCheckOverdueOnly;
+                  setRunbookCheckOverdueOnly(next);
+                  void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, next).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                }}
+              >
+                Overdue
+              </button>
               <button className="tinyButton" onClick={() => downloadChannelRunbookChecks().catch((err) => setError(err instanceof Error ? err.message : 'download channel runbook checks failed'))} title="导出 Runbook 检查">
                 <Download size={14} />
               </button>
@@ -2735,8 +2758,8 @@ function App() {
             {runbookCheckRows.length > 0 && (
               <div className="eventStrip">
                 {runbookCheckRows.slice(0, 8).map((check) => (
-                  <span className="status" key={check.id}>
-                    {check.channel} · {check.runbookStatus} · {check.checkStatus} · {check.assignee || check.actor} · {check.dueAt ? check.dueAt.slice(5, 16).replace('T', ' ') : check.completedAt.slice(5, 16).replace('T', ' ')}
+                  <span className={runbookCheckIsOverdue(check) ? 'status danger' : 'status'} key={check.id}>
+                    {check.channel} · {check.runbookStatus} · {check.checkStatus} · {check.assignee || check.actor} · {check.dueAt ? check.dueAt.slice(5, 16).replace('T', ' ') : check.completedAt.slice(5, 16).replace('T', ' ')}{runbookCheckIsOverdue(check) ? ' · overdue' : ''}
                   </span>
                 ))}
               </div>

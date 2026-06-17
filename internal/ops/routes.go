@@ -500,6 +500,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			r.URL.Query().Get("checkStatus"),
 			r.URL.Query().Get("actor"),
 			r.URL.Query().Get("actionRef"),
+			r.URL.Query().Get("overdue"),
 		))
 	})
 
@@ -523,6 +524,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			r.URL.Query().Get("checkStatus"),
 			r.URL.Query().Get("actor"),
 			r.URL.Query().Get("actionRef"),
+			r.URL.Query().Get("overdue"),
 		))
 		if err != nil {
 			httpjson.Fail(w, http.StatusInternalServerError, "report_error", err.Error())
@@ -852,12 +854,13 @@ func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]by
 	return buf.Bytes(), nil
 }
 
-func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, checkStatus string, actor string, actionRef string) []store.ChannelRunbookCheck {
+func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, checkStatus string, actor string, actionRef string, overdue string) []store.ChannelRunbookCheck {
 	channel = strings.ToLower(strings.TrimSpace(channel))
 	status = strings.ToUpper(strings.TrimSpace(status))
 	checkStatus = strings.ToUpper(strings.TrimSpace(checkStatus))
 	actor = strings.ToLower(strings.TrimSpace(actor))
 	actionRef = strings.ToLower(strings.TrimSpace(actionRef))
+	overdueValue, filterOverdue := optionalBoolQuery(overdue)
 	if channel == "all" {
 		channel = ""
 	}
@@ -884,17 +887,39 @@ func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel stri
 		if actionRef != "" && !strings.Contains(strings.ToLower(check.ActionRef), actionRef) {
 			continue
 		}
+		if filterOverdue && store.ChannelRunbookCheckOverdue(check, time.Now().UTC()) != overdueValue {
+			continue
+		}
 		filtered = append(filtered, check)
 	}
 	return filtered
 }
 
+func optionalBoolQuery(value string) (bool, bool) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" || value == "all" {
+		return false, false
+	}
+	if parsed, err := strconv.ParseBool(value); err == nil {
+		return parsed, true
+	}
+	switch value {
+	case "yes", "y", "overdue":
+		return true, true
+	case "no", "n":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
 func renderChannelRunbookChecksCSV(checks []store.ChannelRunbookCheck) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"id", "channel", "runbook_status", "check_status", "step_index", "step", "action_ref", "report_id", "assignee", "due_at", "actor", "note", "completed_at"}); err != nil {
+	if err := writer.Write([]string{"id", "channel", "runbook_status", "check_status", "step_index", "step", "action_ref", "report_id", "assignee", "due_at", "overdue", "actor", "note", "completed_at"}); err != nil {
 		return nil, err
 	}
+	now := time.Now().UTC()
 	for _, check := range checks {
 		if err := writer.Write([]string{
 			check.ID,
@@ -907,6 +932,7 @@ func renderChannelRunbookChecksCSV(checks []store.ChannelRunbookCheck) ([]byte, 
 			check.ReportID,
 			check.Assignee,
 			check.DueAt,
+			fmt.Sprintf("%t", store.ChannelRunbookCheckOverdue(check, now)),
 			check.Actor,
 			check.Note,
 			check.CompletedAt,

@@ -274,7 +274,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if !strings.Contains(exportRec.Header().Get("Content-Type"), "text/csv") {
 		t.Fatalf("expected csv export, got %s", exportRec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"id,channel,runbook_status,check_status,step_index,step,action_ref,report_id,assignee,due_at,actor,note,completed_at", "Marketplace,DISPATCH,DONE", owner, "ops-a"} {
+	for _, expected := range []string{"id,channel,runbook_status,check_status,step_index,step,action_ref,report_id,assignee,due_at,overdue,actor,note,completed_at", "Marketplace,DISPATCH,DONE", "false", owner, "ops-a"} {
 		if !strings.Contains(exportRec.Body.String(), expected) {
 			t.Fatalf("expected %s in export response, got %s", expected, exportRec.Body.String())
 		}
@@ -303,6 +303,26 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	}
 	if dashboard.ChannelRunbooks[0].CheckSummary.Done != 0 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 1 || dashboard.ChannelRunbooks[0].CheckSummary.Overdue != 1 {
 		t.Fatalf("expected blocked runbook summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
+	}
+
+	overdueReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?overdue=true", nil)
+	overdueRec := httptest.NewRecorder()
+	mux.ServeHTTP(overdueRec, overdueReq)
+	if overdueRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 overdue list, got %d: %s", overdueRec.Code, overdueRec.Body.String())
+	}
+	if !strings.Contains(overdueRec.Body.String(), `"checkStatus":"BLOCKED"`) || strings.Contains(overdueRec.Body.String(), `"checkStatus":"DONE"`) {
+		t.Fatalf("expected only overdue blocked check, got %s", overdueRec.Body.String())
+	}
+
+	overdueExportReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks/export?overdue=true", nil)
+	overdueExportRec := httptest.NewRecorder()
+	mux.ServeHTTP(overdueExportRec, overdueExportReq)
+	if overdueExportRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 overdue export, got %d: %s", overdueExportRec.Code, overdueExportRec.Body.String())
+	}
+	if !strings.Contains(overdueExportRec.Body.String(), ",true,ops-a,waiting for channel owner,") {
+		t.Fatalf("expected overdue csv marker, got %s", overdueExportRec.Body.String())
 	}
 
 	recoverReq := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/recover", strings.NewReader(blockBody))

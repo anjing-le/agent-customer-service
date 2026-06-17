@@ -767,7 +767,8 @@
         "status": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE|ALL",
         "checkStatus": "TODO|DONE|BLOCKED|ALL",
         "actor": "string",
-        "actionRef": "string"
+        "actionRef": "string",
+        "overdue": "boolean"
       }
     },
     "ChannelOpsReportEventsExport": {

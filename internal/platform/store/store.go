@@ -3235,7 +3235,7 @@ func channelRunbookSummary(total int, checks []ChannelRunbookCheck) ChannelRunbo
 		case "BLOCKED":
 			summary.Blocked++
 		}
-		if channelRunbookCheckOverdue(check, now) {
+		if ChannelRunbookCheckOverdue(check, now) {
 			summary.Overdue++
 		}
 	}
@@ -3246,7 +3246,7 @@ func channelRunbookSummary(total int, checks []ChannelRunbookCheck) ChannelRunbo
 	return summary
 }
 
-func channelRunbookCheckOverdue(check ChannelRunbookCheck, now time.Time) bool {
+func ChannelRunbookCheckOverdue(check ChannelRunbookCheck, now time.Time) bool {
 	if strings.EqualFold(strings.TrimSpace(check.CheckStatus), "DONE") || strings.TrimSpace(check.DueAt) == "" {
 		return false
 	}
