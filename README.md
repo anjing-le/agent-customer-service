@@ -71,6 +71,7 @@ go run ./cmd/platform-all
 6. 日报交接：生成 Markdown/CSV 日报，查看历史和补偿事件。
 
 详细流程见 [Demo Flow](./project_document/DEMO_FLOW.md)。
+最终收口见 [Final Acceptance](./project_document/FINAL_ACCEPTANCE.md)。
 
 ## 校验
 
@@ -102,4 +103,6 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 - [服务边界](./project_document/SERVICE_BOUNDARY_GUIDE.md)
 - [API Contract](./project_document/API_CONTRACT_GUIDE.md)
 - [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)
+- [演示流程](./project_document/DEMO_FLOW.md)
+- [最终验收](./project_document/FINAL_ACCEPTANCE.md)
 - [路线图](./project_document/ROADMAP.md)
