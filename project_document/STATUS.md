@@ -30,7 +30,7 @@
 | 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示 active/next secret ref、allowed origins、rate limit、签名窗口、replay 开关和轮换提示，不返回密钥值 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
-| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因；`ChannelAlert`、`ChannelFailureTrend`、`ChannelInboundAudit`、`ChannelInboundAuditQualityEvent`、`ChannelInboundAuditSummary`、`ChannelInboundAuditQualitySummary`、`ChannelOpsHandoffPriority`、`ChannelAlertPolicy`、`ChannelNotification`、`ChannelRunbook`、`ChannelRunbookCheck`、`ChannelOpsReport`、`ChannelOpsReportEvent`、`ReportSchedulerStatus`、`NotificationPolicyChange`、`NotificationPolicyEvent` 聚合渠道失败类型、趋势图、验收审计筛选导出、日报验收率、控制台验收质量条、越线恢复视图、日报越线摘要、运营交接优先级、历史日报通知确认动作、Runbook 检查项处置记录、阻塞/恢复动作、逾期 dueAt 汇总、逾期筛选导出、负责人筛选、逾期交接优先级、日报处置摘要、负责人、截止时间、通知确认锚点、Runbook 复核锚点、按渠道配置的验收质量 Runbook、验收质量越线事件、通知策略、可配置目标 URL、secret ref、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、配置变更审计、demo/HTTP delivery client、签名出站、退避重试、外部回执、脱敏投递审计、死信、Runbook 处置、控制台 JSON 日报、服务端 Markdown/CSV 日报导出、手动/定时日报历史留存、保留策略、调度状态可视化、失败补偿留痕、事件筛选导出和确认闭环 |
+| 回复观测 | Runtime connected | `Message.trace` 记录策略、证据数、历史数、模型尝试、耗时和回退原因；`ChannelAlert`、`ChannelFailureTrend`、`ChannelInboundAudit`、`ChannelInboundAuditQualityEvent`、`ChannelInboundAuditSummary`、`ChannelInboundAuditQualitySummary`、`ChannelOpsHandoffPriority`、`ChannelAlertPolicy`、`ChannelNotification`、`ChannelRunbook`、`ChannelRunbookCheck`、`ChannelOpsReport`、`ChannelOpsReportEvent`、`ReportSchedulerStatus`、`NotificationPolicyChange`、`NotificationPolicyEvent` 聚合渠道失败类型、趋势图、验收审计筛选导出、日报验收率、控制台验收质量条、越线恢复视图、日报越线摘要、运营交接优先级、历史日报通知确认动作、Runbook 检查项处置记录、批量分派、阻塞/恢复动作、逾期 dueAt 汇总、逾期筛选导出、负责人筛选、逾期交接优先级、日报处置摘要、负责人、截止时间、通知确认锚点、Runbook 复核锚点、按渠道配置的验收质量 Runbook、验收质量越线事件、通知策略、可配置目标 URL、secret ref、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、配置变更审计、demo/HTTP delivery client、签名出站、退避重试、外部回执、脱敏投递审计、死信、Runbook 处置、控制台 JSON 日报、服务端 Markdown/CSV 日报导出、手动/定时日报历史留存、保留策略、调度状态可视化、失败补偿留痕、事件筛选导出和确认闭环 |
 | 回归验证 | Runtime connected | `testdata/agent_regression_cases.json` 固化可答、无证据、转人工、模型成功和模型失败回退场景 |
 | 流式回复 | Runtime connected | `/api/customer-service/messages/stream` 以 SSE 返回 `meta`、`delta`、`done`，控制台已接入 |
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
@@ -46,5 +46,5 @@
 
 ## 下一步
 
-1. 补充 Runbook 批量分派动作。
+1. 补充 Runbook 分派审计事件和负责人负载统计。
 2. 继续扩展更多平台渠道 profile。

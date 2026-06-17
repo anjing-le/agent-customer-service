@@ -537,6 +537,10 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		_, _ = w.Write(report)
 	})
 
+	mux.HandleFunc("/api/ops/channel-runbook-checks/assign", func(w http.ResponseWriter, r *http.Request) {
+		handleAssignChannelRunbookChecks(w, r, st)
+	})
+
 	mux.HandleFunc("/api/ops/channel-runbook-checks/complete", func(w http.ResponseWriter, r *http.Request) {
 		handleChannelRunbookCheckStatus(w, r, st, "DONE", "Runbook check completed")
 	})
@@ -799,6 +803,110 @@ func handleChannelRunbookCheckStatus(w http.ResponseWriter, r *http.Request, st 
 		return
 	}
 	httpjson.OK(w, check)
+}
+
+func handleAssignChannelRunbookChecks(w http.ResponseWriter, r *http.Request, st store.Runtime) {
+	if !httpjson.RequireMethod(w, r, http.MethodPost) {
+		return
+	}
+	var req struct {
+		Channel       string `json:"channel"`
+		RunbookStatus string `json:"runbookStatus"`
+		Assignee      string `json:"assignee"`
+		DueAt         string `json:"dueAt"`
+		Actor         string `json:"actor"`
+		Note          string `json:"note"`
+		ReportID      string `json:"reportId"`
+		ActionRef     string `json:"actionRef"`
+		StepIndexes   []int  `json:"stepIndexes"`
+	}
+	if err := httpjson.Decode(r, &req); err != nil {
+		httpjson.BadRequest(w, err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Channel) == "" || strings.TrimSpace(req.RunbookStatus) == "" || strings.TrimSpace(req.Assignee) == "" {
+		httpjson.BadRequest(w, "channel, runbookStatus and assignee are required")
+		return
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	runbook, ok := channelRunbookForAssignment(dashboard.ChannelRunbooks, req.Channel, req.RunbookStatus)
+	if !ok {
+		httpjson.Fail(w, http.StatusNotFound, "not_found", "channel runbook not found")
+		return
+	}
+	selected := runbookAssignmentStepIndexes(runbook, req.StepIndexes)
+	existingByStep := map[int]store.ChannelRunbookCheck{}
+	for _, check := range runbook.Checks {
+		existingByStep[check.StepIndex] = check
+	}
+	assigned := make([]store.ChannelRunbookCheck, 0, len(selected))
+	skipped := 0
+	for _, stepIndex := range selected {
+		if stepIndex < 0 || stepIndex >= len(runbook.Steps) {
+			skipped++
+			continue
+		}
+		existing := existingByStep[stepIndex]
+		if strings.EqualFold(existing.CheckStatus, "DONE") {
+			skipped++
+			continue
+		}
+		checkStatus := fallbackString(existing.CheckStatus, "TODO")
+		actionRef := fallbackString(existing.ActionRef, fallbackString(req.ActionRef, runbook.Channel+":"+runbook.Status))
+		dueAt := fallbackString(req.DueAt, existing.DueAt)
+		reportID := fallbackString(req.ReportID, existing.ReportID)
+		check, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
+			Channel:       runbook.Channel,
+			RunbookStatus: runbook.Status,
+			CheckStatus:   checkStatus,
+			Step:          runbook.Steps[stepIndex],
+			StepIndex:     stepIndex,
+			ActionRef:     actionRef,
+			ReportID:      reportID,
+			Assignee:      req.Assignee,
+			DueAt:         dueAt,
+			Actor:         req.Actor,
+			Note:          fallbackString(req.Note, "Runbook check assigned"),
+		})
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		assigned = append(assigned, check)
+	}
+	httpjson.OK(w, struct {
+		Assigned int                         `json:"assigned"`
+		Skipped  int                         `json:"skipped"`
+		Checks   []store.ChannelRunbookCheck `json:"checks"`
+	}{
+		Assigned: len(assigned),
+		Skipped:  skipped,
+		Checks:   assigned,
+	})
+}
+
+func channelRunbookForAssignment(runbooks []store.ChannelRunbook, channel string, status string) (store.ChannelRunbook, bool) {
+	for _, runbook := range runbooks {
+		if strings.EqualFold(runbook.Channel, channel) && strings.EqualFold(runbook.Status, status) {
+			return runbook, true
+		}
+	}
+	return store.ChannelRunbook{}, false
+}
+
+func runbookAssignmentStepIndexes(runbook store.ChannelRunbook, requested []int) []int {
+	if len(requested) > 0 {
+		return append([]int(nil), requested...)
+	}
+	indexes := make([]int, 0, len(runbook.Steps))
+	for idx := range runbook.Steps {
+		indexes = append(indexes, idx)
+	}
+	return indexes
 }
 
 func fallbackString(value string, fallback string) string {

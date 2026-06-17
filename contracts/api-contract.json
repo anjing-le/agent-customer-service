@@ -264,6 +264,14 @@
       "response": { "status": 200, "schema": "ChannelRunbookChecksExport" }
     },
     {
+      "id": "assignChannelRunbookChecks",
+      "boundary": "ops",
+      "method": "POST",
+      "path": "/api/ops/channel-runbook-checks/assign",
+      "request": { "body": "AssignChannelRunbookChecksRequest" },
+      "response": { "status": 200, "schema": "AssignChannelRunbookChecksResult" }
+    },
+    {
       "id": "completeChannelRunbookCheck",
       "boundary": "ops",
       "method": "POST",
@@ -652,6 +660,27 @@
         "dueAt": "RFC3339 string",
         "actor": "string",
         "note": "string"
+      }
+    },
+    "AssignChannelRunbookChecksRequest": {
+      "required": ["channel", "runbookStatus", "assignee"],
+      "fields": {
+        "channel": "string",
+        "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "assignee": "string",
+        "dueAt": "RFC3339 string",
+        "actor": "string",
+        "note": "string",
+        "reportId": "string",
+        "actionRef": "string",
+        "stepIndexes": "number[]"
+      }
+    },
+    "AssignChannelRunbookChecksResult": {
+      "fields": {
+        "assigned": "number",
+        "skipped": "number",
+        "checks": "ChannelRunbookCheck[]"
       }
     },
     "DispatchChannelNotificationRequest": {

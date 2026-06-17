@@ -3234,14 +3234,18 @@ func channelRunbookSummary(total int, checks []ChannelRunbookCheck) ChannelRunbo
 			summary.Done++
 		case "BLOCKED":
 			summary.Blocked++
+		case "TODO", "":
+			summary.Todo++
+		default:
+			summary.Todo++
 		}
 		if ChannelRunbookCheckOverdue(check, now) {
 			summary.Overdue++
 		}
 	}
-	summary.Todo = total - len(seen)
-	if summary.Todo < 0 {
-		summary.Todo = 0
+	missing := total - len(seen)
+	if missing > 0 {
+		summary.Todo += missing
 	}
 	return summary
 }

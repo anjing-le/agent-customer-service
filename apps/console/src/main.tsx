@@ -380,6 +380,11 @@ type ChannelRunbookCheck = {
   note?: string;
   completedAt: string;
 };
+type AssignChannelRunbookChecksResult = {
+  assigned: number;
+  skipped: number;
+  checks: ChannelRunbookCheck[];
+};
 
 type ChannelRunbook = {
   channel: string;
@@ -1391,6 +1396,27 @@ function App() {
     '/api/ops/channel-runbook-checks/recover',
     `recovered ${runbook.channel}:${runbook.status} step ${stepIndex + 1}`
   );
+
+  const assignRunbookChecks = async (runbook: ChannelRunbook) => {
+    setError('');
+    try {
+      await api<AssignChannelRunbookChecksResult>('/api/ops/channel-runbook-checks/assign', {
+        method: 'POST',
+        body: JSON.stringify({
+          channel: runbook.channel,
+          runbookStatus: runbook.status,
+          actionRef: `${runbook.channel}:${runbook.status}`,
+          assignee: runbook.owner,
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+          actor: 'ops-a',
+          note: `assigned ${runbook.channel}:${runbook.status} runbook checks`
+        })
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'assign runbook checks failed');
+    }
+  };
 
   const dispatchChannelNotification = async (notification: ChannelNotification, outcome: 'SUCCESS' | 'webhook_timeout') => {
     setError('');
@@ -2703,6 +2729,14 @@ function App() {
                     <small>{item.checkSummary.done}/{item.checkSummary.total} done</small>
                     {item.checkSummary.blocked > 0 && <small className="dangerText">{item.checkSummary.blocked} blocked</small>}
                     {(item.checkSummary.overdue ?? 0) > 0 && <small className="dangerText">{item.checkSummary.overdue ?? 0} overdue</small>}
+                    <button
+                      className="tinyButton inlineIconButton"
+                      disabled={item.checkSummary.todo === 0 && item.checkSummary.blocked === 0}
+                      onClick={() => void assignRunbookChecks(item)}
+                      title="批量分派 Runbook 检查项"
+                    >
+                      <UserRoundCheck size={12} />
+                    </button>
                   </div>
                 </article>
               ))}

@@ -336,6 +336,63 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	}
 }
 
+func TestAssignChannelRunbookChecksRoute(t *testing.T) {
+	st := store.NewSeedStore()
+	for idx := 0; idx < 3; idx++ {
+		if err := st.RecordChannelFailure(store.ChannelFailureEvent{
+			Channel:           "Marketplace",
+			Code:              "channel_signature_invalid",
+			Reason:            "签名错误",
+			ExternalMessageID: fmt.Sprintf("runbook-assign-%d", idx),
+			Origin:            "https://marketplace.example.com",
+		}); err != nil {
+			t.Fatalf("record failure: %v", err)
+		}
+	}
+	dashboard, err := st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard: %v", err)
+	}
+	if len(dashboard.ChannelRunbooks) == 0 || len(dashboard.ChannelRunbooks[0].Steps) == 0 {
+		t.Fatalf("expected runbook steps, got %#v", dashboard.ChannelRunbooks)
+	}
+	runbook := dashboard.ChannelRunbooks[0]
+
+	mux := http.NewServeMux()
+	Register(mux, st)
+
+	body := fmt.Sprintf(`{"channel":"%s","runbookStatus":"%s","assignee":"ops-owner","dueAt":"2026-06-15T12:00:00Z","actor":"ops-lead","note":"batch assign from daily handoff"}`, runbook.Channel, runbook.Status)
+	req := httptest.NewRequest(http.MethodPost, "/api/ops/channel-runbook-checks/assign", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 assign, got %d: %s", rec.Code, rec.Body.String())
+	}
+	for _, expected := range []string{fmt.Sprintf(`"assigned":%d`, len(runbook.Steps)), `"skipped":0`, `"checkStatus":"TODO"`, `"assignee":"ops-owner"`, `"actor":"ops-lead"`} {
+		if !strings.Contains(rec.Body.String(), expected) {
+			t.Fatalf("expected %s in assign response, got %s", expected, rec.Body.String())
+		}
+	}
+
+	dashboard, err = st.Dashboard()
+	if err != nil {
+		t.Fatalf("dashboard after assign: %v", err)
+	}
+	if dashboard.ChannelRunbooks[0].CheckSummary.Todo != len(runbook.Steps) || dashboard.ChannelRunbooks[0].CheckSummary.Done != 0 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 0 {
+		t.Fatalf("expected assigned todo summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?assignee=ops-owner&checkStatus=TODO", nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 list, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	if !strings.Contains(listRec.Body.String(), `"assignee":"ops-owner"`) || !strings.Contains(listRec.Body.String(), `"checkStatus":"TODO"`) {
+		t.Fatalf("expected assigned todo checks in list, got %s", listRec.Body.String())
+	}
+}
+
 func TestUpdateChannelAlertPolicyRoute(t *testing.T) {
 	st := store.NewSeedStore()
 	mux := http.NewServeMux()
