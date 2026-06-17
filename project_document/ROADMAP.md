@@ -68,7 +68,8 @@
 - 已支持 Runbook 逾期进入日报交接优先级，生成 `RUNBOOK_OVERDUE` 建议动作，把交接风险继续前移。
 - 已支持 Runbook 检查项按负责人筛选，控制台和 CSV 导出可直接形成负责人视图。
 - 已支持 Runbook 检查项批量分派，把未完成步骤落成 TODO 记录并绑定负责人、截止时间和操作者。
-- 下一步为 Runbook 分派补审计事件和负责人负载统计。
+- 已支持 Runbook 负责人负载统计，Dashboard、历史日报 summary、Markdown/CSV 导出和控制台会聚合 assignee 的 total/done/blocked/overdue/todo、涉及渠道和最近截止时间。
+- 下一步为 Runbook 分派补审计事件。
 
 ## V3: 生产化扩展
 

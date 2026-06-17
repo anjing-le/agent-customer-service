@@ -1272,6 +1272,7 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 	summary.InboundAudit = channelInboundAuditSummary(dashboard.ChannelAudits)
 	summary.InboundAuditQuality = channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 	summary.RunbookSummary = channelOpsRunbookSummary(dashboard.ChannelRunbooks)
+	summary.RunbookLoads = dashboard.RunbookLoads
 	summary.HandoffPriorities = channelOpsHandoffPriorities(dashboard)
 	for _, channel := range append(append(summary.InboundAuditQuality.ActiveChannels, summary.InboundAuditQuality.WatchChannels...), summary.InboundAuditQuality.RecoveredChannels...) {
 		if channel != "" && !seenChannels[channel] {
@@ -1647,6 +1648,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
 	handoffPriorities := channelOpsHandoffPriorities(dashboard)
+	runbookLoads := dashboard.RunbookLoads
 
 	var b strings.Builder
 	b.WriteString("# Agent Customer Service Channel Ops Report\n\n")
@@ -1655,6 +1657,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString(fmt.Sprintf("- Channel failures: %d\n", totalFailures))
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
 	b.WriteString(fmt.Sprintf("- Runbook progress: done=%d blocked=%d overdue=%d todo=%d total=%d\n", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Overdue, runbookSummary.Todo, runbookSummary.Total))
+	b.WriteString(fmt.Sprintf("- Runbook assignees: %d\n", len(runbookLoads)))
 	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
 	b.WriteString(fmt.Sprintf("- Inbound quality events: total=%d active=%d watch=%d recovered=%d\n", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered))
 	b.WriteString(fmt.Sprintf("- Handoff priorities: %d\n", len(handoffPriorities)))
@@ -1669,6 +1672,16 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 			if item.NotificationID != "" || item.RunbookStatus != "" {
 				b.WriteString(fmt.Sprintf("   - Links: notification=%s runbook=%s\n", fallbackReportValue(item.NotificationID), fallbackReportValue(item.RunbookStatus)))
 			}
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("## Runbook Assignee Load\n\n")
+	if len(runbookLoads) == 0 {
+		b.WriteString("- No assigned runbook checks.\n\n")
+	} else {
+		for _, load := range runbookLoads {
+			b.WriteString(fmt.Sprintf("- %s: todo=%d blocked=%d overdue=%d done=%d total=%d channels=%s next_due=%s\n", load.Assignee, load.Todo, load.Blocked, load.Overdue, load.Done, load.Total, channelListOrNone(load.Channels), fallbackReportValue(load.NextDueAt)))
 		}
 		b.WriteString("\n")
 	}
@@ -1778,6 +1791,12 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
 	if err := writer.Write([]string{"runbook_summary", "", "SUMMARY", "progress", fmt.Sprintf("done=%d blocked=%d overdue=%d todo=%d total=%d", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Overdue, runbookSummary.Todo, runbookSummary.Total), "", "", ""}); err != nil {
 		return nil, err
+	}
+	for _, load := range dashboard.RunbookLoads {
+		detail := fmt.Sprintf("todo=%d blocked=%d overdue=%d done=%d total=%d channels=%s next_due=%s", load.Todo, load.Blocked, load.Overdue, load.Done, load.Total, strings.Join(load.Channels, "|"), fallbackReportValue(load.NextDueAt))
+		if err := writer.Write([]string{"runbook_assignee", "", "LOAD", load.Assignee, detail, load.Assignee, "review assigned runbook checks", ""}); err != nil {
+			return nil, err
+		}
 	}
 	if err := writer.Write([]string{"inbound_quality", "", "SUMMARY", "events", fmt.Sprintf("total=%d active=%d watch=%d recovered=%d", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered), "", "", ""}); err != nil {
 		return nil, err

@@ -381,6 +381,13 @@ func TestAssignChannelRunbookChecksRoute(t *testing.T) {
 	if dashboard.ChannelRunbooks[0].CheckSummary.Todo != len(runbook.Steps) || dashboard.ChannelRunbooks[0].CheckSummary.Done != 0 || dashboard.ChannelRunbooks[0].CheckSummary.Blocked != 0 {
 		t.Fatalf("expected assigned todo summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
 	}
+	if len(dashboard.RunbookLoads) != 1 ||
+		dashboard.RunbookLoads[0].Assignee != "ops-owner" ||
+		dashboard.RunbookLoads[0].Todo != len(runbook.Steps) ||
+		dashboard.RunbookLoads[0].Total != len(runbook.Steps) ||
+		dashboard.RunbookLoads[0].NextDueAt != "2026-06-15T12:00:00Z" {
+		t.Fatalf("expected runbook assignee load, got %#v", dashboard.RunbookLoads)
+	}
 
 	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?assignee=ops-owner&checkStatus=TODO", nil)
 	listRec := httptest.NewRecorder()
@@ -718,7 +725,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
 		t.Fatalf("expected markdown content type, got %s", rec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Runbook progress: done=0 blocked=1 overdue=1 todo=", "Progress: done=0 blocked=1 overdue=1 todo=", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `RUNBOOK_OVERDUE`", "overdue runbook checks", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Runbook progress: done=0 blocked=1 overdue=1 todo=", "Runbook assignees: 1", "Runbook Assignee Load", "todo=0 blocked=1 overdue=1 done=0 total=1", "Progress: done=0 blocked=1 overdue=1 todo=", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `RUNBOOK_OVERDUE`", "overdue runbook checks", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in markdown report, got %s", expected, rec.Body.String())
 		}
@@ -737,7 +744,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "section,channel,status,code,count,owner,next_action,escalation") {
 		t.Fatalf("expected csv header, got %s", rec.Body.String())
 	}
-	for _, expected := range []string{"runbook_summary,,SUMMARY,progress,done=0 blocked=1 overdue=1 todo=", "runbook,Marketplace,ESCALATE", "done=0 blocked=1 overdue=1 todo=", "inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "RUNBOOK_OVERDUE", "overdue runbook checks", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
+	for _, expected := range []string{"runbook_summary,,SUMMARY,progress,done=0 blocked=1 overdue=1 todo=", "runbook_assignee,,LOAD", "todo=0 blocked=1 overdue=1 done=0 total=1", "runbook,Marketplace,ESCALATE", "done=0 blocked=1 overdue=1 todo=", "inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "RUNBOOK_OVERDUE", "overdue runbook checks", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in csv report, got %s", expected, rec.Body.String())
 		}

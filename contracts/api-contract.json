@@ -844,6 +844,7 @@
         "inboundAudit": "ChannelInboundAuditSummary",
         "inboundAuditQuality": "ChannelInboundAuditQualitySummary",
         "runbookSummary": "ChannelRunbookSummary",
+        "runbookAssigneeLoads": "ChannelRunbookAssigneeLoad[]",
         "handoffPriorities": "ChannelOpsHandoffPriority[]"
       }
     },
@@ -1230,6 +1231,7 @@
         "channelAlertPolicies": "ChannelAlertPolicy[]",
         "channelNotifications": "ChannelNotification[]",
         "channelRunbooks": "ChannelRunbook[]",
+        "runbookAssigneeLoads": "ChannelRunbookAssigneeLoad[]",
         "notificationPolicyEvents": "NotificationPolicyEvent[]",
         "notificationPolicyChanges": "NotificationPolicyChange[]",
         "quality": "QualitySummary",
@@ -1370,6 +1372,19 @@
         "blocked": "number",
         "overdue": "number",
         "todo": "number"
+      }
+    },
+    "ChannelRunbookAssigneeLoad": {
+      "required": ["assignee", "total", "done", "blocked", "overdue", "todo", "channels"],
+      "fields": {
+        "assignee": "string",
+        "total": "number",
+        "done": "number",
+        "blocked": "number",
+        "overdue": "number",
+        "todo": "number",
+        "channels": "string[]",
+        "nextDueAt": "RFC3339 string"
       }
     },
     "ChannelRunbookCheck": {

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -430,6 +431,7 @@ type Dashboard struct {
 	AlertPolicies    []ChannelAlertPolicy              `json:"channelAlertPolicies"`
 	Notifications    []ChannelNotification             `json:"channelNotifications"`
 	ChannelRunbooks  []ChannelRunbook                  `json:"channelRunbooks"`
+	RunbookLoads     []ChannelRunbookAssigneeLoad      `json:"runbookAssigneeLoads"`
 	PolicyEvents     []NotificationPolicyEvent         `json:"notificationPolicyEvents"`
 	PolicyChanges    []NotificationPolicyChange        `json:"notificationPolicyChanges"`
 	Quality          QualitySummary                    `json:"quality"`
@@ -459,6 +461,7 @@ type ChannelOpsReportSummary struct {
 	InboundAudit        ChannelInboundAuditSummary        `json:"inboundAudit"`
 	InboundAuditQuality ChannelInboundAuditQualitySummary `json:"inboundAuditQuality"`
 	RunbookSummary      ChannelRunbookSummary             `json:"runbookSummary"`
+	RunbookLoads        []ChannelRunbookAssigneeLoad      `json:"runbookAssigneeLoads"`
 	HandoffPriorities   []ChannelOpsHandoffPriority       `json:"handoffPriorities"`
 }
 
@@ -557,6 +560,17 @@ type ChannelRunbookSummary struct {
 	Blocked int `json:"blocked"`
 	Overdue int `json:"overdue"`
 	Todo    int `json:"todo"`
+}
+
+type ChannelRunbookAssigneeLoad struct {
+	Assignee  string   `json:"assignee"`
+	Total     int      `json:"total"`
+	Done      int      `json:"done"`
+	Blocked   int      `json:"blocked"`
+	Overdue   int      `json:"overdue"`
+	Todo      int      `json:"todo"`
+	Channels  []string `json:"channels"`
+	NextDueAt string   `json:"nextDueAt,omitempty"`
 }
 
 type ChannelRunbookCheck struct {
@@ -1454,6 +1468,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 	quality := qualitySummary(s.messages, s.gaps, transfers, s.annotations)
 	channelAlerts := channelAlerts(s.channelFailures)
 	alertPolicies := channelAlertPolicies(s.alertPolicies, channelAlerts)
+	runbooks := channelRunbooks(channelAlerts, alertPolicies, s.notifications, s.inboundAudits, s.runbookChecks)
 	return Dashboard{
 		Metrics: []Metric{
 			{Label: "Active sessions", Value: fmt.Sprintf("%d", len(s.conversations)), Note: "in-memory V1 runtime"},
@@ -1479,7 +1494,8 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		AuditEvents:      append([]ChannelInboundAuditQualityEvent(nil), s.auditEvents...),
 		AlertPolicies:    alertPolicies,
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
-		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, s.notifications, s.inboundAudits, s.runbookChecks),
+		ChannelRunbooks:  runbooks,
+		RunbookLoads:     channelRunbookAssigneeLoads(runbooks, time.Now().UTC()),
 		PolicyEvents:     append([]NotificationPolicyEvent(nil), s.policyEvents...),
 		PolicyChanges:    append([]NotificationPolicyChange(nil), s.policyChanges...),
 		Quality:          quality,
@@ -3259,6 +3275,81 @@ func ChannelRunbookCheckOverdue(check ChannelRunbookCheck, now time.Time) bool {
 		return false
 	}
 	return dueAt.Before(now)
+}
+
+func channelRunbookAssigneeLoads(runbooks []ChannelRunbook, now time.Time) []ChannelRunbookAssigneeLoad {
+	type loadAccumulator struct {
+		load      ChannelRunbookAssigneeLoad
+		channels  map[string]bool
+		nextDueAt time.Time
+		hasDueAt  bool
+	}
+	byAssignee := map[string]*loadAccumulator{}
+	for _, runbook := range runbooks {
+		for _, check := range runbook.Checks {
+			assignee := strings.TrimSpace(check.Assignee)
+			if assignee == "" {
+				continue
+			}
+			acc := byAssignee[strings.ToLower(assignee)]
+			if acc == nil {
+				acc = &loadAccumulator{
+					load: ChannelRunbookAssigneeLoad{
+						Assignee: assignee,
+						Channels: []string{},
+					},
+					channels: map[string]bool{},
+				}
+				byAssignee[strings.ToLower(assignee)] = acc
+			}
+			acc.load.Total++
+			switch strings.ToUpper(strings.TrimSpace(check.CheckStatus)) {
+			case "DONE":
+				acc.load.Done++
+			case "BLOCKED":
+				acc.load.Blocked++
+			case "TODO", "":
+				acc.load.Todo++
+			default:
+				acc.load.Todo++
+			}
+			if ChannelRunbookCheckOverdue(check, now) {
+				acc.load.Overdue++
+			}
+			if check.Channel != "" && !acc.channels[check.Channel] {
+				acc.channels[check.Channel] = true
+				acc.load.Channels = append(acc.load.Channels, check.Channel)
+			}
+			if !strings.EqualFold(check.CheckStatus, "DONE") && strings.TrimSpace(check.DueAt) != "" {
+				if dueAt, err := time.Parse(time.RFC3339, check.DueAt); err == nil && (!acc.hasDueAt || dueAt.Before(acc.nextDueAt)) {
+					acc.nextDueAt = dueAt.UTC()
+					acc.hasDueAt = true
+					acc.load.NextDueAt = acc.nextDueAt.Format(time.RFC3339)
+				}
+			}
+		}
+	}
+	loads := make([]ChannelRunbookAssigneeLoad, 0, len(byAssignee))
+	for _, acc := range byAssignee {
+		sort.Strings(acc.load.Channels)
+		loads = append(loads, acc.load)
+	}
+	sort.SliceStable(loads, func(i, j int) bool {
+		if loads[i].Overdue != loads[j].Overdue {
+			return loads[i].Overdue > loads[j].Overdue
+		}
+		if loads[i].Blocked != loads[j].Blocked {
+			return loads[i].Blocked > loads[j].Blocked
+		}
+		if loads[i].Todo != loads[j].Todo {
+			return loads[i].Todo > loads[j].Todo
+		}
+		if loads[i].Total != loads[j].Total {
+			return loads[i].Total > loads[j].Total
+		}
+		return strings.ToLower(loads[i].Assignee) < strings.ToLower(loads[j].Assignee)
+	})
+	return loads
 }
 
 func channelInboundAuditRunbooks(audits []ChannelInboundAudit, policies []ChannelAlertPolicy) []ChannelRunbook {

@@ -493,6 +493,16 @@ type ChannelOpsHandoffPriority = {
   notificationId?: string;
   runbookStatus?: string;
 };
+type ChannelRunbookAssigneeLoad = {
+  assignee: string;
+  total: number;
+  done: number;
+  blocked: number;
+  overdue: number;
+  todo: number;
+  channels: string[] | null;
+  nextDueAt?: string;
+};
 
 type ChannelOpsReportSummary = {
   failureCount: number;
@@ -508,6 +518,7 @@ type ChannelOpsReportSummary = {
     overdue?: number;
     todo: number;
   };
+  runbookAssigneeLoads?: ChannelRunbookAssigneeLoad[] | null;
   handoffPriorities?: ChannelOpsHandoffPriority[] | null;
   inboundAudit?: {
     total: number;
@@ -598,6 +609,7 @@ type Dashboard = {
   channelAlertPolicies: ChannelAlertPolicy[] | null;
   channelNotifications: ChannelNotification[] | null;
   channelRunbooks: ChannelRunbook[] | null;
+  runbookAssigneeLoads?: ChannelRunbookAssigneeLoad[] | null;
   notificationPolicyEvents: NotificationPolicyEvent[] | null;
   notificationPolicyChanges: NotificationPolicyChange[] | null;
   quality: QualitySummary;
@@ -845,6 +857,7 @@ function App() {
   const channelAlertPolicies = dashboard?.channelAlertPolicies ?? [];
   const channelNotifications = dashboard?.channelNotifications ?? [];
   const channelRunbooks = dashboard?.channelRunbooks ?? [];
+  const runbookAssigneeLoads = dashboard?.runbookAssigneeLoads ?? [];
   const runbookCheckChannels = Array.from(new Set([...channelRunbooks.map((item) => item.channel), ...runbookCheckRows.map((item) => item.channel)])).sort();
   const runbookCheckStatuses = Array.from(new Set([...channelRunbooks.map((item) => item.status), ...runbookCheckRows.map((item) => item.runbookStatus)])).sort();
   const runbookCheckIsOverdue = (check: ChannelRunbookCheck) => {
@@ -2461,6 +2474,11 @@ function App() {
                           runbook {report.summary.runbookSummary.done}/{report.summary.runbookSummary.total} done · {report.summary.runbookSummary.blocked} blocked · {report.summary.runbookSummary.overdue ?? 0} overdue · {report.summary.runbookSummary.todo} todo
                         </span>
                       )}
+                      {(report.summary.runbookAssigneeLoads ?? []).length > 0 && (
+                        <span>
+                          assignee {(report.summary.runbookAssigneeLoads ?? []).slice(0, 3).map((item) => `${item.assignee}:${item.todo}/${item.total}`).join(' / ')}
+                        </span>
+                      )}
                       {report.summary.inboundAudit && (
                         <span>
                           inbound {report.summary.inboundAudit.accepted}/{report.summary.inboundAudit.total} accepted · {report.summary.inboundAudit.acceptanceRate}%
@@ -2742,6 +2760,15 @@ function App() {
               ))}
               {channelRunbooks.length === 0 && <p className="empty">暂无处置 Runbook</p>}
             </div>
+            {runbookAssigneeLoads.length > 0 && (
+              <div className="eventStrip">
+                {runbookAssigneeLoads.slice(0, 6).map((load) => (
+                  <span className={(load.overdue ?? 0) > 0 || (load.blocked ?? 0) > 0 ? 'status danger' : 'status'} key={load.assignee}>
+                    {load.assignee} · todo {load.todo} · blocked {load.blocked} · overdue {load.overdue}{load.nextDueAt ? ` · due ${load.nextDueAt.slice(5, 16).replace('T', ' ')}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="filterRow">
               {['ALL', ...runbookCheckChannels].map((item) => (
                 <button

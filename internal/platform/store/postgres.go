@@ -1563,6 +1563,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		}
 	}
 	transfers = withTransferSLAs(transfers, channelPolicies, time.Now().UTC())
+	runbooks := channelRunbooks(channelAlerts, alertPolicies, notifications, channelAudits, runbookChecks)
 
 	return Dashboard{
 		Metrics: []Metric{
@@ -1589,7 +1590,8 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		AuditEvents:      auditEvents,
 		AlertPolicies:    alertPolicies,
 		Notifications:    notifications,
-		ChannelRunbooks:  channelRunbooks(channelAlerts, alertPolicies, notifications, channelAudits, runbookChecks),
+		ChannelRunbooks:  runbooks,
+		RunbookLoads:     channelRunbookAssigneeLoads(runbooks, time.Now().UTC()),
 		PolicyEvents:     policyEvents,
 		PolicyChanges:    policyChanges,
 		Quality:          qualitySummary(messages, gaps, transfers, annotations),
