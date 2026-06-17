@@ -806,6 +806,7 @@ function App() {
   const [runbookCheckChannelFilter, setRunbookCheckChannelFilter] = useState('ALL');
   const [runbookCheckStatusFilter, setRunbookCheckStatusFilter] = useState('ALL');
   const [runbookCheckActorFilter, setRunbookCheckActorFilter] = useState('');
+  const [runbookCheckAssigneeFilter, setRunbookCheckAssigneeFilter] = useState('');
   const [runbookCheckOverdueOnly, setRunbookCheckOverdueOnly] = useState(false);
   const [reportGenerating, setReportGenerating] = useState('');
   const [reportCompensating, setReportCompensating] = useState(false);
@@ -979,6 +980,7 @@ function App() {
     channel = runbookCheckChannelFilter,
     status = runbookCheckStatusFilter,
     actor = runbookCheckActorFilter,
+    assignee = runbookCheckAssigneeFilter,
     overdueOnly = runbookCheckOverdueOnly,
     limit = 20
   ) => {
@@ -992,6 +994,9 @@ function App() {
     if (actor.trim()) {
       params.set('actor', actor.trim());
     }
+    if (assignee.trim()) {
+      params.set('assignee', assignee.trim());
+    }
     if (overdueOnly) {
       params.set('overdue', 'true');
     }
@@ -1002,9 +1007,10 @@ function App() {
     channel = runbookCheckChannelFilter,
     status = runbookCheckStatusFilter,
     actor = runbookCheckActorFilter,
+    assignee = runbookCheckAssigneeFilter,
     overdueOnly = runbookCheckOverdueOnly
   ) => {
-    const checks = await api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery(channel, status, actor, overdueOnly)}`);
+    const checks = await api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery(channel, status, actor, assignee, overdueOnly)}`);
     setRunbookCheckRows(checks);
   };
 
@@ -1653,7 +1659,7 @@ function App() {
   };
 
   const downloadChannelRunbookChecks = async () => {
-    const response = await fetch(`/api/ops/channel-runbook-checks/export?${channelRunbookCheckQuery(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckOverdueOnly, 100)}`);
+    const response = await fetch(`/api/ops/channel-runbook-checks/export?${channelRunbookCheckQuery(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter, runbookCheckOverdueOnly, 100)}`);
     if (!response.ok) {
       throw new Error('download channel runbook checks failed');
     }
@@ -2709,7 +2715,7 @@ function App() {
                   key={item}
                   onClick={() => {
                     setRunbookCheckChannelFilter(item);
-                    void refreshRunbookChecks(item, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookChecks(item, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                   }}
                 >
                   {item}
@@ -2723,7 +2729,7 @@ function App() {
                   key={item}
                   onClick={() => {
                     setRunbookCheckStatusFilter(item);
-                    void refreshRunbookChecks(runbookCheckChannelFilter, item, runbookCheckActorFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookChecks(runbookCheckChannelFilter, item, runbookCheckActorFilter, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                   }}
                 >
                   {item}
@@ -2732,21 +2738,33 @@ function App() {
               <input
                 aria-label="Runbook 检查操作者"
                 value={runbookCheckActorFilter}
-                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
+                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
                 onChange={(event) => setRunbookCheckActorFilter(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
-                    void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                   }
                 }}
                 placeholder="actor"
+              />
+              <input
+                aria-label="Runbook 检查负责人"
+                value={runbookCheckAssigneeFilter}
+                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
+                onChange={(event) => setRunbookCheckAssigneeFilter(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  }
+                }}
+                placeholder="assignee"
               />
               <button
                 className={runbookCheckOverdueOnly ? 'filterButton active' : 'filterButton'}
                 onClick={() => {
                   const next = !runbookCheckOverdueOnly;
                   setRunbookCheckOverdueOnly(next);
-                  void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, next).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter, next).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
                 }}
               >
                 Overdue

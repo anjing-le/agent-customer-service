@@ -253,7 +253,7 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 		t.Fatalf("expected completed runbook summary, got %#v", dashboard.ChannelRunbooks[0].CheckSummary)
 	}
 
-	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?channel=Marketplace&status=DISPATCH&checkStatus=DONE&actor=ops&actionRef=Marketplace", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-checks?channel=Marketplace&status=DISPATCH&checkStatus=DONE&actor=ops&assignee="+owner+"&actionRef=Marketplace", nil)
 	listRec := httptest.NewRecorder()
 	mux.ServeHTTP(listRec, listReq)
 	if listRec.Code != http.StatusOK {

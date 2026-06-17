@@ -499,6 +499,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			r.URL.Query().Get("status"),
 			r.URL.Query().Get("checkStatus"),
 			r.URL.Query().Get("actor"),
+			r.URL.Query().Get("assignee"),
 			r.URL.Query().Get("actionRef"),
 			r.URL.Query().Get("overdue"),
 		))
@@ -523,6 +524,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 			r.URL.Query().Get("status"),
 			r.URL.Query().Get("checkStatus"),
 			r.URL.Query().Get("actor"),
+			r.URL.Query().Get("assignee"),
 			r.URL.Query().Get("actionRef"),
 			r.URL.Query().Get("overdue"),
 		))
@@ -854,11 +856,12 @@ func renderChannelOpsReportEventsCSV(events []store.ChannelOpsReportEvent) ([]by
 	return buf.Bytes(), nil
 }
 
-func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, checkStatus string, actor string, actionRef string, overdue string) []store.ChannelRunbookCheck {
+func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel string, status string, checkStatus string, actor string, assignee string, actionRef string, overdue string) []store.ChannelRunbookCheck {
 	channel = strings.ToLower(strings.TrimSpace(channel))
 	status = strings.ToUpper(strings.TrimSpace(status))
 	checkStatus = strings.ToUpper(strings.TrimSpace(checkStatus))
 	actor = strings.ToLower(strings.TrimSpace(actor))
+	assignee = strings.ToLower(strings.TrimSpace(assignee))
 	actionRef = strings.ToLower(strings.TrimSpace(actionRef))
 	overdueValue, filterOverdue := optionalBoolQuery(overdue)
 	if channel == "all" {
@@ -882,6 +885,9 @@ func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel stri
 			continue
 		}
 		if actor != "" && !strings.Contains(strings.ToLower(check.Actor), actor) {
+			continue
+		}
+		if assignee != "" && !strings.Contains(strings.ToLower(check.Assignee), assignee) {
 			continue
 		}
 		if actionRef != "" && !strings.Contains(strings.ToLower(check.ActionRef), actionRef) {

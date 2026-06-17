@@ -767,6 +767,7 @@
         "status": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE|ALL",
         "checkStatus": "TODO|DONE|BLOCKED|ALL",
         "actor": "string",
+        "assignee": "string",
         "actionRef": "string",
         "overdue": "boolean"
       }
