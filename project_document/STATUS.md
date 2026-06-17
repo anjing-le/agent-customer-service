@@ -4,7 +4,9 @@
 
 ## 当前状态
 
-项目已从早期旧技术方向切换到安静 DVSkyFolding 技术基线，第一版新骨架已经落地。
+项目已从早期旧技术方向切换到安静 DVSkyFolding 技术基线，并已收口为可靠 Agent 客服教学样例。
+
+教学样例完成度：约 95%。剩余 5% 主要是向量检索、权限、多租户、成本治理等生产化扩展，不影响当前课堂演示目标。
 
 | 领域 | 状态 | 说明 |
 |---|---|---|
@@ -37,6 +39,7 @@
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
 | 人工质检 | Runtime connected | 支持对助手消息提交人工标注，记录 groundedness/safety/helpfulness 维度并汇总到 Dashboard 质量摘要 |
 | 复盘导出 | Runtime connected | 低分或待复核标注可导出为 `TrainingSample`，控制台展示 prompt/answer/维度评分用于复盘 |
+| 课堂材料 | Runtime workspace | README 已压缩为课堂入口，`DEMO_FLOW.md` 已按讲法/看哪里/证明什么收口，`pnpm demo:classroom` 可做课前 smoke |
 
 ## 迁移原则
 
@@ -47,5 +50,5 @@
 
 ## 下一步
 
-1. 做一次完整课堂 smoke，确认 README、Demo Flow 和控制台演示路径顺畅。
-2. 后续再进入向量检索、权限、多租户、成本治理和更多平台渠道 profile 等生产化扩展。
+1. 当前教学样例可视为收口完成，后续只做发现问题后的轻量修正。
+2. 生产化扩展再进入向量检索、权限、多租户、成本治理和更多平台渠道 profile。

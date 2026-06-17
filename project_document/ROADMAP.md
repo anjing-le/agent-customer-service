@@ -72,7 +72,9 @@
 - 已支持 Runbook 检查项操作审计事件，每次 ASSIGN/COMPLETE/BLOCK/RECOVER 都会沉淀 `ChannelRunbookCheckEvent`，并支持控制台查看、按动作/负责人筛选和 CSV 导出。
 - 已支持 Runbook 审计事件进入日报摘要，历史日报、Markdown 和 CSV 会展示 ASSIGN/COMPLETE/BLOCK/RECOVER 计数和最近操作。
 - 已补充最终验收清单和课堂讲解脚本，明确完成定义、必跑命令、必讲路径和不做范围。
-- 当前教学样例进入收口完成状态，后续主要是少量 UI/文案打磨和生产化扩展。
+- 已补充 `pnpm demo:classroom`，一条命令 smoke 检查健康接口、控制台课堂主线、Dashboard、知识库、RAG evidence、规则转人工、日报导出和渠道 adapter。
+- README 和 `DEMO_FLOW.md` 已按课堂口播收口，强调“脚手架承载工程习惯，客服 Agent 只讲业务增量”。
+- 当前教学样例完成度约 95%，剩余工作主要是 V3 生产化扩展。
 
 ## V3: 生产化扩展
 

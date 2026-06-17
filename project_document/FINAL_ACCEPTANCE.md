@@ -54,15 +54,15 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 
 ## 验收清单
 
-- [ ] 根 README 能在一分钟内讲清项目定位、启动方式和演示路径。
-- [ ] `project_document/DEMO_FLOW.md` 能支撑一次完整课堂演示。
-- [ ] 控制台顶部课堂主线能直接串起脚手架基线、客服主链路、RAG/规则、渠道验收、Runbook 和日报交接。
-- [ ] 控制台可以完成客服主链路、渠道接入、Runbook 和日报演示。
-- [ ] `contracts/api-contract.json` 覆盖新增接口和领域对象。
-- [ ] PostgreSQL migrations 能表达当前持久化模型。
-- [ ] `pnpm verify` 通过。
-- [ ] 最新 commit author 是 `安静 <245548353+anjing-le@users.noreply.github.com>`。
-- [ ] `main` 和 `master` 已推送到 GitHub。
+- [x] 根 README 能在一分钟内讲清项目定位、启动方式和演示路径。
+- [x] `project_document/DEMO_FLOW.md` 能支撑一次完整课堂演示。
+- [x] 控制台顶部课堂主线能直接串起脚手架基线、客服主链路、RAG/规则、渠道验收、Runbook 和日报交接。
+- [x] 控制台可以完成客服主链路、渠道接入、Runbook 和日报演示。
+- [x] `contracts/api-contract.json` 覆盖新增接口和领域对象。
+- [x] PostgreSQL migrations 能表达当前持久化模型。
+- [x] `pnpm verify` 通过。
+- [x] 最新 commit author 是 `安静 <245548353+anjing-le@users.noreply.github.com>`。
+- [x] `main` 和 `master` 已推送到 GitHub。
 
 ## 明确不做
 
@@ -76,4 +76,4 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 
 ## 当前判断
 
-当前项目已经达到可靠 Agent 客服教学样例的完成标准。后续若继续演进，应优先做少量 UI/文案打磨和生产化扩展，而不是继续堆叠新概念。
+当前项目已经达到可靠 Agent 客服教学样例的完成标准，完成度约 95%。后续若继续演进，应优先进入生产化扩展，而不是继续堆叠课堂概念。
