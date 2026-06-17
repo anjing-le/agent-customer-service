@@ -17,6 +17,7 @@
     "test:go": "go test ./...",
     "test:agent-regression": "./scripts/check-agent-regression.sh",
     "test:agent-quality": "./scripts/check-agent-quality.sh",
+    "demo:classroom": "./scripts/demo-classroom-smoke.sh",
     "demo:channels": "./scripts/demo-channel-inbound.sh",
     "verify": "./scripts/quality-gate.sh"
   },

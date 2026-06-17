@@ -44,6 +44,7 @@ go run ./cmd/platform-all
 本地服务启动后可运行：
 
 ```bash
+pnpm demo:classroom
 ./scripts/demo-channel-inbound.sh
 ```
 

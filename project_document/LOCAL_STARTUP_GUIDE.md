@@ -96,6 +96,18 @@ export ANJING_CHANNEL_REPORT_RUN_ON_STARTUP=true
 
 ## Smoke Checks
 
+课堂演示前推荐先跑：
+
+```bash
+pnpm demo:classroom
+```
+
+脚本默认检查 `http://localhost:10002`；如服务端口不同，可传入地址：
+
+```bash
+pnpm demo:classroom -- http://localhost:10003
+```
+
 ```bash
 curl http://localhost:10002/healthz
 curl http://localhost:10002/api/ops/dashboard

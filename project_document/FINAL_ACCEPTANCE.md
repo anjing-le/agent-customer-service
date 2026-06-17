@@ -18,6 +18,12 @@ git status --short --branch
 pnpm verify
 ```
 
+课堂 smoke 需要先启动 `go run ./cmd/platform-all`：
+
+```bash
+pnpm demo:classroom
+```
+
 可选 PostgreSQL 验收：
 
 ```bash
