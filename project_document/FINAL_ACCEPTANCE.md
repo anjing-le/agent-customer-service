@@ -76,4 +76,4 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 
 ## 当前判断
 
-当前项目已经达到可靠 Agent 客服教学样例的完成标准，完成度约 95%。后续若继续演进，应优先进入生产化扩展，而不是继续堆叠课堂概念。
+当前项目已经达到可靠 Agent 客服教学样例的完成标准，完成度约 96%。后续若继续演进，应优先进入生产化扩展，而不是继续堆叠课堂概念。

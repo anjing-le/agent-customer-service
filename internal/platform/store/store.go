@@ -192,13 +192,15 @@ type AgentTrace struct {
 }
 
 type KnowledgeArticle struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	Category   string   `json:"category"`
-	Content    string   `json:"content"`
-	Tags       []string `json:"tags"`
-	TrustLevel string   `json:"trustLevel"`
-	UpdatedAt  string   `json:"updatedAt"`
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Category        string   `json:"category"`
+	Content         string   `json:"content"`
+	Tags            []string `json:"tags"`
+	TrustLevel      string   `json:"trustLevel"`
+	UpdatedAt       string   `json:"updatedAt"`
+	RetrievalScore  float64  `json:"retrievalScore,omitempty"`
+	RetrievalReason string   `json:"retrievalReason,omitempty"`
 }
 
 type KnowledgeGap struct {
@@ -1566,36 +1568,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 }
 
 func (s *Store) searchLocked(query string) []KnowledgeArticle {
-	query = strings.ToLower(query)
-	if strings.TrimSpace(query) == "" {
-		return nil
-	}
-	matches := make([]KnowledgeArticle, 0)
-	for _, item := range s.knowledge {
-		haystack := strings.ToLower(item.Title + " " + item.Category + " " + item.Content + " " + strings.Join(item.Tags, " "))
-		if strings.Contains(query, strings.ToLower(item.Title)) || strings.Contains(query, strings.ToLower(item.Category)) {
-			matches = append(matches, item)
-			continue
-		}
-		tagMatched := false
-		for _, tag := range item.Tags {
-			if strings.Contains(query, strings.ToLower(tag)) {
-				matches = append(matches, item)
-				tagMatched = true
-				break
-			}
-		}
-		if tagMatched {
-			continue
-		}
-		for _, token := range strings.Fields(query) {
-			if strings.Contains(haystack, token) {
-				matches = append(matches, item)
-				break
-			}
-		}
-	}
-	return matches
+	return rankKnowledge(query, s.knowledge, maxKnowledgeEvidence)
 }
 
 func agentReply(generator ReplyGenerator, conversationID, content string, evidence []KnowledgeArticle, history []Message, ruleResult RuleTestResult, now string) (Message, *KnowledgeGap) {

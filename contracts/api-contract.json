@@ -1015,7 +1015,9 @@
         "content": "string",
         "tags": "string[]",
         "trustLevel": "LOW|MEDIUM|HIGH",
-        "updatedAt": "RFC3339 string"
+        "updatedAt": "RFC3339 string",
+        "retrievalScore": "number, optional; present on search/send evidence results",
+        "retrievalReason": "string, optional; present on search/send evidence results"
       }
     },
     "KnowledgeGap": {

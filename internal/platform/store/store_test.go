@@ -162,6 +162,33 @@ func TestCreateArticleFromGapResolvesGapAndEnablesRecall(t *testing.T) {
 	}
 }
 
+func TestSearchKnowledgeReranksEvidence(t *testing.T) {
+	st := NewSeedStore()
+
+	recalled, err := st.SearchKnowledge("订单完成之后怎么申请发票？")
+	if err != nil {
+		t.Fatalf("search knowledge: %v", err)
+	}
+	if len(recalled) == 0 || recalled[0].ID != "kb_invoice" {
+		t.Fatalf("expected invoice article first, got %#v", recalled)
+	}
+	if recalled[0].RetrievalScore <= 0 || recalled[0].RetrievalReason == "" {
+		t.Fatalf("expected retrieval score and reason, got %#v", recalled[0])
+	}
+}
+
+func TestSearchKnowledgeAvoidsWeakOverlap(t *testing.T) {
+	st := NewSeedStore()
+
+	recalled, err := st.SearchKnowledge("完全没有资料的新品保价规则是什么？")
+	if err != nil {
+		t.Fatalf("search knowledge: %v", err)
+	}
+	if len(recalled) != 0 {
+		t.Fatalf("expected no weak-overlap evidence, got %#v", recalled)
+	}
+}
+
 func TestSendMessageRecommendsHumanTransfer(t *testing.T) {
 	st := NewSeedStore()
 

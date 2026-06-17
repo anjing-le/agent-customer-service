@@ -74,11 +74,12 @@
 - 已补充最终验收清单和课堂讲解脚本，明确完成定义、必跑命令、必讲路径和不做范围。
 - 已补充 `pnpm demo:classroom`，一条命令 smoke 检查健康接口、控制台课堂主线、Dashboard、知识库、RAG evidence、规则转人工、日报导出和渠道 adapter。
 - README 和 `DEMO_FLOW.md` 已按课堂口播收口，强调“脚手架承载工程习惯，客服 Agent 只讲业务增量”。
-- 当前教学样例完成度约 95%，剩余工作主要是 V3 生产化扩展。
+- 已把知识检索从重复关键词匹配收敛为 seed/PostgreSQL 共用的轻量 hybrid rerank，RAG evidence 返回 `retrievalScore` 和 `retrievalReason`，控制台可解释召回依据。
+- 当前教学样例完成度约 96%，剩余工作主要是 V3 生产化扩展。
 
 ## V3: 生产化扩展
 
-- 接入向量数据库和 rerank，替换 V1 关键词检索。
+- 接入向量数据库和生产级 rerank 服务，替换当前教学版 lightweight rerank。
 - 真实渠道接入生产化：Web、App、微信、抖音等渠道频率限制、回调协议差异和官方 message id 对账。
 - 更完整的质检任务分配、规则版本灰度和复盘样本流转。
 - 多租户、权限、限流、成本统计和治理面板。

@@ -14,7 +14,7 @@
 | `ChannelAdapterRequest` | 真实渠道回调的薄适配请求，例如 WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu 字段映射 | `/api/channels/*/inbound` 与 `contracts/channel-protocol-matrix.json` |
 | `Message` | 用户或助手的一条消息，包含回复引擎、证据、兜底原因和 trace | `SendMessage` runtime |
 | `AgentTrace` | 单轮回复的策略、证据数量、历史数量、模型尝试与回退观测 | `Message.trace` |
-| `KnowledgeArticle` | 可引用的可信知识 | seed store 或 PostgreSQL |
+| `KnowledgeArticle` | 可引用的可信知识；作为检索结果时会带 `retrievalScore` 和 `retrievalReason`，用于解释 RAG evidence 为什么被选中 | seed store 或 PostgreSQL |
 | `KnowledgeGap` | 无可靠证据时沉淀的知识缺口 | `NO_EVIDENCE_FALLBACK` |
 | `Rule` | 规则兜底或转人工策略，包含版本、阶段、命中次数和最后命中时间 | seed store 或 PostgreSQL |
 | `RuleTestResult` | 对单句用户输入的当前规则测试结果 | `/api/ops/rules/test` |
@@ -56,7 +56,7 @@
 ```text
 user message
   -> customer-service SendMessage
-  -> keyword knowledge recall
+  -> hybrid knowledge rerank
   -> rule / guardrail decision
   -> evidence answer OR safe fallback
   -> create knowledge gap OR create transfer ticket when needed
@@ -95,7 +95,7 @@ user message
 | `AcknowledgeChannelNotification` | 确认渠道通知事件 |
 | `AssignChannelRunbookChecks` / `CompleteChannelRunbookCheck` / `BlockChannelRunbookCheck` / `RecoverChannelRunbookCheck` / `ListChannelRunbookChecks` / `ListChannelRunbookCheckEvents` | 批量分派、确认、阻塞、恢复 Runbook 检查项，并按渠道、Runbook 状态、检查状态、操作者、负责人、action ref 或 overdue 查询处置记录；每次操作会生成审计事件，支持按动作、操作者、负责人和 action ref 查询或导出；未完成且 dueAt 已过期的检查项会进入 overdue 汇总和 CSV 导出 |
 | `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
-| `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |
+| `ListKnowledge` / `SearchKnowledge` | 知识列表和轻量 hybrid rerank 检索 |
 | `ResolveKnowledgeGap` | 关闭知识缺口 |
 | `CreateArticleFromGap` | 由缺口生成可信知识 |
 | `TestRule` | 规则兜底测试 |
@@ -125,7 +125,7 @@ user message
 
 ## Current Limits
 
-- 检索仍是轻量关键词匹配，V3 再引入向量检索和 rerank。
+- 检索已具备轻量 hybrid rerank 和 evidence score/reason，可用于课堂解释 RAG 召回；外部向量数据库和 rerank 服务仍属于 V3 生产化扩展。
 - 规则引擎是确定性轻量规则，尚未接完整表达式 DSL。
 - 当前没有鉴权、多租户和限流。
 - 模型客户端默认关闭，开启后只在有知识证据的路径参与生成；失败会自动回退到 `rag+rule`。

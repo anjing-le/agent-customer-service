@@ -908,33 +908,7 @@ func (s *PostgresStore) SearchKnowledge(query string) ([]KnowledgeArticle, error
 	if err != nil {
 		return nil, err
 	}
-	query = strings.ToLower(query)
-	matches := make([]KnowledgeArticle, 0)
-	for _, item := range items {
-		haystack := strings.ToLower(item.Title + " " + item.Category + " " + item.Content + " " + strings.Join(item.Tags, " "))
-		if strings.Contains(query, strings.ToLower(item.Title)) || strings.Contains(query, strings.ToLower(item.Category)) {
-			matches = append(matches, item)
-			continue
-		}
-		matched := false
-		for _, tag := range item.Tags {
-			if strings.Contains(query, strings.ToLower(tag)) {
-				matches = append(matches, item)
-				matched = true
-				break
-			}
-		}
-		if matched {
-			continue
-		}
-		for _, token := range strings.Fields(query) {
-			if strings.Contains(haystack, token) {
-				matches = append(matches, item)
-				break
-			}
-		}
-	}
-	return matches, nil
+	return rankKnowledge(query, items, maxKnowledgeEvidence), nil
 }
 
 func (s *PostgresStore) ResolveKnowledgeGap(id string) (KnowledgeGap, error) {

@@ -174,6 +174,8 @@ type KnowledgeArticle = {
   content?: string;
   tags?: string[];
   trustLevel: string;
+  retrievalScore?: number;
+  retrievalReason?: string;
 };
 type AgentTrace = {
   strategy: string;
@@ -2171,6 +2173,9 @@ function App() {
                   <div>
                     <strong>{item.title}</strong>
                     <span>{item.category} · {item.trustLevel}</span>
+                    {item.retrievalScore !== undefined && (
+                      <span>score {item.retrievalScore} · {item.retrievalReason ?? 'rerank'}</span>
+                    )}
                   </div>
                   {item.content && <p>{item.content}</p>}
                 </article>

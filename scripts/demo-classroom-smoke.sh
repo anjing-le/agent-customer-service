@@ -112,8 +112,10 @@ async function main() {
   }));
   expect(messageResult.agentMessage && messageResult.agentMessage.safe === true, 'agent reply is not marked safe');
   expect(Array.isArray(messageResult.evidence) && messageResult.evidence.length > 0, 'agent reply has no RAG evidence');
+  expect(messageResult.evidence[0].retrievalScore > 0, 'agent evidence has no retrieval score');
+  expect(typeof messageResult.evidence[0].retrievalReason === 'string' && messageResult.evidence[0].retrievalReason.length > 0, 'agent evidence has no retrieval reason');
   expect(messageResult.agentMessage.trace && messageResult.agentMessage.trace.evidenceCount > 0, 'agent trace did not record evidence');
-  console.log(`ok agent reply evidence=${messageResult.evidence.length} engine=${messageResult.agentMessage.engine}`);
+  console.log(`ok agent reply evidence=${messageResult.evidence.length} score=${messageResult.evidence[0].retrievalScore} engine=${messageResult.agentMessage.engine}`);
 
   const ruleResult = parseEnvelope('rule test', await request('POST', '/api/ops/rules/test', {
     content: '我已经投诉很多次了，现在必须转人工'

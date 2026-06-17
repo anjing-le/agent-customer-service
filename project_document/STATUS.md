@@ -6,7 +6,7 @@
 
 项目已从早期旧技术方向切换到安静 DVSkyFolding 技术基线，并已收口为可靠 Agent 客服教学样例。
 
-教学样例完成度：约 95%。剩余 5% 主要是向量检索、权限、多租户、成本治理等生产化扩展，不影响当前课堂演示目标。
+教学样例完成度：约 96%。剩余 4% 主要是生产级向量数据库/rerank、权限、多租户、成本治理等扩展，不影响当前课堂演示目标。
 
 | 领域 | 状态 | 说明 |
 |---|---|---|
@@ -14,13 +14,14 @@
 | Go 后端 | Runtime connected | 使用 `net/http` / `ServeMux`、`log/slog`、统一 JSON envelope、env 配置 |
 | 服务命令 | Runtime connected | `platform-all`、`customer-service-api`、`ops-api`、`console-web`、`migrate-db` |
 | 客服 API | Runtime connected | 会话列表、创建会话、发送消息、历史记录、RAG 检索、可选模型生成、无证据兜底、转人工兜底 |
-| 知识 API | Runtime connected | 知识列表、关键词检索、知识缺口关闭、缺口生成知识，支持 seed 和 PostgreSQL |
+| 知识 API | Runtime connected | 知识列表、轻量 hybrid rerank 检索、知识缺口关闭、缺口生成知识，支持 seed 和 PostgreSQL |
 | 运营 API | Runtime connected | 运营指标、会话队列、知识缺口、规则测试、人工队列 |
 | 错误边界 | Runtime connected | Store 接口显式返回 error，路由层统一转 `store_error` JSON envelope |
 | 前端控制台 | Runtime workspace | React/Vite 控制台已按客服坐席与运营工作台重新组织，并展示证据、缺口、规则护栏、渠道失败和通知投递治理 |
 | 数据底座 | Runtime connected | `infra/postgres/migrations` 定义核心表和 demo seed；配置 `ANJING_DATABASE_URL` 后 API 切到 PostgreSQL store |
 | 本地数据库 | Ready | `infra/local/docker-compose.yml`、`pnpm db:*` 脚本和可选 Postgres 集成测试已接入 |
 | 知识运营闭环 | Runtime connected | 缺口支持关闭，支持由缺口生成可信知识条目并回写为已处理 |
+| RAG 检索解释 | Runtime connected | seed store 和 PostgreSQL store 共用检索排序逻辑，evidence 返回 `retrievalScore` / `retrievalReason`，控制台展示召回依据 |
 | 规则测试 | Runtime connected | 场景配置区可输入问题测试转人工、无证据兜底和可回答边界 |
 | 规则灰度 | Runtime connected | `Rule` 支持 active/canary 阶段、版本和命中计数，控制台可对比灰度规则是否改变处置结果；发布前需要带样本明细的审批门禁，审批记录可联动低分复盘样本详情，发布后生成观测指标和回滚建议，并可发布/回滚形成事件留痕 |
 | 人工队列 | Runtime connected | 转人工回复自动生成 ticket，控制台可查看、筛选、处理工单，并展示 SLA、升级状态和事件时间线 |
@@ -51,4 +52,4 @@
 ## 下一步
 
 1. 当前教学样例可视为收口完成，后续只做发现问题后的轻量修正。
-2. 生产化扩展再进入向量检索、权限、多租户、成本治理和更多平台渠道 profile。
+2. 生产化扩展再进入向量数据库/rerank、权限、多租户、成本治理和更多平台渠道 profile。
