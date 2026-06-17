@@ -1189,6 +1189,28 @@ func channelOpsHandoffPriorities(dashboard store.Dashboard) []store.ChannelOpsHa
 	candidates := make([]channelOpsHandoffCandidate, 0)
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 	eventByChannel := latestChannelInboundAuditQualityEventByChannel(dashboard.AuditEvents)
+	for _, runbook := range dashboard.ChannelRunbooks {
+		if runbook.CheckSummary.Overdue <= 0 {
+			continue
+		}
+		notification := channelNotificationForHandoff(dashboard.Notifications, runbook.Channel, "OPEN", "RETRYING", "DEAD_LETTER")
+		candidates = append(candidates, channelOpsHandoffCandidate{
+			score: 450000 + runbook.CheckSummary.Overdue,
+			item: store.ChannelOpsHandoffPriority{
+				Channel:           runbook.Channel,
+				Severity:          fallbackReportValue(runbook.Severity),
+				Source:            "RUNBOOK_OVERDUE",
+				Reason:            fmt.Sprintf("%d overdue runbook checks; blocked=%d owner=%s", runbook.CheckSummary.Overdue, runbook.CheckSummary.Blocked, fallbackReportValue(runbook.Owner)),
+				RecommendedAction: "review overdue runbook checks, assign an owner, and recover or escalate blocked steps",
+				Count:             runbook.CheckSummary.Overdue,
+				ActionType:        "REVIEW_RUNBOOK",
+				ActionRef:         handoffRunbookRef(runbook),
+				ActionLabel:       handoffRunbookLabel(runbook.Channel, runbook),
+				NotificationID:    notification.ID,
+				RunbookStatus:     runbook.Status,
+			},
+		})
+	}
 	for _, channel := range inboundQuality.ActiveChannels {
 		event := eventByChannel[channel]
 		snapshot := channelAuditQuality(dashboard.ChannelAudits, channel)
