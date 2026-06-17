@@ -79,6 +79,7 @@
 
 ## V3: 生产化扩展
 
+- 生产化扩展拆解见 [PRODUCTION_EXTENSION_GUIDE.md](./PRODUCTION_EXTENSION_GUIDE.md)，这些能力作为后续章节推进，不压进当前教学样例主链路。
 - 接入向量数据库和生产级 rerank 服务，替换当前教学版 lightweight rerank。
 - 真实渠道接入生产化：Web、App、微信、抖音等渠道频率限制、回调协议差异和官方 message id 对账。
 - 更完整的质检任务分配、规则版本灰度和复盘样本流转。

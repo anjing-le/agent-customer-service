@@ -52,4 +52,4 @@
 ## 下一步
 
 1. 当前教学样例可视为收口完成，后续只做发现问题后的轻量修正。
-2. 生产化扩展再进入向量数据库/rerank、权限、多租户、成本治理和更多平台渠道 profile。
+2. 生产化扩展参考 [PRODUCTION_EXTENSION_GUIDE.md](./PRODUCTION_EXTENSION_GUIDE.md)，按向量数据库/rerank、权限、多租户、成本治理和更多平台渠道 profile 分章节推进。
