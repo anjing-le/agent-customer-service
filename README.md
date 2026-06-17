@@ -88,5 +88,6 @@ PostgreSQL 集成测试见 [本地启动](./project_document/LOCAL_STARTUP_GUIDE
 - [最终验收](./project_document/FINAL_ACCEPTANCE.md)
 - [脚手架继承](./project_document/SCAFFOLD_INHERITANCE.md)
 - [领域模型](./project_document/DOMAIN_MODEL.md)
+- [RAG 检索说明](./project_document/RAG_RETRIEVAL_GUIDE.md)
 - [服务边界](./project_document/SERVICE_BOUNDARY_GUIDE.md)
 - [项目状态](./project_document/STATUS.md)

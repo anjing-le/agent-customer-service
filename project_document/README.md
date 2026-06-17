@@ -11,6 +11,7 @@
 - [DEMO_FLOW.md](./DEMO_FLOW.md)：课堂演示路径，从客服主链路到 Runbook 和日报交接。
 - [FINAL_ACCEPTANCE.md](./FINAL_ACCEPTANCE.md)：最终完成定义、验收命令和课堂讲解脚本。
 - [DOMAIN_MODEL.md](./DOMAIN_MODEL.md)：可靠客服 Agent 的领域模型和应用端口。
+- [RAG_RETRIEVAL_GUIDE.md](./RAG_RETRIEVAL_GUIDE.md)：教学版 RAG rerank、evidence score/reason 和生产化替换边界。
 - [ROADMAP.md](./ROADMAP.md)：V1/V2/V3 路线图。
 - [STATUS.md](./STATUS.md)：当前阶段状态和验证入口。
 - [LOCAL_STARTUP_GUIDE.md](./LOCAL_STARTUP_GUIDE.md)：本地启动和 smoke check。

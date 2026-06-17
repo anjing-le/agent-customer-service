@@ -33,6 +33,7 @@ pnpm demo:classroom
 演示：
 
 - 问退货运费，观察 evidence 和 `Message.trace`。
+- 观察 evidence 的 `retrievalScore` / `retrievalReason`，说明当前是可解释的教学版 rerank。
 - 问知识库没有的问题，观察知识缺口。
 - 问投诉/催办/人工诉求，观察转人工。
 
