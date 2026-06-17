@@ -743,7 +743,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if reportRunbook.Channel == "" || len(reportRunbook.Steps) == 0 {
 		t.Fatalf("expected report runbook steps, got %#v", dashboard.ChannelRunbooks)
 	}
-	if _, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
+	reportCheck, err := st.CompleteChannelRunbookCheck(store.ChannelRunbookCheck{
 		Channel:       reportRunbook.Channel,
 		RunbookStatus: reportRunbook.Status,
 		CheckStatus:   "BLOCKED",
@@ -754,8 +754,25 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 		DueAt:         "2020-01-01T00:00:00Z",
 		Actor:         "ops-a",
 		Note:          "waiting for channel owner",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("block report runbook check: %v", err)
+	}
+	if _, err := st.RecordChannelRunbookCheckEvent(store.ChannelRunbookCheckEvent{
+		Action:        "BLOCK",
+		Channel:       reportCheck.Channel,
+		RunbookStatus: reportCheck.RunbookStatus,
+		CheckStatus:   reportCheck.CheckStatus,
+		CheckID:       reportCheck.ID,
+		Step:          reportCheck.Step,
+		StepIndex:     reportCheck.StepIndex,
+		ActionRef:     reportCheck.ActionRef,
+		Assignee:      reportCheck.Assignee,
+		DueAt:         reportCheck.DueAt,
+		Actor:         reportCheck.Actor,
+		Note:          reportCheck.Note,
+	}); err != nil {
+		t.Fatalf("record report runbook event: %v", err)
 	}
 	mux := http.NewServeMux()
 	Register(mux, st)
@@ -770,7 +787,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
 		t.Fatalf("expected markdown content type, got %s", rec.Header().Get("Content-Type"))
 	}
-	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Runbook progress: done=0 blocked=1 overdue=1 todo=", "Runbook assignees: 1", "Runbook Assignee Load", "todo=0 blocked=1 overdue=1 done=0 total=1", "Progress: done=0 blocked=1 overdue=1 todo=", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `RUNBOOK_OVERDUE`", "overdue runbook checks", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
+	for _, expected := range []string{"# Agent Customer Service Channel Ops Report", "Marketplace", "channel_signature_invalid", "Runbook progress: done=0 blocked=1 overdue=1 todo=", "Runbook assignees: 1", "Runbook events: total=1 assign=0 complete=0 block=1 recover=0", "Runbook Assignee Load", "Runbook Audit Events", "BLOCK Marketplace ESCALATE step=1 check=BLOCKED", "todo=0 blocked=1 overdue=1 done=0 total=1", "Progress: done=0 blocked=1 overdue=1 todo=", "Inbound audits: total=4 accepted=1 rejected=3 acceptance_rate=25%", "Inbound quality events: total=1 active=1 watch=0 recovered=0", "Handoff priorities:", "Marketplace `RUNBOOK_OVERDUE`", "overdue runbook checks", "Marketplace `INBOUND_AUDIT_ACTIVE`", "Action: Review Marketplace ESCALATE runbook", "Links: notification=", "`invalid_signature`: 3", "Active channels: Marketplace"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in markdown report, got %s", expected, rec.Body.String())
 		}
@@ -789,7 +806,7 @@ func TestExportChannelOpsReportRouteReturnsMarkdownAndCSV(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "section,channel,status,code,count,owner,next_action,escalation") {
 		t.Fatalf("expected csv header, got %s", rec.Body.String())
 	}
-	for _, expected := range []string{"runbook_summary,,SUMMARY,progress,done=0 blocked=1 overdue=1 todo=", "runbook_assignee,,LOAD", "todo=0 blocked=1 overdue=1 done=0 total=1", "runbook,Marketplace,ESCALATE", "done=0 blocked=1 overdue=1 todo=", "inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "RUNBOOK_OVERDUE", "overdue runbook checks", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
+	for _, expected := range []string{"runbook_summary,,SUMMARY,progress,done=0 blocked=1 overdue=1 todo=", "runbook_assignee,,LOAD", "todo=0 blocked=1 overdue=1 done=0 total=1", "runbook_event,,SUMMARY,events,total=1 assign=0 complete=0 block=1 recover=0", "runbook_event,Marketplace,ESCALATE,BLOCK", "runbook,Marketplace,ESCALATE", "done=0 blocked=1 overdue=1 todo=", "inbound_audit,,ACCEPTANCE_RATE,accepted,1/4 (25%)", "inbound_audit_error,,REJECTED,invalid_signature,3", "inbound_quality,,SUMMARY,events,total=1 active=1 watch=0 recovered=0", "inbound_quality_channel,Marketplace,ACTIVE", "handoff_priority,Marketplace", "RUNBOOK_OVERDUE", "overdue runbook checks", "INBOUND_AUDIT_ACTIVE", "Review Marketplace ESCALATE runbook", "action=REVIEW_RUNBOOK ref=Marketplace:ESCALATE"} {
 		if !strings.Contains(rec.Body.String(), expected) {
 			t.Fatalf("expected %s in csv report, got %s", expected, rec.Body.String())
 		}

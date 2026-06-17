@@ -880,6 +880,7 @@
         "inboundAuditQuality": "ChannelInboundAuditQualitySummary",
         "runbookSummary": "ChannelRunbookSummary",
         "runbookAssigneeLoads": "ChannelRunbookAssigneeLoad[]",
+        "runbookEvents": "ChannelRunbookEventSummary",
         "handoffPriorities": "ChannelOpsHandoffPriority[]"
       }
     },
@@ -1421,6 +1422,25 @@
         "todo": "number",
         "channels": "string[]",
         "nextDueAt": "RFC3339 string"
+      }
+    },
+    "ChannelRunbookEventSummary": {
+      "required": ["total", "assigned", "completed", "blocked", "recovered", "actionCounts", "latest"],
+      "fields": {
+        "total": "number",
+        "assigned": "number",
+        "completed": "number",
+        "blocked": "number",
+        "recovered": "number",
+        "actionCounts": "ChannelRunbookEventActionCount[]",
+        "latest": "ChannelRunbookCheckEvent[]"
+      }
+    },
+    "ChannelRunbookEventActionCount": {
+      "required": ["action", "count"],
+      "fields": {
+        "action": "ASSIGN|COMPLETE|BLOCK|RECOVER",
+        "count": "number"
       }
     },
     "ChannelRunbookCheck": {

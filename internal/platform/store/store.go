@@ -466,6 +466,7 @@ type ChannelOpsReportSummary struct {
 	InboundAuditQuality ChannelInboundAuditQualitySummary `json:"inboundAuditQuality"`
 	RunbookSummary      ChannelRunbookSummary             `json:"runbookSummary"`
 	RunbookLoads        []ChannelRunbookAssigneeLoad      `json:"runbookAssigneeLoads"`
+	RunbookEvents       ChannelRunbookEventSummary        `json:"runbookEvents"`
 	HandoffPriorities   []ChannelOpsHandoffPriority       `json:"handoffPriorities"`
 }
 
@@ -575,6 +576,21 @@ type ChannelRunbookAssigneeLoad struct {
 	Todo      int      `json:"todo"`
 	Channels  []string `json:"channels"`
 	NextDueAt string   `json:"nextDueAt,omitempty"`
+}
+
+type ChannelRunbookEventSummary struct {
+	Total        int                              `json:"total"`
+	Assigned     int                              `json:"assigned"`
+	Completed    int                              `json:"completed"`
+	Blocked      int                              `json:"blocked"`
+	Recovered    int                              `json:"recovered"`
+	ActionCounts []ChannelRunbookEventActionCount `json:"actionCounts"`
+	Latest       []ChannelRunbookCheckEvent       `json:"latest"`
+}
+
+type ChannelRunbookEventActionCount struct {
+	Action string `json:"action"`
+	Count  int    `json:"count"`
 }
 
 type ChannelRunbookCheck struct {

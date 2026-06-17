@@ -58,7 +58,7 @@ go run ./cmd/platform-all
 - 渠道失败或验收异常会派生 `ChannelRunbook`。
 - Runbook 检查项可以批量分派、完成、阻塞和恢复。
 - Dashboard 会聚合负责人负载、逾期、阻塞和最近截止时间。
-- 每次 ASSIGN、COMPLETE、BLOCK、RECOVER 都会生成 `ChannelRunbookCheckEvent`，并支持 CSV 导出。
+- 每次 ASSIGN、COMPLETE、BLOCK、RECOVER 都会生成 `ChannelRunbookCheckEvent`，进入 Dashboard、历史日报摘要和 CSV 导出。
 
 ## 6. 讲日报交接
 
@@ -67,6 +67,7 @@ go run ./cmd/platform-all
 - 渠道失败和验收率摘要。
 - 验收质量 ACTIVE/WATCH/RECOVERED 汇总。
 - Runbook 完成、阻塞、逾期和负责人负载。
+- Runbook 审计事件计数和最近操作。
 - 交接优先级建议和通知确认锚点。
 - 历史日报、定时调度状态和补偿事件。
 

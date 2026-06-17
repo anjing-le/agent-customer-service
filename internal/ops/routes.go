@@ -1435,6 +1435,7 @@ func channelOpsReportSummary(dashboard store.Dashboard) store.ChannelOpsReportSu
 	summary.InboundAuditQuality = channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 	summary.RunbookSummary = channelOpsRunbookSummary(dashboard.ChannelRunbooks)
 	summary.RunbookLoads = dashboard.RunbookLoads
+	summary.RunbookEvents = channelRunbookEventSummary(dashboard.RunbookEvents)
 	summary.HandoffPriorities = channelOpsHandoffPriorities(dashboard)
 	for _, channel := range append(append(summary.InboundAuditQuality.ActiveChannels, summary.InboundAuditQuality.WatchChannels...), summary.InboundAuditQuality.RecoveredChannels...) {
 		if channel != "" && !seenChannels[channel] {
@@ -1453,6 +1454,50 @@ func channelOpsRunbookSummary(runbooks []store.ChannelRunbook) store.ChannelRunb
 		summary.Blocked += runbook.CheckSummary.Blocked
 		summary.Overdue += runbook.CheckSummary.Overdue
 		summary.Todo += runbook.CheckSummary.Todo
+	}
+	return summary
+}
+
+func channelRunbookEventSummary(events []store.ChannelRunbookCheckEvent) store.ChannelRunbookEventSummary {
+	summary := store.ChannelRunbookEventSummary{
+		ActionCounts: []store.ChannelRunbookEventActionCount{},
+		Latest:       []store.ChannelRunbookCheckEvent{},
+	}
+	counts := map[string]int{}
+	for _, event := range events {
+		action := strings.ToUpper(strings.TrimSpace(event.Action))
+		if action == "" {
+			action = "UPDATE"
+		}
+		summary.Total++
+		counts[action]++
+		switch action {
+		case "ASSIGN":
+			summary.Assigned++
+		case "COMPLETE":
+			summary.Completed++
+		case "BLOCK":
+			summary.Blocked++
+		case "RECOVER":
+			summary.Recovered++
+		}
+		if len(summary.Latest) < 5 {
+			summary.Latest = append(summary.Latest, event)
+		}
+	}
+	for _, action := range []string{"ASSIGN", "COMPLETE", "BLOCK", "RECOVER"} {
+		if count := counts[action]; count > 0 {
+			summary.ActionCounts = append(summary.ActionCounts, store.ChannelRunbookEventActionCount{Action: action, Count: count})
+			delete(counts, action)
+		}
+	}
+	extraActions := make([]string, 0, len(counts))
+	for action := range counts {
+		extraActions = append(extraActions, action)
+	}
+	sort.Strings(extraActions)
+	for _, action := range extraActions {
+		summary.ActionCounts = append(summary.ActionCounts, store.ChannelRunbookEventActionCount{Action: action, Count: counts[action]})
 	}
 	return summary
 }
@@ -1811,6 +1856,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
 	handoffPriorities := channelOpsHandoffPriorities(dashboard)
 	runbookLoads := dashboard.RunbookLoads
+	runbookEvents := channelRunbookEventSummary(dashboard.RunbookEvents)
 
 	var b strings.Builder
 	b.WriteString("# Agent Customer Service Channel Ops Report\n\n")
@@ -1820,6 +1866,7 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	b.WriteString(fmt.Sprintf("- Active runbooks: %d\n", len(dashboard.ChannelRunbooks)))
 	b.WriteString(fmt.Sprintf("- Runbook progress: done=%d blocked=%d overdue=%d todo=%d total=%d\n", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Overdue, runbookSummary.Todo, runbookSummary.Total))
 	b.WriteString(fmt.Sprintf("- Runbook assignees: %d\n", len(runbookLoads)))
+	b.WriteString(fmt.Sprintf("- Runbook events: total=%d assign=%d complete=%d block=%d recover=%d\n", runbookEvents.Total, runbookEvents.Assigned, runbookEvents.Completed, runbookEvents.Blocked, runbookEvents.Recovered))
 	b.WriteString(fmt.Sprintf("- Inbound audits: total=%d accepted=%d rejected=%d acceptance_rate=%d%%\n", inboundAudit.Total, inboundAudit.Accepted, inboundAudit.Rejected, inboundAudit.AcceptanceRate))
 	b.WriteString(fmt.Sprintf("- Inbound quality events: total=%d active=%d watch=%d recovered=%d\n", inboundQuality.EventCount, inboundQuality.Active, inboundQuality.Watch, inboundQuality.Recovered))
 	b.WriteString(fmt.Sprintf("- Handoff priorities: %d\n", len(handoffPriorities)))
@@ -1844,6 +1891,17 @@ func renderChannelOpsReportMarkdown(dashboard store.Dashboard, generatedAt time.
 	} else {
 		for _, load := range runbookLoads {
 			b.WriteString(fmt.Sprintf("- %s: todo=%d blocked=%d overdue=%d done=%d total=%d channels=%s next_due=%s\n", load.Assignee, load.Todo, load.Blocked, load.Overdue, load.Done, load.Total, channelListOrNone(load.Channels), fallbackReportValue(load.NextDueAt)))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("## Runbook Audit Events\n\n")
+	if len(runbookEvents.Latest) == 0 {
+		b.WriteString("- No runbook audit events.\n\n")
+	} else {
+		b.WriteString(fmt.Sprintf("- Summary: total=%d assign=%d complete=%d block=%d recover=%d\n", runbookEvents.Total, runbookEvents.Assigned, runbookEvents.Completed, runbookEvents.Blocked, runbookEvents.Recovered))
+		for _, event := range runbookEvents.Latest {
+			b.WriteString(fmt.Sprintf("- %s %s %s step=%d check=%s assignee=%s actor=%s at=%s note=%s\n", event.Action, event.Channel, event.RunbookStatus, event.StepIndex+1, event.CheckStatus, fallbackReportValue(event.Assignee), fallbackReportValue(event.Actor), fallbackReportValue(event.CreatedAt), fallbackReportValue(event.Note)))
 		}
 		b.WriteString("\n")
 	}
@@ -1951,12 +2009,22 @@ func renderChannelOpsReportCSV(dashboard store.Dashboard) ([]byte, error) {
 	}
 	inboundQuality := channelInboundAuditQualitySummary(dashboard.ChannelAudits, dashboard.AlertPolicies, dashboard.AuditEvents)
 	runbookSummary := channelOpsRunbookSummary(dashboard.ChannelRunbooks)
+	runbookEvents := channelRunbookEventSummary(dashboard.RunbookEvents)
 	if err := writer.Write([]string{"runbook_summary", "", "SUMMARY", "progress", fmt.Sprintf("done=%d blocked=%d overdue=%d todo=%d total=%d", runbookSummary.Done, runbookSummary.Blocked, runbookSummary.Overdue, runbookSummary.Todo, runbookSummary.Total), "", "", ""}); err != nil {
 		return nil, err
 	}
 	for _, load := range dashboard.RunbookLoads {
 		detail := fmt.Sprintf("todo=%d blocked=%d overdue=%d done=%d total=%d channels=%s next_due=%s", load.Todo, load.Blocked, load.Overdue, load.Done, load.Total, strings.Join(load.Channels, "|"), fallbackReportValue(load.NextDueAt))
 		if err := writer.Write([]string{"runbook_assignee", "", "LOAD", load.Assignee, detail, load.Assignee, "review assigned runbook checks", ""}); err != nil {
+			return nil, err
+		}
+	}
+	if err := writer.Write([]string{"runbook_event", "", "SUMMARY", "events", fmt.Sprintf("total=%d assign=%d complete=%d block=%d recover=%d", runbookEvents.Total, runbookEvents.Assigned, runbookEvents.Completed, runbookEvents.Blocked, runbookEvents.Recovered), "", "review runbook audit events", ""}); err != nil {
+		return nil, err
+	}
+	for _, event := range runbookEvents.Latest {
+		detail := fmt.Sprintf("step=%d check=%s actor=%s assignee=%s due=%s created=%s note=%s action_ref=%s", event.StepIndex+1, event.CheckStatus, fallbackReportValue(event.Actor), fallbackReportValue(event.Assignee), fallbackReportValue(event.DueAt), fallbackReportValue(event.CreatedAt), fallbackReportValue(event.Note), fallbackReportValue(event.ActionRef))
+		if err := writer.Write([]string{"runbook_event", event.Channel, event.RunbookStatus, event.Action, detail, event.Assignee, "review runbook audit trail", event.CheckID}); err != nil {
 			return nil, err
 		}
 	}

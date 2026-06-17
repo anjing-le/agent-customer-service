@@ -26,7 +26,7 @@
 | 渠道策略 | Runtime connected | `ChannelPolicy` 定义 Web/WeChat/WeCom/App/Marketplace/Douyin/Xiaohongshu 的语气、风险加权和 SLA，转人工工单按渠道计算升级 |
 | 渠道接入 | Runtime connected | `/api/channels/inbound` 读取 `ChannelIntegration` 后执行来源、限流、HMAC-SHA256 签名、timestamp 时间窗、enabled、external message id 和 replay 校验 |
 | 渠道协议适配 | Runtime connected | `/api/channels/wechat|wecom|app|marketplace|douyin|xiaohongshu/inbound` 将真实渠道字段归一到标准 inbound 链路，控制台可发送成功/失败 contract examples，并展示 trace/evidence、平台验签 profile、协议差异和失败指标 |
-| 渠道验收审计 | Runtime connected | `ChannelInboundAudit` 记录成功/拒绝入站的来源、验签结果、错误码、replay key、签名预览和 content hash，不保存完整 payload 或密钥；控制台支持按渠道、状态、错误码筛选、CSV 导出、验收质量条和越线恢复视图，日报汇总 accepted/rejected、验收率、高频错误码、越线次数、恢复渠道、仍需处理渠道、交接优先级建议和通知/Runbook 处理锚点，历史日报可直接确认关联通知，Runbook 检查项可逐条确认并保留 action ref，批量分派后会聚合负责人负载、阻塞数、逾期数和最近截止时间，每次分派、完成、阻塞和恢复都会沉淀 `ChannelRunbookCheckEvent` 审计事件，验收率过低或同一错误码高频出现时会按渠道策略阈值派生 Runbook，并沉淀 `ChannelInboundAuditQualityEvent` 复盘事件 |
+| 渠道验收审计 | Runtime connected | `ChannelInboundAudit` 记录成功/拒绝入站的来源、验签结果、错误码、replay key、签名预览和 content hash，不保存完整 payload 或密钥；控制台支持按渠道、状态、错误码筛选、CSV 导出、验收质量条和越线恢复视图，日报汇总 accepted/rejected、验收率、高频错误码、越线次数、恢复渠道、仍需处理渠道、交接优先级建议和通知/Runbook 处理锚点，历史日报可直接确认关联通知，Runbook 检查项可逐条确认并保留 action ref，批量分派后会聚合负责人负载、阻塞数、逾期数和最近截止时间，每次分派、完成、阻塞和恢复都会沉淀 `ChannelRunbookCheckEvent` 审计事件，并进入日报摘要和 Markdown/CSV 交接材料，验收率过低或同一错误码高频出现时会按渠道策略阈值派生 Runbook，并沉淀 `ChannelInboundAuditQualityEvent` 复盘事件 |
 | 渠道集成治理 | Runtime connected | `ChannelIntegration` 展示 active/next secret ref、allowed origins、rate limit、签名窗口、replay 开关和轮换提示，不返回密钥值 |
 | 模型客户端 | Optional | 通过 `ANJING_LLM_*` 开启，只在有知识证据时生成；失败自动回退到规则 RAG |
 | API 契约 | Runtime connected | `contracts/api-contract.json` 覆盖 endpoint、request、response 和领域对象字段，并纳入 contract 检查 |
@@ -46,5 +46,5 @@
 
 ## 下一步
 
-1. 为 Runbook 审计事件补充日报摘要和交接提醒。
+1. 梳理最终验收清单和课堂讲解脚本。
 2. 继续扩展更多平台渠道 profile。

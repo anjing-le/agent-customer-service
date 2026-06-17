@@ -34,7 +34,8 @@
 | `ChannelRunbook` | 渠道失败告警与入站验收质量的运营处置步骤，由失败聚合、通知状态、告警策略和按渠道配置的验收质量阈值派生，给出下一步、升级条件、检查项、完成/阻塞摘要和已完成检查记录 | `Dashboard.channelRunbooks` |
 | `ChannelRunbookSummary` | Runbook 检查项处置摘要，统计 total、done、blocked、overdue、todo，用于 Dashboard、日报和控制台展示渠道处置进度与逾期风险 | `ChannelRunbook.checkSummary` |
 | `ChannelRunbookCheck` | Runbook 检查项处置记录，保存 channel、runbook status、check status、step index、action ref、负责人、截止时间、操作者和完成时间，用于把日报交接建议批量分派到具体处置步骤，并支持筛选和 CSV 导出 | `/api/ops/channel-runbook-checks` |
-| `ChannelRunbookCheckEvent` | Runbook 检查项操作审计事件，记录 ASSIGN/COMPLETE/BLOCK/RECOVER、关联检查项、负责人、操作者、备注和时间，用于复盘每一次处置动作 | `/api/ops/channel-runbook-check-events` |
+| `ChannelRunbookCheckEvent` | Runbook 检查项操作审计事件，记录 ASSIGN/COMPLETE/BLOCK/RECOVER、关联检查项、负责人、操作者、备注和时间，用于复盘每一次处置动作，并进入渠道运营日报摘要 | `/api/ops/channel-runbook-check-events` |
+| `ChannelRunbookEventSummary` | Runbook 操作审计摘要，统计 ASSIGN/COMPLETE/BLOCK/RECOVER 次数和最近事件，用于历史日报、Markdown/CSV 导出和交接说明 | `ChannelOpsReport.summary.runbookEvents` |
 | `ChannelRunbookAssigneeLoad` | Runbook 负责人负载摘要，按 assignee 聚合 total、done、blocked、overdue、todo、涉及渠道和最近截止时间，用于 Dashboard、日报 summary、Markdown/CSV 导出和控制台负责人视图 | `Dashboard.runbookAssigneeLoads` |
 | `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、Runbook 处置进度、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
 | `ChannelInboundAuditSummary` | 渠道验收摘要，统计 accepted/rejected、验收率和高频错误码，用于 Dashboard 日报和运营交接 | `ChannelOpsReport.summary.inboundAudit` |

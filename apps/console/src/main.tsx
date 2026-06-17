@@ -520,6 +520,15 @@ type ChannelRunbookAssigneeLoad = {
   channels: string[] | null;
   nextDueAt?: string;
 };
+type ChannelRunbookEventSummary = {
+  total: number;
+  assigned: number;
+  completed: number;
+  blocked: number;
+  recovered: number;
+  actionCounts?: Array<{ action: string; count: number }> | null;
+  latest?: ChannelRunbookCheckEvent[] | null;
+};
 
 type ChannelOpsReportSummary = {
   failureCount: number;
@@ -536,6 +545,7 @@ type ChannelOpsReportSummary = {
     todo: number;
   };
   runbookAssigneeLoads?: ChannelRunbookAssigneeLoad[] | null;
+  runbookEvents?: ChannelRunbookEventSummary | null;
   handoffPriorities?: ChannelOpsHandoffPriority[] | null;
   inboundAudit?: {
     total: number;
@@ -2553,6 +2563,12 @@ function App() {
                       {(report.summary.runbookAssigneeLoads ?? []).length > 0 && (
                         <span>
                           assignee {(report.summary.runbookAssigneeLoads ?? []).slice(0, 3).map((item) => `${item.assignee}:${item.todo}/${item.total}`).join(' / ')}
+                        </span>
+                      )}
+                      {report.summary.runbookEvents && report.summary.runbookEvents.total > 0 && (
+                        <span>
+                          runbook events {report.summary.runbookEvents.total} · assign {report.summary.runbookEvents.assigned} · block {report.summary.runbookEvents.blocked} · recover {report.summary.runbookEvents.recovered}
+                          {(report.summary.runbookEvents.latest ?? []).length > 0 ? ` · ${(report.summary.runbookEvents.latest ?? []).slice(0, 2).map((item) => `${item.action}:${item.assignee || item.actor}`).join(' / ')}` : ''}
                         </span>
                       )}
                       {report.summary.inboundAudit && (
