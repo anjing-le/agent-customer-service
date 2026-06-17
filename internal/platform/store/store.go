@@ -98,6 +98,8 @@ type Runtime interface {
 	AcknowledgeChannelNotification(id, actor, note string) (ChannelNotification, error)
 	CompleteChannelRunbookCheck(check ChannelRunbookCheck) (ChannelRunbookCheck, error)
 	ListChannelRunbookChecks(limit int) ([]ChannelRunbookCheck, error)
+	RecordChannelRunbookCheckEvent(event ChannelRunbookCheckEvent) (ChannelRunbookCheckEvent, error)
+	ListChannelRunbookCheckEvents(limit int) ([]ChannelRunbookCheckEvent, error)
 	ReceiveChannelMessage(message ChannelInboundMessage) (SendMessageResult, error)
 	ListKnowledge() ([]KnowledgeArticle, error)
 	SearchKnowledge(query string) ([]KnowledgeArticle, error)
@@ -136,6 +138,7 @@ type Store struct {
 	alertPolicies   []ChannelAlertPolicy
 	notifications   []ChannelNotification
 	runbookChecks   []ChannelRunbookCheck
+	runbookEvents   []ChannelRunbookCheckEvent
 	channelReports  []ChannelOpsReport
 	reportEvents    []ChannelOpsReportEvent
 	auditEvents     []ChannelInboundAuditQualityEvent
@@ -432,6 +435,7 @@ type Dashboard struct {
 	Notifications    []ChannelNotification             `json:"channelNotifications"`
 	ChannelRunbooks  []ChannelRunbook                  `json:"channelRunbooks"`
 	RunbookLoads     []ChannelRunbookAssigneeLoad      `json:"runbookAssigneeLoads"`
+	RunbookEvents    []ChannelRunbookCheckEvent        `json:"runbookCheckEvents"`
 	PolicyEvents     []NotificationPolicyEvent         `json:"notificationPolicyEvents"`
 	PolicyChanges    []NotificationPolicyChange        `json:"notificationPolicyChanges"`
 	Quality          QualitySummary                    `json:"quality"`
@@ -587,6 +591,24 @@ type ChannelRunbookCheck struct {
 	Actor         string `json:"actor"`
 	Note          string `json:"note,omitempty"`
 	CompletedAt   string `json:"completedAt"`
+}
+
+type ChannelRunbookCheckEvent struct {
+	ID            string `json:"id"`
+	Action        string `json:"action"`
+	Channel       string `json:"channel"`
+	RunbookStatus string `json:"runbookStatus"`
+	CheckStatus   string `json:"checkStatus"`
+	CheckID       string `json:"checkId,omitempty"`
+	Step          string `json:"step"`
+	StepIndex     int    `json:"stepIndex"`
+	ActionRef     string `json:"actionRef,omitempty"`
+	ReportID      string `json:"reportId,omitempty"`
+	Assignee      string `json:"assignee,omitempty"`
+	DueAt         string `json:"dueAt,omitempty"`
+	Actor         string `json:"actor"`
+	Note          string `json:"note,omitempty"`
+	CreatedAt     string `json:"createdAt"`
 }
 
 type QualitySummary struct {
@@ -1146,6 +1168,25 @@ func (s *Store) ListChannelRunbookChecks(limit int) ([]ChannelRunbookCheck, erro
 	return items, nil
 }
 
+func (s *Store) RecordChannelRunbookCheckEvent(event ChannelRunbookCheckEvent) (ChannelRunbookCheckEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	normalizeChannelRunbookCheckEvent(&event)
+	s.runbookEvents = append([]ChannelRunbookCheckEvent{event}, s.runbookEvents...)
+	return event, nil
+}
+
+func (s *Store) ListChannelRunbookCheckEvents(limit int) ([]ChannelRunbookCheckEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	limit = normalizeRunbookCheckEventLimit(limit)
+	items := append([]ChannelRunbookCheckEvent(nil), s.runbookEvents...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
 func (s *Store) ChannelIntegration(channel string) (ChannelIntegration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1496,6 +1537,7 @@ func (s *Store) Dashboard() (Dashboard, error) {
 		Notifications:    append([]ChannelNotification(nil), s.notifications...),
 		ChannelRunbooks:  runbooks,
 		RunbookLoads:     channelRunbookAssigneeLoads(runbooks, time.Now().UTC()),
+		RunbookEvents:    append([]ChannelRunbookCheckEvent(nil), s.runbookEvents...),
 		PolicyEvents:     append([]NotificationPolicyEvent(nil), s.policyEvents...),
 		PolicyChanges:    append([]NotificationPolicyChange(nil), s.policyChanges...),
 		Quality:          quality,
@@ -2591,6 +2633,31 @@ func normalizeChannelRunbookCheck(check *ChannelRunbookCheck) {
 	}
 }
 
+func normalizeChannelRunbookCheckEvent(event *ChannelRunbookCheckEvent) {
+	now := time.Now().UTC()
+	if strings.TrimSpace(event.ID) == "" {
+		event.ID = fmt.Sprintf("channel_runbook_event_%d", now.UnixNano())
+	}
+	event.Action = fallback(strings.ToUpper(strings.TrimSpace(event.Action)), "UPDATE")
+	event.Channel = fallback(strings.TrimSpace(event.Channel), "Unknown")
+	event.RunbookStatus = fallback(strings.ToUpper(strings.TrimSpace(event.RunbookStatus)), "DISPATCH")
+	event.CheckStatus = fallback(strings.ToUpper(strings.TrimSpace(event.CheckStatus)), "TODO")
+	event.CheckID = strings.TrimSpace(event.CheckID)
+	event.Step = fallback(strings.TrimSpace(event.Step), "Runbook step")
+	if event.StepIndex < 0 {
+		event.StepIndex = 0
+	}
+	event.ActionRef = strings.TrimSpace(event.ActionRef)
+	event.ReportID = strings.TrimSpace(event.ReportID)
+	event.Assignee = strings.TrimSpace(event.Assignee)
+	event.DueAt = normalizeOptionalRFC3339(event.DueAt)
+	event.Actor = fallback(strings.TrimSpace(event.Actor), "operator")
+	event.Note = strings.TrimSpace(event.Note)
+	if strings.TrimSpace(event.CreatedAt) == "" {
+		event.CreatedAt = now.Format(time.RFC3339)
+	}
+}
+
 func normalizeOptionalRFC3339(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -2604,6 +2671,16 @@ func normalizeOptionalRFC3339(value string) string {
 }
 
 func normalizeRunbookCheckLimit(limit int) int {
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 200 {
+		return 200
+	}
+	return limit
+}
+
+func normalizeRunbookCheckEventLimit(limit int) int {
 	if limit <= 0 {
 		return 50
 	}

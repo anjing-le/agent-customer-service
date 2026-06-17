@@ -1455,6 +1455,40 @@ func (s *PostgresStore) ListChannelRunbookChecks(limit int) ([]ChannelRunbookChe
 	return checks, nil
 }
 
+func (s *PostgresStore) RecordChannelRunbookCheckEvent(event ChannelRunbookCheckEvent) (ChannelRunbookCheckEvent, error) {
+	normalizeChannelRunbookCheckEvent(&event)
+	createdAt, err := time.Parse(time.RFC3339, event.CreatedAt)
+	if err != nil {
+		createdAt = time.Now().UTC()
+		event.CreatedAt = createdAt.Format(time.RFC3339)
+	}
+	dueAt := nullableTime(event.DueAt, time.Time{})
+	if parsed, err := time.Parse(time.RFC3339, event.DueAt); err == nil {
+		dueAt = nullableTime(event.DueAt, parsed.UTC())
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		insert into channel_runbook_check_events (id, action, channel, runbook_status, check_status, check_id, step, step_index, action_ref, report_id, assignee, due_at, actor, note, created_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+	`, event.ID, event.Action, event.Channel, event.RunbookStatus, event.CheckStatus, event.CheckID, event.Step, event.StepIndex, event.ActionRef, event.ReportID, event.Assignee, dueAt, event.Actor, event.Note, createdAt); err != nil {
+		return ChannelRunbookCheckEvent{}, fmt.Errorf("record channel runbook check event: %w", err)
+	}
+	return event, nil
+}
+
+func (s *PostgresStore) ListChannelRunbookCheckEvents(limit int) ([]ChannelRunbookCheckEvent, error) {
+	rows, err := s.pool.Query(context.Background(), `
+		select id, action, channel, runbook_status, check_status, check_id, step, step_index, action_ref, report_id, assignee, due_at, actor, note, created_at
+		from channel_runbook_check_events
+		order by created_at desc, id desc
+		limit $1
+	`, normalizeRunbookCheckEventLimit(limit))
+	if err != nil {
+		return nil, fmt.Errorf("list channel runbook check events: %w", err)
+	}
+	defer rows.Close()
+	return scanChannelRunbookCheckEvents(rows)
+}
+
 func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err := s.expireNotificationPolicyChanges(); err != nil {
 		return Dashboard{}, err
@@ -1543,6 +1577,10 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 	if err != nil {
 		return Dashboard{}, err
 	}
+	runbookEvents, err := s.ListChannelRunbookCheckEvents(50)
+	if err != nil {
+		return Dashboard{}, err
+	}
 
 	openGaps := 0
 	for _, gap := range gaps {
@@ -1592,6 +1630,7 @@ func (s *PostgresStore) Dashboard() (Dashboard, error) {
 		Notifications:    notifications,
 		ChannelRunbooks:  runbooks,
 		RunbookLoads:     channelRunbookAssigneeLoads(runbooks, time.Now().UTC()),
+		RunbookEvents:    runbookEvents,
 		PolicyEvents:     policyEvents,
 		PolicyChanges:    policyChanges,
 		Quality:          qualitySummary(messages, gaps, transfers, annotations),
@@ -2590,6 +2629,27 @@ func scanChannelOpsReportEvents(rows pgx.Rows) ([]ChannelOpsReportEvent, error) 
 		var createdAt time.Time
 		if err := rows.Scan(&item.ID, &item.Action, &item.Actor, &item.Status, &item.ReportID, &item.Format, &item.Pruned, &item.Note, &item.Error, &createdAt); err != nil {
 			return nil, fmt.Errorf("scan channel ops report event: %w", err)
+		}
+		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func scanChannelRunbookCheckEvents(rows pgx.Rows) ([]ChannelRunbookCheckEvent, error) {
+	items := make([]ChannelRunbookCheckEvent, 0)
+	for rows.Next() {
+		var item ChannelRunbookCheckEvent
+		var createdAt time.Time
+		var dueAt *time.Time
+		if err := rows.Scan(&item.ID, &item.Action, &item.Channel, &item.RunbookStatus, &item.CheckStatus, &item.CheckID, &item.Step, &item.StepIndex, &item.ActionRef, &item.ReportID, &item.Assignee, &dueAt, &item.Actor, &item.Note, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan channel runbook check event: %w", err)
+		}
+		if dueAt != nil {
+			item.DueAt = dueAt.UTC().Format(time.RFC3339)
 		}
 		item.CreatedAt = createdAt.UTC().Format(time.RFC3339)
 		items = append(items, item)

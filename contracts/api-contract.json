@@ -264,6 +264,22 @@
       "response": { "status": 200, "schema": "ChannelRunbookChecksExport" }
     },
     {
+      "id": "listChannelRunbookCheckEvents",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-runbook-check-events",
+      "request": { "query": "ListChannelRunbookCheckEventsQuery" },
+      "response": { "status": 200, "schema": "ChannelRunbookCheckEvent[]" }
+    },
+    {
+      "id": "exportChannelRunbookCheckEvents",
+      "boundary": "ops",
+      "method": "GET",
+      "path": "/api/ops/channel-runbook-check-events/export",
+      "request": { "query": "ListChannelRunbookCheckEventsQuery" },
+      "response": { "status": 200, "schema": "ChannelRunbookCheckEventsExport" }
+    },
+    {
       "id": "assignChannelRunbookChecks",
       "boundary": "ops",
       "method": "POST",
@@ -801,6 +817,18 @@
         "overdue": "boolean"
       }
     },
+    "ListChannelRunbookCheckEventsQuery": {
+      "fields": {
+        "limit": "number",
+        "channel": "string|ALL",
+        "status": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE|ALL",
+        "checkStatus": "TODO|DONE|BLOCKED|ALL",
+        "action": "ASSIGN|COMPLETE|BLOCK|RECOVER|ALL",
+        "actor": "string",
+        "assignee": "string",
+        "actionRef": "string"
+      }
+    },
     "ChannelOpsReportEventsExport": {
       "required": ["content"],
       "fields": {
@@ -809,6 +837,13 @@
       }
     },
     "ChannelRunbookChecksExport": {
+      "required": ["content"],
+      "fields": {
+        "content": "text/csv response body",
+        "contentType": "text/csv"
+      }
+    },
+    "ChannelRunbookCheckEventsExport": {
       "required": ["content"],
       "fields": {
         "content": "text/csv response body",
@@ -1215,7 +1250,7 @@
       }
     },
     "Dashboard": {
-      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelInboundAudits", "channelInboundAuditQualityEvents", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
+      "required": ["metrics", "conversations", "knowledgeGaps", "rules", "transfers", "channelPolicies", "integrations", "channelAlerts", "channelFailureTrends", "channelInboundAudits", "channelInboundAuditQualityEvents", "channelAlertPolicies", "channelNotifications", "channelRunbooks", "runbookCheckEvents", "notificationPolicyEvents", "notificationPolicyChanges", "quality", "annotations", "reviewTasks", "ruleApprovals", "ruleEvents", "ruleObservations"],
       "fields": {
         "metrics": "Metric[]",
         "conversations": "Conversation[]",
@@ -1232,6 +1267,7 @@
         "channelNotifications": "ChannelNotification[]",
         "channelRunbooks": "ChannelRunbook[]",
         "runbookAssigneeLoads": "ChannelRunbookAssigneeLoad[]",
+        "runbookCheckEvents": "ChannelRunbookCheckEvent[]",
         "notificationPolicyEvents": "NotificationPolicyEvent[]",
         "notificationPolicyChanges": "NotificationPolicyChange[]",
         "quality": "QualitySummary",
@@ -1403,6 +1439,26 @@
         "actor": "string",
         "note": "string",
         "completedAt": "RFC3339 string"
+      }
+    },
+    "ChannelRunbookCheckEvent": {
+      "required": ["id", "action", "channel", "runbookStatus", "checkStatus", "step", "stepIndex", "actor", "createdAt"],
+      "fields": {
+        "id": "string",
+        "action": "ASSIGN|COMPLETE|BLOCK|RECOVER",
+        "channel": "string",
+        "runbookStatus": "MONITOR|DISPATCH|RETRY|ESCALATE|ACK|DONE",
+        "checkStatus": "TODO|DONE|BLOCKED",
+        "checkId": "string",
+        "step": "string",
+        "stepIndex": "number",
+        "actionRef": "string",
+        "reportId": "string",
+        "assignee": "string",
+        "dueAt": "RFC3339 string",
+        "actor": "string",
+        "note": "string",
+        "createdAt": "RFC3339 string"
       }
     },
     "NotificationDeliveryAudit": {

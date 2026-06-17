@@ -537,20 +537,74 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 		_, _ = w.Write(report)
 	})
 
+	mux.HandleFunc("/api/ops/channel-runbook-check-events", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		events, err := st.ListChannelRunbookCheckEvents(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		httpjson.OK(w, filterChannelRunbookCheckEvents(
+			events,
+			r.URL.Query().Get("channel"),
+			r.URL.Query().Get("status"),
+			r.URL.Query().Get("checkStatus"),
+			r.URL.Query().Get("action"),
+			r.URL.Query().Get("actor"),
+			r.URL.Query().Get("assignee"),
+			r.URL.Query().Get("actionRef"),
+		))
+	})
+
+	mux.HandleFunc("/api/ops/channel-runbook-check-events/export", func(w http.ResponseWriter, r *http.Request) {
+		if !httpjson.RequireMethod(w, r, http.MethodGet) {
+			return
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 100
+		}
+		events, err := st.ListChannelRunbookCheckEvents(limit)
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
+		report, err := renderChannelRunbookCheckEventsCSV(filterChannelRunbookCheckEvents(
+			events,
+			r.URL.Query().Get("channel"),
+			r.URL.Query().Get("status"),
+			r.URL.Query().Get("checkStatus"),
+			r.URL.Query().Get("action"),
+			r.URL.Query().Get("actor"),
+			r.URL.Query().Get("assignee"),
+			r.URL.Query().Get("actionRef"),
+		))
+		if err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "report_error", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="agent-customer-service-channel-runbook-check-events.csv"`)
+		_, _ = w.Write(report)
+	})
+
 	mux.HandleFunc("/api/ops/channel-runbook-checks/assign", func(w http.ResponseWriter, r *http.Request) {
 		handleAssignChannelRunbookChecks(w, r, st)
 	})
 
 	mux.HandleFunc("/api/ops/channel-runbook-checks/complete", func(w http.ResponseWriter, r *http.Request) {
-		handleChannelRunbookCheckStatus(w, r, st, "DONE", "Runbook check completed")
+		handleChannelRunbookCheckStatus(w, r, st, "DONE", "COMPLETE", "Runbook check completed")
 	})
 
 	mux.HandleFunc("/api/ops/channel-runbook-checks/block", func(w http.ResponseWriter, r *http.Request) {
-		handleChannelRunbookCheckStatus(w, r, st, "BLOCKED", "Runbook check blocked")
+		handleChannelRunbookCheckStatus(w, r, st, "BLOCKED", "BLOCK", "Runbook check blocked")
 	})
 
 	mux.HandleFunc("/api/ops/channel-runbook-checks/recover", func(w http.ResponseWriter, r *http.Request) {
-		handleChannelRunbookCheckStatus(w, r, st, "DONE", "Runbook check recovered")
+		handleChannelRunbookCheckStatus(w, r, st, "DONE", "RECOVER", "Runbook check recovered")
 	})
 
 	mux.HandleFunc("/api/ops/channel-notifications/dispatch", func(w http.ResponseWriter, r *http.Request) {
@@ -761,7 +815,7 @@ func registerRoutes(mux *http.ServeMux, st store.Runtime, scheduler *ReportSched
 	})
 }
 
-func handleChannelRunbookCheckStatus(w http.ResponseWriter, r *http.Request, st store.Runtime, checkStatus string, defaultNote string) {
+func handleChannelRunbookCheckStatus(w http.ResponseWriter, r *http.Request, st store.Runtime, checkStatus string, action string, defaultNote string) {
 	if !httpjson.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -799,6 +853,10 @@ func handleChannelRunbookCheckStatus(w http.ResponseWriter, r *http.Request, st 
 		Note:          fallbackString(req.Note, defaultNote),
 	})
 	if err != nil {
+		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+		return
+	}
+	if _, err := recordChannelRunbookCheckEvent(st, action, check); err != nil {
 		httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 		return
 	}
@@ -876,6 +934,10 @@ func handleAssignChannelRunbookChecks(w http.ResponseWriter, r *http.Request, st
 			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
 			return
 		}
+		if _, err := recordChannelRunbookCheckEvent(st, "ASSIGN", check); err != nil {
+			httpjson.Fail(w, http.StatusInternalServerError, "store_error", err.Error())
+			return
+		}
 		assigned = append(assigned, check)
 	}
 	httpjson.OK(w, struct {
@@ -886,6 +948,24 @@ func handleAssignChannelRunbookChecks(w http.ResponseWriter, r *http.Request, st
 		Assigned: len(assigned),
 		Skipped:  skipped,
 		Checks:   assigned,
+	})
+}
+
+func recordChannelRunbookCheckEvent(st store.Runtime, action string, check store.ChannelRunbookCheck) (store.ChannelRunbookCheckEvent, error) {
+	return st.RecordChannelRunbookCheckEvent(store.ChannelRunbookCheckEvent{
+		Action:        action,
+		Channel:       check.Channel,
+		RunbookStatus: check.RunbookStatus,
+		CheckStatus:   check.CheckStatus,
+		CheckID:       check.ID,
+		Step:          check.Step,
+		StepIndex:     check.StepIndex,
+		ActionRef:     check.ActionRef,
+		ReportID:      check.ReportID,
+		Assignee:      check.Assignee,
+		DueAt:         check.DueAt,
+		Actor:         check.Actor,
+		Note:          check.Note,
 	})
 }
 
@@ -1009,6 +1089,54 @@ func filterChannelRunbookChecks(checks []store.ChannelRunbookCheck, channel stri
 	return filtered
 }
 
+func filterChannelRunbookCheckEvents(events []store.ChannelRunbookCheckEvent, channel string, status string, checkStatus string, action string, actor string, assignee string, actionRef string) []store.ChannelRunbookCheckEvent {
+	channel = strings.ToLower(strings.TrimSpace(channel))
+	status = strings.ToUpper(strings.TrimSpace(status))
+	checkStatus = strings.ToUpper(strings.TrimSpace(checkStatus))
+	action = strings.ToUpper(strings.TrimSpace(action))
+	actor = strings.ToLower(strings.TrimSpace(actor))
+	assignee = strings.ToLower(strings.TrimSpace(assignee))
+	actionRef = strings.ToLower(strings.TrimSpace(actionRef))
+	if channel == "all" {
+		channel = ""
+	}
+	if status == "ALL" {
+		status = ""
+	}
+	if checkStatus == "ALL" {
+		checkStatus = ""
+	}
+	if action == "ALL" {
+		action = ""
+	}
+	filtered := make([]store.ChannelRunbookCheckEvent, 0, len(events))
+	for _, event := range events {
+		if channel != "" && !strings.EqualFold(event.Channel, channel) {
+			continue
+		}
+		if status != "" && !strings.EqualFold(event.RunbookStatus, status) {
+			continue
+		}
+		if checkStatus != "" && !strings.EqualFold(event.CheckStatus, checkStatus) {
+			continue
+		}
+		if action != "" && !strings.EqualFold(event.Action, action) {
+			continue
+		}
+		if actor != "" && !strings.Contains(strings.ToLower(event.Actor), actor) {
+			continue
+		}
+		if assignee != "" && !strings.Contains(strings.ToLower(event.Assignee), assignee) {
+			continue
+		}
+		if actionRef != "" && !strings.Contains(strings.ToLower(event.ActionRef), actionRef) {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	return filtered
+}
+
 func optionalBoolQuery(value string) (bool, bool) {
 	value = strings.ToLower(strings.TrimSpace(value))
 	if value == "" || value == "all" {
@@ -1050,6 +1178,40 @@ func renderChannelRunbookChecksCSV(checks []store.ChannelRunbookCheck) ([]byte, 
 			check.Actor,
 			check.Note,
 			check.CompletedAt,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func renderChannelRunbookCheckEventsCSV(events []store.ChannelRunbookCheckEvent) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"id", "action", "channel", "runbook_status", "check_status", "check_id", "step_index", "step", "action_ref", "report_id", "assignee", "due_at", "actor", "note", "created_at"}); err != nil {
+		return nil, err
+	}
+	for _, event := range events {
+		if err := writer.Write([]string{
+			event.ID,
+			event.Action,
+			event.Channel,
+			event.RunbookStatus,
+			event.CheckStatus,
+			event.CheckID,
+			fmt.Sprintf("%d", event.StepIndex),
+			event.Step,
+			event.ActionRef,
+			event.ReportID,
+			event.Assignee,
+			event.DueAt,
+			event.Actor,
+			event.Note,
+			event.CreatedAt,
 		}); err != nil {
 			return nil, err
 		}

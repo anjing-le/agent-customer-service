@@ -69,7 +69,8 @@
 - 已支持 Runbook 检查项按负责人筛选，控制台和 CSV 导出可直接形成负责人视图。
 - 已支持 Runbook 检查项批量分派，把未完成步骤落成 TODO 记录并绑定负责人、截止时间和操作者。
 - 已支持 Runbook 负责人负载统计，Dashboard、历史日报 summary、Markdown/CSV 导出和控制台会聚合 assignee 的 total/done/blocked/overdue/todo、涉及渠道和最近截止时间。
-- 下一步为 Runbook 分派补审计事件。
+- 已支持 Runbook 检查项操作审计事件，每次 ASSIGN/COMPLETE/BLOCK/RECOVER 都会沉淀 `ChannelRunbookCheckEvent`，并支持控制台查看、按动作/负责人筛选和 CSV 导出。
+- 下一步为 Runbook 审计事件补充日报摘要和交接提醒。
 
 ## V3: 生产化扩展
 

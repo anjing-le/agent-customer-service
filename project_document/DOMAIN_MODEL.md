@@ -34,6 +34,7 @@
 | `ChannelRunbook` | 渠道失败告警与入站验收质量的运营处置步骤，由失败聚合、通知状态、告警策略和按渠道配置的验收质量阈值派生，给出下一步、升级条件、检查项、完成/阻塞摘要和已完成检查记录 | `Dashboard.channelRunbooks` |
 | `ChannelRunbookSummary` | Runbook 检查项处置摘要，统计 total、done、blocked、overdue、todo，用于 Dashboard、日报和控制台展示渠道处置进度与逾期风险 | `ChannelRunbook.checkSummary` |
 | `ChannelRunbookCheck` | Runbook 检查项处置记录，保存 channel、runbook status、check status、step index、action ref、负责人、截止时间、操作者和完成时间，用于把日报交接建议批量分派到具体处置步骤，并支持筛选和 CSV 导出 | `/api/ops/channel-runbook-checks` |
+| `ChannelRunbookCheckEvent` | Runbook 检查项操作审计事件，记录 ASSIGN/COMPLETE/BLOCK/RECOVER、关联检查项、负责人、操作者、备注和时间，用于复盘每一次处置动作 | `/api/ops/channel-runbook-check-events` |
 | `ChannelRunbookAssigneeLoad` | Runbook 负责人负载摘要，按 assignee 聚合 total、done、blocked、overdue、todo、涉及渠道和最近截止时间，用于 Dashboard、日报 summary、Markdown/CSV 导出和控制台负责人视图 | `Dashboard.runbookAssigneeLoads` |
 | `ChannelOpsReport` | 渠道运营日报快照，保存 Markdown/CSV 正文、摘要指标、Runbook 处置进度、渠道范围和生成时间，用于审计、复盘和运营交接 | `/api/ops/channel-ops-reports/*` |
 | `ChannelInboundAuditSummary` | 渠道验收摘要，统计 accepted/rejected、验收率和高频错误码，用于 Dashboard 日报和运营交接 | `ChannelOpsReport.summary.inboundAudit` |
@@ -70,7 +71,7 @@ user message
 | 投诉、催办、法律风险、人工诉求 | 返回转人工话术；创建 `TransferTicket` 和 `CREATED` 事件 |
 | 渠道差异 | 按 `ChannelPolicy` 计算转人工 SLA，并在控制台按渠道筛选会话和工单 |
 | 渠道接入 | adapter 先把真实渠道字段归一为标准 inbound，再读取 `ChannelIntegration` 做来源、限流、HMAC-SHA256 签名、时间窗、enabled、external message id 和 replay 校验 |
-| 渠道观测 | Dashboard 聚合失败类型、小时趋势、按渠道配置的验收质量阈值、通知策略、通知事件、处置 Runbook 和负责人负载；验收质量越线会单独沉淀事件，便于复盘什么时候触发过质量线；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认；日报调度状态单独暴露，补偿动作单独留痕，避免把后台任务状态混进实时 Dashboard |
+| 渠道观测 | Dashboard 聚合失败类型、小时趋势、按渠道配置的验收质量阈值、通知策略、通知事件、处置 Runbook、负责人负载和检查项操作审计；验收质量越线会单独沉淀事件，便于复盘什么时候触发过质量线；通知事件可演示目标解析、secret ref 签名、高风险变更审批/拒绝/撤销/过期、审批人权限、二次确认短语、字段级 diff、通知目标回滚、demo/HTTP delivery client、退避重试、外部回执、死信和运营确认；日报调度状态单独暴露，补偿动作单独留痕，避免把后台任务状态混进实时 Dashboard |
 | 缺口处理 | 可以关闭缺口，也可以由缺口生成 `KnowledgeArticle` |
 | 规则测试 | 不发送真实消息，也能验证转人工、无证据兜底和可回答边界；正式测试只使用 `active` 规则并记录命中 |
 | 规则灰度 | canary 规则不影响正式回复链路，先通过 `RuleComparison` 观察处置变化和人工队列压力 |
@@ -91,7 +92,7 @@ user message
 | `RecordChannelInboundAudit` | 记录渠道请求验收结果，成功和拒绝都可复盘 |
 | `ListChannelInboundAuditQualityEvents` | 查询渠道验收质量越线事件，用于运营复盘和导出 |
 | `AcknowledgeChannelNotification` | 确认渠道通知事件 |
-| `AssignChannelRunbookChecks` / `CompleteChannelRunbookCheck` / `BlockChannelRunbookCheck` / `RecoverChannelRunbookCheck` / `ListChannelRunbookChecks` | 批量分派、确认、阻塞、恢复 Runbook 检查项，并按渠道、Runbook 状态、检查状态、操作者、负责人、action ref 或 overdue 查询处置记录；未完成且 dueAt 已过期的检查项会进入 overdue 汇总和 CSV 导出 |
+| `AssignChannelRunbookChecks` / `CompleteChannelRunbookCheck` / `BlockChannelRunbookCheck` / `RecoverChannelRunbookCheck` / `ListChannelRunbookChecks` / `ListChannelRunbookCheckEvents` | 批量分派、确认、阻塞、恢复 Runbook 检查项，并按渠道、Runbook 状态、检查状态、操作者、负责人、action ref 或 overdue 查询处置记录；每次操作会生成审计事件，支持按动作、操作者、负责人和 action ref 查询或导出；未完成且 dueAt 已过期的检查项会进入 overdue 汇总和 CSV 导出 |
 | `ReceiveChannelMessage` | 接收外部渠道消息并进入统一客服链路 |
 | `ListKnowledge` / `SearchKnowledge` | 知识列表和检索 |
 | `ResolveKnowledgeGap` | 关闭知识缺口 |

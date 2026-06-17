@@ -334,6 +334,36 @@ func TestCompleteChannelRunbookCheckRoute(t *testing.T) {
 	if !strings.Contains(recoverRec.Body.String(), `"checkStatus":"DONE"`) || !strings.Contains(recoverRec.Body.String(), "waiting for channel owner") {
 		t.Fatalf("expected recovered runbook check, got %s", recoverRec.Body.String())
 	}
+
+	eventReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-check-events?action=BLOCK&actor=ops&assignee="+owner, nil)
+	eventRec := httptest.NewRecorder()
+	mux.ServeHTTP(eventRec, eventReq)
+	if eventRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 events, got %d: %s", eventRec.Code, eventRec.Body.String())
+	}
+	for _, expected := range []string{`"action":"BLOCK"`, `"channel":"Marketplace"`, `"checkStatus":"BLOCKED"`, `"checkId":"`, `"assignee":"` + owner + `"`, `"actor":"ops-a"`} {
+		if !strings.Contains(eventRec.Body.String(), expected) {
+			t.Fatalf("expected %s in event list, got %s", expected, eventRec.Body.String())
+		}
+	}
+	if strings.Contains(eventRec.Body.String(), `"action":"COMPLETE"`) || strings.Contains(eventRec.Body.String(), `"action":"RECOVER"`) {
+		t.Fatalf("expected action filter to keep only block events, got %s", eventRec.Body.String())
+	}
+
+	eventExportReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-check-events/export?action=RECOVER", nil)
+	eventExportRec := httptest.NewRecorder()
+	mux.ServeHTTP(eventExportRec, eventExportReq)
+	if eventExportRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 event export, got %d: %s", eventExportRec.Code, eventExportRec.Body.String())
+	}
+	if !strings.Contains(eventExportRec.Header().Get("Content-Type"), "text/csv") {
+		t.Fatalf("expected event csv export, got %s", eventExportRec.Header().Get("Content-Type"))
+	}
+	for _, expected := range []string{"id,action,channel,runbook_status,check_status,check_id,step_index,step,action_ref,report_id,assignee,due_at,actor,note,created_at", "RECOVER,Marketplace,DISPATCH,DONE", owner, "ops-a"} {
+		if !strings.Contains(eventExportRec.Body.String(), expected) {
+			t.Fatalf("expected %s in event export, got %s", expected, eventExportRec.Body.String())
+		}
+	}
 }
 
 func TestAssignChannelRunbookChecksRoute(t *testing.T) {
@@ -397,6 +427,21 @@ func TestAssignChannelRunbookChecksRoute(t *testing.T) {
 	}
 	if !strings.Contains(listRec.Body.String(), `"assignee":"ops-owner"`) || !strings.Contains(listRec.Body.String(), `"checkStatus":"TODO"`) {
 		t.Fatalf("expected assigned todo checks in list, got %s", listRec.Body.String())
+	}
+
+	eventReq := httptest.NewRequest(http.MethodGet, "/api/ops/channel-runbook-check-events?action=ASSIGN&assignee=ops-owner", nil)
+	eventRec := httptest.NewRecorder()
+	mux.ServeHTTP(eventRec, eventReq)
+	if eventRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 assign events, got %d: %s", eventRec.Code, eventRec.Body.String())
+	}
+	for _, expected := range []string{`"action":"ASSIGN"`, `"checkStatus":"TODO"`, `"assignee":"ops-owner"`, `"actor":"ops-lead"`, `"channel":"Marketplace"`} {
+		if !strings.Contains(eventRec.Body.String(), expected) {
+			t.Fatalf("expected %s in assign events, got %s", expected, eventRec.Body.String())
+		}
+	}
+	if strings.Count(eventRec.Body.String(), `"action":"ASSIGN"`) != len(runbook.Steps) {
+		t.Fatalf("expected one assign event per step, got %s", eventRec.Body.String())
 	}
 }
 

@@ -566,12 +566,39 @@ func TestChannelFailureTrendsAndAlertPolicies(t *testing.T) {
 	if len(checks) != 1 || checks[0].ActionRef != "Marketplace:DISPATCH" || checks[0].CheckStatus != "DONE" || checks[0].Assignee == "" || checks[0].DueAt != "2026-06-15T12:00:00Z" {
 		t.Fatalf("expected listed runbook check, got %#v", checks)
 	}
+	event, err := st.RecordChannelRunbookCheckEvent(ChannelRunbookCheckEvent{
+		Action:        "COMPLETE",
+		Channel:       check.Channel,
+		RunbookStatus: check.RunbookStatus,
+		CheckStatus:   check.CheckStatus,
+		CheckID:       check.ID,
+		Step:          check.Step,
+		StepIndex:     check.StepIndex,
+		ActionRef:     check.ActionRef,
+		Assignee:      check.Assignee,
+		DueAt:         check.DueAt,
+		Actor:         check.Actor,
+		Note:          check.Note,
+	})
+	if err != nil {
+		t.Fatalf("record runbook check event: %v", err)
+	}
+	events, err := st.ListChannelRunbookCheckEvents(10)
+	if err != nil {
+		t.Fatalf("list runbook check events: %v", err)
+	}
+	if len(events) != 1 || events[0].ID != event.ID || events[0].Action != "COMPLETE" || events[0].CheckID != check.ID || events[0].Assignee == "" {
+		t.Fatalf("expected listed runbook check event, got %#v", events)
+	}
 	dashboard, err = st.Dashboard()
 	if err != nil {
 		t.Fatalf("dashboard after check: %v", err)
 	}
 	if len(dashboard.ChannelRunbooks[0].Checks) != 1 || dashboard.ChannelRunbooks[0].Checks[0].ActionRef != "Marketplace:DISPATCH" {
 		t.Fatalf("expected runbook check on dashboard, got %#v", dashboard.ChannelRunbooks[0].Checks)
+	}
+	if len(dashboard.RunbookEvents) != 1 || dashboard.RunbookEvents[0].CheckID != check.ID {
+		t.Fatalf("expected runbook check event on dashboard, got %#v", dashboard.RunbookEvents)
 	}
 	if dashboard.ChannelRunbooks[0].CheckSummary.Total != len(dashboard.ChannelRunbooks[0].Steps) ||
 		dashboard.ChannelRunbooks[0].CheckSummary.Done != 1 ||

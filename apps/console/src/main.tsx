@@ -380,6 +380,23 @@ type ChannelRunbookCheck = {
   note?: string;
   completedAt: string;
 };
+type ChannelRunbookCheckEvent = {
+  id: string;
+  action: string;
+  channel: string;
+  runbookStatus: string;
+  checkStatus: string;
+  checkId?: string;
+  step: string;
+  stepIndex: number;
+  actionRef?: string;
+  reportId?: string;
+  assignee?: string;
+  dueAt?: string;
+  actor: string;
+  note?: string;
+  createdAt: string;
+};
 type AssignChannelRunbookChecksResult = {
   assigned: number;
   skipped: number;
@@ -610,6 +627,7 @@ type Dashboard = {
   channelNotifications: ChannelNotification[] | null;
   channelRunbooks: ChannelRunbook[] | null;
   runbookAssigneeLoads?: ChannelRunbookAssigneeLoad[] | null;
+  runbookCheckEvents?: ChannelRunbookCheckEvent[] | null;
   notificationPolicyEvents: NotificationPolicyEvent[] | null;
   notificationPolicyChanges: NotificationPolicyChange[] | null;
   quality: QualitySummary;
@@ -818,6 +836,7 @@ function App() {
   const [reportEvents, setReportEvents] = useState<ChannelOpsReportEvent[]>([]);
   const [auditQualityEvents, setAuditQualityEvents] = useState<ChannelInboundAuditQualityEvent[]>([]);
   const [runbookCheckRows, setRunbookCheckRows] = useState<ChannelRunbookCheck[]>([]);
+  const [runbookCheckEvents, setRunbookCheckEvents] = useState<ChannelRunbookCheckEvent[]>([]);
   const [reportEventStatusFilter, setReportEventStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAILED'>('ALL');
   const [reportEventActorFilter, setReportEventActorFilter] = useState('');
   const [runbookCheckChannelFilter, setRunbookCheckChannelFilter] = useState('ALL');
@@ -825,6 +844,7 @@ function App() {
   const [runbookCheckActorFilter, setRunbookCheckActorFilter] = useState('');
   const [runbookCheckAssigneeFilter, setRunbookCheckAssigneeFilter] = useState('');
   const [runbookCheckOverdueOnly, setRunbookCheckOverdueOnly] = useState(false);
+  const [runbookCheckEventActionFilter, setRunbookCheckEventActionFilter] = useState('ALL');
   const [reportGenerating, setReportGenerating] = useState('');
   const [reportCompensating, setReportCompensating] = useState(false);
   const [channelDemoSending, setChannelDemoSending] = useState('');
@@ -858,8 +878,10 @@ function App() {
   const channelNotifications = dashboard?.channelNotifications ?? [];
   const channelRunbooks = dashboard?.channelRunbooks ?? [];
   const runbookAssigneeLoads = dashboard?.runbookAssigneeLoads ?? [];
-  const runbookCheckChannels = Array.from(new Set([...channelRunbooks.map((item) => item.channel), ...runbookCheckRows.map((item) => item.channel)])).sort();
+  const visibleRunbookCheckEvents = runbookCheckEvents;
+  const runbookCheckChannels = Array.from(new Set([...channelRunbooks.map((item) => item.channel), ...runbookCheckRows.map((item) => item.channel), ...visibleRunbookCheckEvents.map((item) => item.channel)])).sort();
   const runbookCheckStatuses = Array.from(new Set([...channelRunbooks.map((item) => item.status), ...runbookCheckRows.map((item) => item.runbookStatus)])).sort();
+  const runbookCheckEventActions = ['ALL', ...Array.from(new Set(['ASSIGN', 'COMPLETE', 'BLOCK', 'RECOVER', ...visibleRunbookCheckEvents.map((item) => item.action)])).sort()];
   const runbookCheckIsOverdue = (check: ChannelRunbookCheck) => {
     if (!check.dueAt || check.checkStatus === 'DONE') {
       return false;
@@ -1032,6 +1054,44 @@ function App() {
     setRunbookCheckRows(checks);
   };
 
+  const channelRunbookCheckEventQuery = (
+    channel = runbookCheckChannelFilter,
+    status = runbookCheckStatusFilter,
+    action = runbookCheckEventActionFilter,
+    actor = runbookCheckActorFilter,
+    assignee = runbookCheckAssigneeFilter,
+    limit = 20
+  ) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (channel !== 'ALL') {
+      params.set('channel', channel);
+    }
+    if (status !== 'ALL') {
+      params.set('status', status);
+    }
+    if (action !== 'ALL') {
+      params.set('action', action);
+    }
+    if (actor.trim()) {
+      params.set('actor', actor.trim());
+    }
+    if (assignee.trim()) {
+      params.set('assignee', assignee.trim());
+    }
+    return params.toString();
+  };
+
+  const refreshRunbookCheckEvents = async (
+    channel = runbookCheckChannelFilter,
+    status = runbookCheckStatusFilter,
+    action = runbookCheckEventActionFilter,
+    actor = runbookCheckActorFilter,
+    assignee = runbookCheckAssigneeFilter
+  ) => {
+    const events = await api<ChannelRunbookCheckEvent[]>(`/api/ops/channel-runbook-check-events?${channelRunbookCheckEventQuery(channel, status, action, actor, assignee)}`);
+    setRunbookCheckEvents(events);
+  };
+
   const channelInboundAuditQuery = (
     channel = inboundAuditChannelFilter,
     status = inboundAuditStatusFilter,
@@ -1092,7 +1152,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData, auditQualityEventData, runbookCheckData] = await Promise.all([
+      const [dashboardData, knowledgeData, sampleData, reportData, schedulerData, reportEventData, auditQualityEventData, runbookCheckData, runbookCheckEventData] = await Promise.all([
         api<Dashboard>('/api/ops/dashboard'),
         api<KnowledgeArticle[]>('/api/knowledge/articles'),
         api<TrainingSample[]>('/api/ops/training-samples/export?maxScore=80'),
@@ -1100,7 +1160,8 @@ function App() {
         api<ChannelOpsReportScheduler>('/api/ops/channel-ops-report-scheduler'),
         api<ChannelOpsReportEvent[]>(`/api/ops/channel-ops-report-events?${channelOpsEventQuery()}`),
         api<ChannelInboundAuditQualityEvent[]>(`/api/ops/channel-inbound-audit-quality-events?${channelInboundAuditQualityEventQuery()}`),
-        api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery()}`)
+        api<ChannelRunbookCheck[]>(`/api/ops/channel-runbook-checks?${channelRunbookCheckQuery()}`),
+        api<ChannelRunbookCheckEvent[]>(`/api/ops/channel-runbook-check-events?${channelRunbookCheckEventQuery()}`)
       ]);
       setDashboard(dashboardData);
       setKnowledge(knowledgeData ?? []);
@@ -1110,6 +1171,7 @@ function App() {
       setReportEvents(reportEventData ?? []);
       setAuditQualityEvents(auditQualityEventData ?? []);
       setRunbookCheckRows(runbookCheckData ?? []);
+      setRunbookCheckEvents(runbookCheckEventData ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'load failed');
     } finally {
@@ -1707,6 +1769,20 @@ function App() {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `agent-customer-service-channel-runbook-checks-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadChannelRunbookCheckEvents = async () => {
+    const response = await fetch(`/api/ops/channel-runbook-check-events/export?${channelRunbookCheckEventQuery(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckEventActionFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter, 100)}`);
+    if (!response.ok) {
+      throw new Error('download channel runbook check events failed');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `agent-customer-service-channel-runbook-check-events-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -2777,6 +2853,7 @@ function App() {
                   onClick={() => {
                     setRunbookCheckChannelFilter(item);
                     void refreshRunbookChecks(item, runbookCheckStatusFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookCheckEvents(item, runbookCheckStatusFilter, runbookCheckEventActionFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
                   }}
                 >
                   {item}
@@ -2791,6 +2868,7 @@ function App() {
                   onClick={() => {
                     setRunbookCheckStatusFilter(item);
                     void refreshRunbookChecks(runbookCheckChannelFilter, item, runbookCheckActorFilter, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookCheckEvents(runbookCheckChannelFilter, item, runbookCheckEventActionFilter, runbookCheckActorFilter, runbookCheckAssigneeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
                   }}
                 >
                   {item}
@@ -2799,11 +2877,15 @@ function App() {
               <input
                 aria-label="Runbook 检查操作者"
                 value={runbookCheckActorFilter}
-                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
+                onBlur={(event) => {
+                  void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  void refreshRunbookCheckEvents(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckEventActionFilter, event.currentTarget.value, runbookCheckAssigneeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
+                }}
                 onChange={(event) => setRunbookCheckActorFilter(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, event.currentTarget.value, runbookCheckAssigneeFilter, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookCheckEvents(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckEventActionFilter, event.currentTarget.value, runbookCheckAssigneeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
                   }
                 }}
                 placeholder="actor"
@@ -2811,11 +2893,15 @@ function App() {
               <input
                 aria-label="Runbook 检查负责人"
                 value={runbookCheckAssigneeFilter}
-                onBlur={(event) => void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'))}
+                onBlur={(event) => {
+                  void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                  void refreshRunbookCheckEvents(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckEventActionFilter, runbookCheckActorFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
+                }}
                 onChange={(event) => setRunbookCheckAssigneeFilter(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     void refreshRunbookChecks(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckActorFilter, event.currentTarget.value, runbookCheckOverdueOnly).catch((err) => setError(err instanceof Error ? err.message : 'load runbook checks failed'));
+                    void refreshRunbookCheckEvents(runbookCheckChannelFilter, runbookCheckStatusFilter, runbookCheckEventActionFilter, runbookCheckActorFilter, event.currentTarget.value).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
                   }
                 }}
                 placeholder="assignee"
@@ -2839,6 +2925,32 @@ function App() {
                 {runbookCheckRows.slice(0, 8).map((check) => (
                   <span className={runbookCheckIsOverdue(check) ? 'status danger' : 'status'} key={check.id}>
                     {check.channel} · {check.runbookStatus} · {check.checkStatus} · {check.assignee || check.actor} · {check.dueAt ? check.dueAt.slice(5, 16).replace('T', ' ') : check.completedAt.slice(5, 16).replace('T', ' ')}{runbookCheckIsOverdue(check) ? ' · overdue' : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="filterRow">
+              {runbookCheckEventActions.map((item) => (
+                <button
+                  className={runbookCheckEventActionFilter === item ? 'filterButton active' : 'filterButton'}
+                  key={item}
+                  onClick={() => {
+                    setRunbookCheckEventActionFilter(item);
+                    void refreshRunbookCheckEvents(runbookCheckChannelFilter, runbookCheckStatusFilter, item, runbookCheckActorFilter, runbookCheckAssigneeFilter).catch((err) => setError(err instanceof Error ? err.message : 'load runbook check events failed'));
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+              <button className="tinyButton" onClick={() => downloadChannelRunbookCheckEvents().catch((err) => setError(err instanceof Error ? err.message : 'download channel runbook check events failed'))} title="导出 Runbook 审计">
+                <Download size={14} />
+              </button>
+            </div>
+            {visibleRunbookCheckEvents.length > 0 && (
+              <div className="eventStrip">
+                {visibleRunbookCheckEvents.slice(0, 8).map((event) => (
+                  <span className={event.action === 'BLOCK' ? 'status danger' : 'status'} key={event.id}>
+                    {event.action} · {event.channel} · {event.runbookStatus} · {event.assignee || event.actor} · {event.createdAt.slice(5, 16).replace('T', ' ')}
                   </span>
                 ))}
               </div>

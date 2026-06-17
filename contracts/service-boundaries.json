@@ -78,6 +78,8 @@
         { "name": "ackChannelNotification", "path": "/api/ops/channel-notifications/ack", "methods": ["POST"] },
         { "name": "listChannelRunbookChecks", "path": "/api/ops/channel-runbook-checks", "methods": ["GET"] },
         { "name": "exportChannelRunbookChecks", "path": "/api/ops/channel-runbook-checks/export", "methods": ["GET"] },
+        { "name": "listChannelRunbookCheckEvents", "path": "/api/ops/channel-runbook-check-events", "methods": ["GET"] },
+        { "name": "exportChannelRunbookCheckEvents", "path": "/api/ops/channel-runbook-check-events/export", "methods": ["GET"] },
         { "name": "assignChannelRunbookChecks", "path": "/api/ops/channel-runbook-checks/assign", "methods": ["POST"] },
         { "name": "completeChannelRunbookCheck", "path": "/api/ops/channel-runbook-checks/complete", "methods": ["POST"] },
         { "name": "blockChannelRunbookCheck", "path": "/api/ops/channel-runbook-checks/block", "methods": ["POST"] },
