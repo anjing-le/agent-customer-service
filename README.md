@@ -1,19 +1,27 @@
 # agent-customer-service
 
-可靠智能客服教学项目，按安静 DVSkyFolding 脚手架口径重构：Go 后端、React + TypeScript + Vite 前端、PostgreSQL 数据底座、单镜像多 command 交付。
+可靠智能客服教学项目，基于安静 DVSkyFolding 脚手架重构。
 
-项目关注的业务边界是多轮会话、RAG 知识检索、规则兜底、防幻觉、会话管理、历史记录和运营质检。
+它不是从零发明一套工程习惯，而是在脚手架的 Go、React/Vite、PostgreSQL、contracts、scripts 和 quality gate 之上，生长出一个“可靠 Agent 客服”业务样例。
+
+## 业务边界
+
+- 多轮会话、历史记录和客服坐席视图
+- RAG 知识检索、无证据兜底和知识缺口
+- 规则兜底、转人工、人工质检和复盘样本
+- 渠道 inbound 适配、签名、限流、replay 和验收审计
+- 通知、日报、Runbook、负责人负载和操作审计
 
 ## 技术栈
 
 - Frontend: React + TypeScript + Vite
 - Backend: Go + `net/http` / `ServeMux`
-- Database: PostgreSQL + `pgx/v5` + SQL
-- Logging: `log/slog` JSON
+- Database: PostgreSQL + `pgx/v5` + SQL migrations
 - Config: env first
+- Logging: `log/slog` JSON
 - Delivery: one image, multiple Go commands
 
-## 新工程结构
+## 目录
 
 ```text
 apps/console        React 控制台
@@ -22,14 +30,13 @@ cmd/customer-service-api
 cmd/ops-api
 cmd/console-web
 cmd/migrate-db
-internal/platform   配置、HTTP JSON、日志、DB、seed store
+internal/platform   配置、HTTP JSON、DB、seed/PostgreSQL store
 internal/customer   会话与 Agent Runtime API
 internal/knowledge  知识检索 API
-internal/ops        运营看板 API
+internal/ops        运营看板、日报、Runbook API
 infra/postgres      PostgreSQL migrations
+contracts           API、服务边界和渠道协议契约
 ```
-
-早期运行面已退场，当前运行时只保留 DVSkyFolding 口径的 Go、React/Vite 和 PostgreSQL 结构。
 
 ## 快速开始
 
@@ -39,7 +46,7 @@ pnpm build:console
 go run ./cmd/platform-all
 ```
 
-默认端口：后端和静态控制台 `10002`。
+默认地址：`http://localhost:10002`
 
 PostgreSQL 模式：
 
@@ -50,61 +57,34 @@ export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_custo
 go run ./cmd/platform-all
 ```
 
-可选模型生成模式：
+模型客户端默认关闭。开启后也只在命中可信知识证据时参与生成；无证据、高风险或模型失败仍走规则兜底。
 
-```bash
-export ANJING_LLM_API_URL='https://example.com/v1/chat/completions'
-export ANJING_LLM_API_KEY='your-api-key'
-export ANJING_LLM_MODEL='gpt-4o-mini'
-go run ./cmd/platform-all
-```
+## 演示路径
 
-模型客户端默认关闭；开启后也只在命中知识证据时参与回复生成。无证据、高风险或模型不可用时仍走规则兜底。
+推荐按这条链路讲：
 
-渠道 webhook 会读取 `ChannelIntegration`，执行来源白名单、频率限制、签名、时间窗、启用状态、`externalMessageId` 对账和重复提交校验。控制台只展示 active/next secret ref、allowed origins 和 rate limit，不返回密钥值。签名密钥默认使用 demo 值；演示真实渠道时可通过 env 覆盖：
+1. 客服对话：知识命中、无证据兜底、转人工。
+2. 运营视图：知识缺口、质检任务、规则测试、复盘样本。
+3. 渠道接入：adapter 字段归一、签名、来源、限流、replay。
+4. 渠道验收：成功/失败审计、验收质量事件、通知策略。
+5. Runbook 闭环：生成处置步骤、批量分派、阻塞/恢复、负责人负载、操作审计。
+6. 日报交接：生成 Markdown/CSV 日报，查看历史和补偿事件。
 
-```bash
-export ANJING_CHANNEL_WECHAT_SECRET='your-wechat-secret'
-export ANJING_CHANNEL_WECHAT_NEXT_SECRET='your-next-wechat-secret'
-export ANJING_CHANNEL_WECOM_SECRET='your-wecom-secret'
-export ANJING_CHANNEL_WECOM_NEXT_SECRET='your-next-wecom-secret'
-export ANJING_CHANNEL_SIGNATURE_WINDOW_SECONDS=300
-```
-
-真实渠道 adapter 入口会先归一字段，再复用标准 inbound 链路：
-
-- `/api/channels/wechat/inbound`
-- `/api/channels/wecom/inbound`
-- `/api/channels/app/inbound`
-- `/api/channels/marketplace/inbound`
-
-本地服务启动后，可用契约样例演示渠道接入：
-
-```bash
-./scripts/demo-channel-inbound.sh
-```
-
-流式回复：
-
-```bash
-curl -N -X POST http://localhost:10002/api/customer-service/messages/stream \
-  -H "Content-Type: application/json" \
-  -d '{"conversationId":"conv_demo_refund","content":"这个商品能不能开发票？"}'
-```
+详细流程见 [Demo Flow](./project_document/DEMO_FLOW.md)。
 
 ## 校验
 
 ```bash
-./scripts/quality-gate.sh
+pnpm verify
 ```
 
 常用拆分命令：
 
 ```bash
-./scripts/check-agent-regression.sh
-./scripts/check-agent-quality.sh
 go test ./...
 pnpm build:console
+./scripts/check-agent-regression.sh
+./scripts/check-agent-quality.sh
 ```
 
 PostgreSQL 集成测试：
@@ -117,6 +97,9 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 ## 文档
 
 - [项目状态](./project_document/STATUS.md)
+- [脚手架继承](./project_document/SCAFFOLD_INHERITANCE.md)
 - [领域模型](./project_document/DOMAIN_MODEL.md)
 - [服务边界](./project_document/SERVICE_BOUNDARY_GUIDE.md)
+- [API Contract](./project_document/API_CONTRACT_GUIDE.md)
+- [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)
 - [路线图](./project_document/ROADMAP.md)
