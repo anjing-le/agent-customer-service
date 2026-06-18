@@ -10,6 +10,7 @@
 - [SCAFFOLD_INHERITANCE.md](./SCAFFOLD_INHERITANCE.md)：本项目如何从 DVSkyFolding 技术基线生长出来。
 - [DEMO_FLOW.md](./DEMO_FLOW.md)：课堂演示路径，从客服主链路到 Runbook 和日报交接。
 - [FINAL_ACCEPTANCE.md](./FINAL_ACCEPTANCE.md)：最终完成定义、验收命令和课堂讲解脚本。
+- [TEACHING_DELIVERY_CHECKLIST.md](./TEACHING_DELIVERY_CHECKLIST.md)：交付前体检清单，确认仓库、author、远端分支、质量门禁、课堂 smoke 和文档口径一致。
 - [DOMAIN_MODEL.md](./DOMAIN_MODEL.md)：可靠客服 Agent 的领域模型和应用端口。
 - [RAG_RETRIEVAL_GUIDE.md](./RAG_RETRIEVAL_GUIDE.md)：教学版 RAG rerank、evidence score/reason 和生产化替换边界。
 - [PRODUCTION_EXTENSION_GUIDE.md](./PRODUCTION_EXTENSION_GUIDE.md)：剩余 4% 生产化扩展章节，说明向量检索、权限、多租户、成本治理和真实渠道加固如何继续从脚手架生长。
