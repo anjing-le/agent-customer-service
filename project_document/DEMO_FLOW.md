@@ -6,15 +6,17 @@
 
 ```bash
 pnpm install
+pnpm demo:classroom:local
+```
+
+如果需要边讲边操作控制台，再手动启动服务：
+
+```bash
 pnpm build:console
 go run ./cmd/platform-all
 ```
 
-打开 `http://localhost:10002`，然后跑一遍课堂 smoke：
-
-```bash
-pnpm demo:classroom
-```
+打开 `http://localhost:10002`。
 
 ## 1. 先讲脚手架
 

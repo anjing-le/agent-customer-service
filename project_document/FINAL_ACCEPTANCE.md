@@ -25,6 +25,12 @@ pnpm verify
 pnpm demo:classroom
 ```
 
+也可以用一条命令构建 console、临时启动服务、跑 smoke 并自动停掉服务：
+
+```bash
+pnpm demo:classroom:local
+```
+
 可选 PostgreSQL 验收：
 
 ```bash

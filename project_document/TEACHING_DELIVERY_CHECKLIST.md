@@ -102,6 +102,12 @@ http://localhost:10002
 运行课堂 smoke：
 
 ```bash
+pnpm demo:classroom:local
+```
+
+如果服务已经手动启动，也可以只检查当前服务：
+
+```bash
 pnpm demo:classroom
 ```
 

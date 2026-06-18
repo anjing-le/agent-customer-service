@@ -37,7 +37,7 @@ go run ./cmd/platform-all
 课堂 smoke：
 
 ```bash
-pnpm demo:classroom
+pnpm demo:classroom:local
 ```
 
 完整质量门禁：
@@ -79,7 +79,8 @@ scripts             校验、回归和课堂 smoke
 - `./scripts/check-agent-regression.sh`
 - `./scripts/check-agent-quality.sh`
 - `pnpm check:delivery`
-- `pnpm demo:classroom`，需要先启动 `go run ./cmd/platform-all`
+- `pnpm demo:classroom:local`
+- `pnpm demo:classroom`，用于检查已启动的 `go run ./cmd/platform-all`
 
 PostgreSQL 集成测试见 [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)。
 

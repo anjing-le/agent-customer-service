@@ -73,6 +73,7 @@ required_files=(
   "project_document/SCAFFOLD_INHERITANCE.md"
   "project_document/STATUS.md"
   "project_document/TEACHING_DELIVERY_CHECKLIST.md"
+  "scripts/demo-classroom-local.sh"
   "scripts/demo-classroom-smoke.sh"
   "scripts/quality-gate.sh"
 )
@@ -90,6 +91,7 @@ require_grep "PRODUCTION_EXTENSION_GUIDE.md" "project_document/ROADMAP.md"
 require_grep "完成度：约 96%" "project_document/STATUS.md"
 require_grep "\"verify\": \"./scripts/quality-gate.sh\"" "package.json"
 require_grep "\"demo:classroom\": \"./scripts/demo-classroom-smoke.sh\"" "package.json"
+require_grep "\"demo:classroom:local\": \"./scripts/demo-classroom-local.sh\"" "package.json"
 require_grep "\"check:delivery\": \"./scripts/check-teaching-delivery.sh\"" "package.json"
 
 echo "check-teaching-delivery: ok"

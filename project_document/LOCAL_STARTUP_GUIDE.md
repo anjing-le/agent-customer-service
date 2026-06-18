@@ -10,6 +10,12 @@ pnpm build:console
 go run ./cmd/platform-all
 ```
 
+如果只想做课前自动巡检，可以直接运行：
+
+```bash
+pnpm demo:classroom:local
+```
+
 默认端口是 `10002`。打开 `http://localhost:10002` 可访问 React 控制台。
 
 ## PostgreSQL Runtime

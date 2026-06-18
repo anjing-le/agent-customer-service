@@ -24,6 +24,10 @@ required_files=(
   "project_document/SERVICE_BOUNDARY_GUIDE.md"
   "project_document/SCAFFOLD_INHERITANCE.md"
   "project_document/LOCAL_STARTUP_GUIDE.md"
+  "project_document/FINAL_ACCEPTANCE.md"
+  "project_document/TEACHING_DELIVERY_CHECKLIST.md"
+  "scripts/demo-classroom-local.sh"
+  "scripts/check-teaching-delivery.sh"
 )
 
 for file in "${required_files[@]}"; do

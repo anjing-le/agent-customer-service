@@ -19,6 +19,7 @@
     "test:agent-quality": "./scripts/check-agent-quality.sh",
     "check:delivery": "./scripts/check-teaching-delivery.sh",
     "demo:classroom": "./scripts/demo-classroom-smoke.sh",
+    "demo:classroom:local": "./scripts/demo-classroom-local.sh",
     "demo:channels": "./scripts/demo-channel-inbound.sh",
     "verify": "./scripts/quality-gate.sh"
   },
