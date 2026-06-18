@@ -40,7 +40,7 @@
 | 质量评估 | Runtime connected | Dashboard 返回 `QualitySummary`，`testdata/quality_eval_cases.json` 固化质量评估用例并进入 quality gate |
 | 人工质检 | Runtime connected | 支持对助手消息提交人工标注，记录 groundedness/safety/helpfulness 维度并汇总到 Dashboard 质量摘要 |
 | 复盘导出 | Runtime connected | 低分或待复核标注可导出为 `TrainingSample`，控制台展示 prompt/answer/维度评分用于复盘 |
-| 课堂材料 | Runtime workspace | README 已压缩为课堂入口，`DEMO_FLOW.md` 已按讲法/看哪里/证明什么收口，`TEACHING_DELIVERY_CHECKLIST.md` 可做交付前体检，`pnpm demo:classroom` 可做课前 smoke |
+| 课堂材料 | Runtime workspace | README 已压缩为课堂入口，`DEMO_FLOW.md` 已按讲法/看哪里/证明什么收口，`TEACHING_DELIVERY_CHECKLIST.md` 和 `pnpm check:delivery` 可做交付前体检，`pnpm demo:classroom` 可做课前 smoke |
 
 ## 迁移原则
 

@@ -15,6 +15,7 @@
 
 ```bash
 git status --short --branch
+pnpm check:delivery
 pnpm verify
 ```
 

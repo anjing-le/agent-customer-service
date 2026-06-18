@@ -78,6 +78,7 @@ scripts             校验、回归和课堂 smoke
 - `pnpm build:console`
 - `./scripts/check-agent-regression.sh`
 - `./scripts/check-agent-quality.sh`
+- `pnpm check:delivery`
 - `pnpm demo:classroom`，需要先启动 `go run ./cmd/platform-all`
 
 PostgreSQL 集成测试见 [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)。
