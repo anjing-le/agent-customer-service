@@ -2,6 +2,8 @@
 
 这条路径用于课堂演示：底层工程习惯来自 DVSkyFolding，业务只关注可靠 Agent 客服设计。
 
+更短的课堂口播见 [TEACHING_TALK_TRACK.md](./TEACHING_TALK_TRACK.md)。
+
 ## 课前准备
 
 ```bash
@@ -79,4 +81,4 @@ go run ./cmd/platform-all
 pnpm verify
 ```
 
-这一步会跑模板、contracts、渠道样例、Go 测试、Agent 回归、质量评估和前端 build。课堂前再跑 `pnpm demo:classroom`，确认本地服务和演示链路都通。
+这一步会跑模板、contracts、渠道样例、Go 测试、Agent 回归、质量评估和前端 build。课堂前再跑 `pnpm demo:classroom:local`，确认本地服务和演示链路都通。

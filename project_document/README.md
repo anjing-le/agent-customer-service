@@ -9,6 +9,7 @@
 - [SERVICE_BOUNDARY_GUIDE.md](./SERVICE_BOUNDARY_GUIDE.md)：服务/模块边界和未来拆分方向。
 - [SCAFFOLD_INHERITANCE.md](./SCAFFOLD_INHERITANCE.md)：本项目如何从 DVSkyFolding 技术基线生长出来。
 - [DEMO_FLOW.md](./DEMO_FLOW.md)：课堂演示路径，从客服主链路到 Runbook 和日报交接。
+- [TEACHING_TALK_TRACK.md](./TEACHING_TALK_TRACK.md)：课堂、录屏和项目讲解口播稿，压缩开场、转场、证明点和收尾。
 - [FINAL_ACCEPTANCE.md](./FINAL_ACCEPTANCE.md)：最终完成定义、验收命令和课堂讲解脚本。
 - [TEACHING_DELIVERY_CHECKLIST.md](./TEACHING_DELIVERY_CHECKLIST.md)：交付前体检清单，确认仓库、author、远端分支、质量门禁、课堂 smoke 和文档口径一致。
 - [DOMAIN_MODEL.md](./DOMAIN_MODEL.md)：可靠客服 Agent 的领域模型和应用端口。

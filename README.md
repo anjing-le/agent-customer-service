@@ -87,6 +87,7 @@ PostgreSQL 集成测试见 [本地启动](./project_document/LOCAL_STARTUP_GUIDE
 ## 文档
 
 - [演示流程](./project_document/DEMO_FLOW.md)
+- [课堂口播](./project_document/TEACHING_TALK_TRACK.md)
 - [最终验收](./project_document/FINAL_ACCEPTANCE.md)
 - [交付体检](./project_document/TEACHING_DELIVERY_CHECKLIST.md)
 - [脚手架继承](./project_document/SCAFFOLD_INHERITANCE.md)

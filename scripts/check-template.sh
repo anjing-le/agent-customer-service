@@ -26,6 +26,7 @@ required_files=(
   "project_document/LOCAL_STARTUP_GUIDE.md"
   "project_document/FINAL_ACCEPTANCE.md"
   "project_document/TEACHING_DELIVERY_CHECKLIST.md"
+  "project_document/TEACHING_TALK_TRACK.md"
   "scripts/demo-classroom-local.sh"
   "scripts/check-teaching-delivery.sh"
 )

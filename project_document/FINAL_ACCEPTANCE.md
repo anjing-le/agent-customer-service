@@ -41,6 +41,8 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 
 ## 必讲脚本
 
+更短的课堂口播见 [TEACHING_TALK_TRACK.md](./TEACHING_TALK_TRACK.md)。
+
 1. 脚手架继承
    说明项目没有重新发明工程结构，而是沿用 DVSkyFolding 的命令、目录、配置、日志、数据库、契约和质量门禁。
 
@@ -63,6 +65,7 @@ ANJING_INTEGRATION_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_
 
 - [x] 根 README 能在一分钟内讲清项目定位、启动方式和演示路径。
 - [x] `project_document/DEMO_FLOW.md` 能支撑一次完整课堂演示。
+- [x] `project_document/TEACHING_TALK_TRACK.md` 能支撑课堂、录屏和项目讲解的短口播。
 - [x] `project_document/TEACHING_DELIVERY_CHECKLIST.md` 能在交付前确认仓库、author、远端分支、质量门禁、课堂 smoke 和文档口径。
 - [x] 控制台顶部课堂主线能直接串起脚手架基线、客服主链路、RAG/规则、渠道验收、Runbook 和日报交接。
 - [x] 控制台可以完成客服主链路、渠道接入、Runbook 和日报演示。

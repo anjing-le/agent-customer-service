@@ -127,6 +127,7 @@ pnpm demo:classroom
 - `README.md`：一分钟说明项目定位、启动方式、演示路径。
 - `project_document/SCAFFOLD_INHERITANCE.md`：说明它如何继承 DVSkyFolding。
 - `project_document/DEMO_FLOW.md`：说明课堂怎么讲。
+- `project_document/TEACHING_TALK_TRACK.md`：说明课堂和录屏怎么口播。
 - `project_document/FINAL_ACCEPTANCE.md`：说明完成定义和验收命令。
 - `project_document/STATUS.md`：说明当前完成度和剩余边界。
 - `project_document/PRODUCTION_EXTENSION_GUIDE.md`：说明生产化扩展，不把 V3 复杂度压进教学样例。
