@@ -1,8 +1,8 @@
 # agent-customer-service
 
-可靠智能客服教学项目，基于安静 DVSkyFolding 脚手架重构。
+可靠 Agent 客服教学样例，基于安静 DVSkyFolding 脚手架重构。
 
-一句话：脚手架负责工程习惯，业务只讲“可靠 Agent 客服”设计。
+底层工程习惯来自脚手架；业务只讲多轮会话、RAG evidence、无证据兜底、转人工、渠道验收和运营交接。
 
 ## 课堂主线
 
@@ -24,38 +24,34 @@
 
 ## 快速开始
 
-Seed runtime 不依赖数据库，适合课堂演示：
+一条命令做课堂巡检：构建 console、临时启动服务、跑 smoke、自动停服。
 
 ```bash
 pnpm install
+pnpm demo:classroom:local
+```
+
+手动打开控制台：
+
+```bash
 pnpm build:console
 go run ./cmd/platform-all
 ```
 
 默认地址：`http://localhost:10002`
 
-课堂 smoke：
-
-```bash
-pnpm demo:classroom:local
-```
-
-完整质量门禁：
+## 质量检查
 
 ```bash
 pnpm verify
+pnpm check:delivery
 ```
 
-PostgreSQL runtime：
+`pnpm verify` 跑模板、contracts、渠道样例、Go 测试、Agent 回归、质量评估和前端 build。
 
-```bash
-pnpm db:up
-pnpm db:migrate
-export ANJING_DATABASE_URL='postgres://anjing:anjing@localhost:54330/agent_customer_service?sslmode=disable'
-go run ./cmd/platform-all
-```
+`pnpm check:delivery` 检查 Git author、`main/master` 远端同步和教学材料入口。
 
-模型客户端默认关闭。开启后也只在命中可信知识证据时参与生成；无证据、高风险或模型失败仍走规则兜底。
+PostgreSQL、本地数据库和可选集成测试见 [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)。
 
 ## 关键目录
 
@@ -65,29 +61,16 @@ cmd/platform-all    本地一体化启动
 internal/customer   会话与 Agent Runtime API
 internal/knowledge  知识检索 API
 internal/ops        运营看板、日报、Runbook API
-internal/platform   配置、HTTP JSON、DB、seed/PostgreSQL store
+internal/platform   配置、HTTP JSON、DB、store
 infra/postgres      PostgreSQL migrations
 contracts           API、服务边界和渠道协议契约
 scripts             校验、回归和课堂 smoke
 ```
 
-## 常用校验
-
-- `pnpm verify`
-- `go test ./...`
-- `pnpm build:console`
-- `./scripts/check-agent-regression.sh`
-- `./scripts/check-agent-quality.sh`
-- `pnpm check:delivery`
-- `pnpm demo:classroom:local`
-- `pnpm demo:classroom`，用于检查已启动的 `go run ./cmd/platform-all`
-
-PostgreSQL 集成测试见 [本地启动](./project_document/LOCAL_STARTUP_GUIDE.md)。
-
 ## 文档
 
-- [演示流程](./project_document/DEMO_FLOW.md)
 - [课堂口播](./project_document/TEACHING_TALK_TRACK.md)
+- [演示流程](./project_document/DEMO_FLOW.md)
 - [最终验收](./project_document/FINAL_ACCEPTANCE.md)
 - [交付体检](./project_document/TEACHING_DELIVERY_CHECKLIST.md)
 - [脚手架继承](./project_document/SCAFFOLD_INHERITANCE.md)
